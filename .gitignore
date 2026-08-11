@@ -31,3 +31,5 @@ contracts/broadcast/
 # editors
 .idea/
 .vscode/
+
+# pnpm lockfile is committed; see README on why we pin the toolchain
