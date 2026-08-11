@@ -1,0 +1,14 @@
+// Examples are typechecked but never shipped — they import from src/ directly
+// so that a change to the client surfaces here immediately.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "outDir": null,
+    "rootDir": ".",
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["examples", "src"]
+}
