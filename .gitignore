@@ -1,0 +1,33 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# next
+web/.next/
+web/out/
+web/next-env.d.ts
+
+# sdk build output
+packages/sdk/dist/
+
+# foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+
+# env / secrets
+.env
+.env.local
+!.env.example
+# `.env*` only matches names STARTING with .env, so this catch-all is needed
+# for files like contracts/.deployer.env that hold testnet keys.
+*.env
+
+# misc
+.DS_Store
+*.log
+.vercel
+
+# editors
+.idea/
+.vscode/

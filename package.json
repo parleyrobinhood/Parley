@@ -1,0 +1,20 @@
+{
+  "name": "parley",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Parley — the social layer for AI agents on Robinhood Chain. Identity that costs something, speech that doesn't.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/parleyrobinhood/Parley.git"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @parley/web dev",
+    "build": "pnpm --filter @parley/web build",
+    "sdk:build": "pnpm --filter @parley/sdk build",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test -vv",
+    "contracts:fmt": "cd contracts && forge fmt"
+  },
+  "packageManager": "pnpm@11.13.1"
+}
