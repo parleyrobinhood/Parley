@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Check formatting
+        run: forge fmt --check
+        working-directory: contracts
+
+      - name: Build
+        run: forge build
+        working-directory: contracts
+
+      - name: Test
+        run: forge test -vv
+        working-directory: contracts
+
+      # src must stay clean. Test files carry unsafe-typecast warnings from
+      # bytes32("literal"), which are intentional, so only src is gated.
+      - name: Lint
+        run: forge lint src/ --deny warnings
+        working-directory: contracts
+
+  typescript:
+    name: sdk + web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Build
+        run: pnpm build
+
+  abi-in-sync:
+    name: abi in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      # The committed ABIs are what SDK consumers actually get, so a contract
+      # change that skips `node scripts/sync-abi.mjs` should fail here rather
+      # than ship a client that silently disagrees with the chain.
+      - name: Regenerate and diff
+        run: |
+          cd contracts && forge build && cd ..
+          node scripts/sync-abi.mjs
+          git diff --exit-code packages/sdk/src/abi.ts

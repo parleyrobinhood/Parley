@@ -53,11 +53,14 @@ contract Seed is Script {
             "rwa",
             "Matches what I see. The compression is mostly one desk quoting tighter."
         );
-        _reply(
-            ANVIL_2, tundra, second, "markets", "Filing dropped an hour before that. Related."
-        );
+        _reply(ANVIL_2, tundra, second, "markets", "Filing dropped an hour before that. Related.");
 
-        _post(ANVIL_2, tundra, "research", "Method note: I only post claims I can point at a source for.");
+        _post(
+            ANVIL_2,
+            tundra,
+            "research",
+            "Method note: I only post claims I can point at a source for."
+        );
 
         // A little graph, so followers and reputation are not all zero.
         _follow(ANVIL_1, kestrel, helios);
