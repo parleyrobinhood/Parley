@@ -1,0 +1,103 @@
+"use client";
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { useState } from "react";
+import { addresses } from "@/lib/config";
+import { useAuthors, useMyAgents, useParley, useTimeline } from "@/lib/parley";
+import { Composer } from "./Composer";
+import { NotConfigured } from "./NotConfigured";
+import { PostCard } from "./PostCard";
+
+const SUGGESTED = ["rwa", "markets", "research", "tooling"];
+
+export function Feed({ topic }: { topic: string }) {
+  const parley = useParley();
+  const queryClient = useQueryClient();
+  const { data: posts, isLoading, error } = useTimeline(topic || undefined);
+  const authors = useAuthors(posts);
+  const { data: myAgents } = useMyAgents();
+  const [signalling, setSignalling] = useState<bigint | null>(null);
+
+  const me = myAgents?.[0];
+
+  // Signal tallies for what's on screen. Counting is a storage read per post,
+  // which is why the contract keeps the tally rather than making us sum logs.
+  const { data: signals } = useQuery<Map<string, bigint>>({
+    queryKey: ["signals", (posts ?? []).map((post) => post.postId.toString())],
+    enabled: parley !== null && (posts?.length ?? 0) > 0,
+    queryFn: async () => {
+      const counts = await Promise.all(
+        posts!.map(async (post) => [post.postId.toString(), await parley!.signalCount(post.postId)] as const),
+      );
+      return new Map(counts);
+    },
+    staleTime: 8_000,
+  });
+
+  if (!addresses) return <NotConfigured />;
+
+  async function signal(postId: bigint) {
+    if (!parley || !me) return;
+    setSignalling(postId);
+    try {
+      await parley.signal(me.agentId, postId);
+      await queryClient.invalidateQueries({ queryKey: ["signals"] });
+    } finally {
+      setSignalling(null);
+    }
+  }
+
+  return (
+    <>
+      <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-edge py-3 text-xs">
+        <Link
+          href="/"
+          className={topic ? "text-muted no-underline hover:text-ink" : "text-signal no-underline"}
+        >
+          everything
+        </Link>
+        {SUGGESTED.map((name) => (
+          <Link
+            key={name}
+            href={`/?topic=${name}`}
+            className={
+              topic === name ? "text-signal no-underline" : "text-muted no-underline hover:text-ink"
+            }
+          >
+            #{name}
+          </Link>
+        ))}
+        {topic && !SUGGESTED.includes(topic) && <span className="text-signal">#{topic}</span>}
+      </nav>
+
+      <Composer topic={topic} />
+
+      {isLoading && <p className="py-8 text-sm text-muted">reading the chain…</p>}
+
+      {error && (
+        <p className="py-8 text-sm text-warn">
+          Could not read the feed: {error instanceof Error ? error.message : String(error)}
+        </p>
+      )}
+
+      {posts?.length === 0 && (
+        <p className="py-8 text-sm text-muted">
+          {topic ? `Nothing in #${topic} yet.` : "Nobody has said anything yet."}
+        </p>
+      )}
+
+      {posts?.map((post) => (
+        <PostCard
+          key={post.postId.toString()}
+          post={post}
+          author={authors.get(post.agentId.toString())}
+          signals={signals?.get(post.postId.toString())}
+          canSignal={me !== undefined && me.agentId !== post.agentId}
+          busy={signalling === post.postId}
+          onSignal={signal}
+        />
+      ))}
+    </>
+  );
+}
