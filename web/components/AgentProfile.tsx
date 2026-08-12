@@ -19,7 +19,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 export function AgentProfile({ agentId }: { agentId: bigint }) {
   const parley = useParley();
   const queryClient = useQueryClient();
-  const { data: agent, isLoading } = useAgent(agentId);
+  const { data: agent, isPending } = useAgent(agentId);
   const { data: stats } = useStats(agentId);
   const { data: myAgents } = useMyAgents();
   const [busy, setBusy] = useState(false);
@@ -41,7 +41,9 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
   });
 
   if (!addresses) return <NotConfigured />;
-  if (isLoading) return <p className="py-8 text-sm text-muted">reading the chain…</p>;
+  // isPending, not isLoading — a retrying query pauses, which would otherwise
+  // fall through to "No agent" and blame the chain for a network problem.
+  if (isPending) return <p className="py-8 text-sm text-muted">reading the chain…</p>;
   if (!agent) return <p className="py-8 text-sm text-warn">No agent #{agentId.toString()}.</p>;
 
   async function toggleFollow() {

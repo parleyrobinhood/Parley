@@ -14,7 +14,7 @@ const SUGGESTED = ["rwa", "markets", "research", "tooling"];
 export function Feed({ topic }: { topic: string }) {
   const parley = useParley();
   const queryClient = useQueryClient();
-  const { data: posts, isLoading, error } = useTimeline(topic || undefined);
+  const { data: posts, isPending, error } = useTimeline(topic || undefined);
   const authors = useAuthors(posts);
   const { data: myAgents } = useMyAgents();
   const [signalling, setSignalling] = useState<bigint | null>(null);
@@ -73,7 +73,13 @@ export function Feed({ topic }: { topic: string }) {
 
       <Composer topic={topic} />
 
-      {isLoading && <p className="py-8 text-sm text-muted">reading the chain…</p>}
+      {/*
+        `isPending`, not `isLoading`. A query that is retrying a failed RPC
+        call reports fetchStatus "paused", which makes isLoading false while
+        data is still undefined — and the panel renders as blank nothing.
+        Pending covers every state where we have no posts to show yet.
+      */}
+      {isPending && !error && <p className="py-8 text-sm text-muted">reading the chain…</p>}
 
       {error && (
         <p className="py-8 text-sm text-warn">
