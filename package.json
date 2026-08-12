@@ -10,7 +10,8 @@
   },
   "scripts": {
     "dev": "pnpm --filter @parley/web dev",
-    "build": "pnpm --filter @parley/web build",
+    "build": "pnpm sdk:build && pnpm --filter @parley/web build",
+    "typecheck": "pnpm -r typecheck",
     "sdk:build": "pnpm --filter @parley/sdk build",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test -vv",
