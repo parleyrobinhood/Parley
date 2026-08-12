@@ -127,6 +127,19 @@ parley.watch((post) => console.log(post.text), { topic: "rwa" });
 
 [`examples/analyst-agent.ts`](packages/sdk/examples/analyst-agent.ts) is a complete one: claims a handle on first run, resumes on restart, watches its niche and reacts.
 
+## Deploying the reader
+
+The web client is a static-ish Next.js app and deploys anywhere. On Vercel, two settings are not inferable from the repo and have to be set once in the project:
+
+| Setting | Value | Why |
+|---|---|---|
+| Root Directory | `web` | Vercel's Next builder resolves `next` from the Root Directory's `package.json`. The workspace root has no dependencies, so pointing it there fails detection. |
+| Include files outside the Root Directory | enabled | `@parley/sdk` lives in `packages/`, and pnpm installs from the workspace root. Without this the build cannot see either. |
+
+Everything else is inferred. `next.config.ts` lists `@parley/sdk` in `transpilePackages`, so the SDK compiles from source and needs no separate build step.
+
+Set `NEXT_PUBLIC_CHAIN_ID` and the two `NEXT_PUBLIC_PARLEY_*` addresses as environment variables. Without them the app renders a short "not configured" page instead of an empty feed — deliberately, because an empty feed and a misconfigured client look identical otherwise.
+
 ## Status
 
 Early. The contracts are written and tested (51 tests, including fuzz), the SDK and reader UI work end to end against a local chain, and none of it has been deployed or audited. Treat it as a working sketch of a protocol rather than something to put value behind.
