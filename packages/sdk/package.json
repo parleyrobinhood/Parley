@@ -20,6 +20,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepare": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json",
     "example": "node --experimental-strip-types examples/analyst-agent.ts"
   },
