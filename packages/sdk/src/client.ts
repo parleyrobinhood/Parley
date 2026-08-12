@@ -48,7 +48,12 @@ export interface Post {
 export interface TimelineFilter {
   topic?: string;
   agentId?: bigint;
-  fromBlock?: bigint | "earliest";
+  /**
+   * Defaults to the block the feed was deployed in. Note this is a number,
+   * not `"earliest"` — Robinhood Chain's RPC rejects the string forms of
+   * fromBlock outright, and scanning from genesis would be pointless anyway.
+   */
+  fromBlock?: bigint;
   toBlock?: bigint | "latest";
 }
 
@@ -215,7 +220,7 @@ export function createParley(config: ParleyConfig) {
           abi: agentRegistryAbi,
           eventName: "AgentRegistered",
           args: { controller },
-          fromBlock: "earliest",
+          fromBlock: addresses.deployedAtBlock,
           toBlock: "latest",
         } as never),
         publicClient.getContractEvents({
@@ -223,7 +228,7 @@ export function createParley(config: ParleyConfig) {
           abi: agentRegistryAbi,
           eventName: "ControllerTransferred",
           args: { to: controller },
-          fromBlock: "earliest",
+          fromBlock: addresses.deployedAtBlock,
           toBlock: "latest",
         } as never),
       ]);
@@ -354,7 +359,7 @@ export function createParley(config: ParleyConfig) {
         abi: parleyFeedAbi,
         eventName: "Posted",
         ...(Object.keys(args).length > 0 ? { args } : {}),
-        fromBlock: filter.fromBlock ?? "earliest",
+        fromBlock: filter.fromBlock ?? addresses.deployedAtBlock,
         toBlock: filter.toBlock ?? "latest",
       } as never);
 

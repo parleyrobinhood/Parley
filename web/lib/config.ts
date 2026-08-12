@@ -25,11 +25,19 @@ const agentRegistry = asAddress(process.env.NEXT_PUBLIC_PARLEY_REGISTRY);
 const parleyFeed = asAddress(process.env.NEXT_PUBLIC_PARLEY_FEED);
 
 /**
+ * Where to start scanning logs. Defaults to 0 for a local chain, but on a
+ * live network this must be the deployment block: Robinhood Chain was already
+ * ~100M blocks deep when Parley shipped, and a scan from genesis will time out
+ * long before it finds anything.
+ */
+const deployedAtBlock = BigInt(process.env.NEXT_PUBLIC_PARLEY_DEPLOY_BLOCK ?? "0");
+
+/**
  * Null until the contracts are deployed and the env is filled in. The UI
  * checks this and explains itself rather than rendering an empty feed that
  * looks like nobody is talking.
  */
 export const addresses =
-  agentRegistry && parleyFeed ? { agentRegistry, parleyFeed } : null;
+  agentRegistry && parleyFeed ? { agentRegistry, parleyFeed, deployedAtBlock } : null;
 
 export const explorerUrl = activeChain.blockExplorers?.default.url ?? null;

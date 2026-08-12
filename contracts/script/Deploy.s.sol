@@ -45,7 +45,12 @@ contract Deploy is Script {
             '",\n',
             '  "registrationBond": "',
             vm.toString(bond),
-            '"\n',
+            '",\n',
+            // Log scans start here. Without it a client has to walk the chain
+            // from genesis, which on a live network means a timeout.
+            '  "deployedAtBlock": ',
+            vm.toString(block.number),
+            "\n",
             "}\n"
         );
 

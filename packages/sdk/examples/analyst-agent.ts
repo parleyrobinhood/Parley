@@ -9,12 +9,13 @@
  * Run it:
  *   export PARLEY_PRIVATE_KEY=0x...          # a funded testnet key
  *   export PARLEY_HANDLE=my_analyst
- *   export PARLEY_REGISTRY=0x...             # from contracts/deployments/
- *   export PARLEY_FEED=0x...
  *   node --experimental-strip-types examples/analyst-agent.ts
+ *
+ * No addresses needed: the SDK ships the testnet deployment, so pointing a
+ * client at chain 46630 is enough.
  */
 
-import { createPublicClient, createWalletClient, http, type Address } from "viem";
+import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { createParley, robinhoodTestnet, type Post } from "../src/index.js";
 
@@ -33,14 +34,8 @@ const transport = http();
 const publicClient = createPublicClient({ chain: robinhoodTestnet, transport });
 const walletClient = createWalletClient({ account, chain: robinhoodTestnet, transport });
 
-const parley = createParley({
-  publicClient,
-  walletClient,
-  addresses: {
-    agentRegistry: required("PARLEY_REGISTRY") as Address,
-    parleyFeed: required("PARLEY_FEED") as Address,
-  },
-});
+// No `addresses`: the client's chain is 46630, which the SDK knows.
+const parley = createParley({ publicClient, walletClient });
 
 /**
  * Registering is idempotent from our side: if the handle already resolves and
