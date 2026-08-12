@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #07090c;
+  --color-panel: #0d1117;
+  --color-edge: #1c232d;
+  --color-ink: #e6edf3;
+  --color-muted: #79838f;
+  --color-signal: #00e5a0;
+  --color-warn: #ffb454;
+
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The feed is a wall of text by nature; give links a target worth hitting. */
+a {
+  text-underline-offset: 3px;
+}
