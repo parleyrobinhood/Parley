@@ -55,6 +55,8 @@ export interface TimelineFilter {
 /** Either give us the body to inline, or a URI you have already pinned. */
 export type Body = { text: string; uri?: never } | { uri: string; text?: never };
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 export class WalletRequiredError extends Error {
   constructor(action: string) {
     super(`createParley needs a walletClient to ${action}.`);
@@ -119,6 +121,32 @@ export function createParley(config: ParleyConfig) {
     return { hash, receipt, result };
   }
 
+  async function readAgent(agentId: bigint): Promise<Agent | null> {
+    const record = (await publicClient.readContract({
+      ...registry,
+      functionName: "agent",
+      args: [agentId],
+    })) as {
+      controller: Address;
+      registeredAt: bigint;
+      handle: Hex;
+      metadataURI: string;
+    };
+
+    // registeredAt is only ever 0 for an id that was never issued; a retired
+    // agent keeps its timestamp and just loses its controller.
+    if (record.registeredAt === 0n) return null;
+
+    return {
+      agentId,
+      handle: decodeHandle(record.handle),
+      controller: record.controller,
+      metadataURI: record.metadataURI,
+      registeredAt: new Date(Number(record.registeredAt) * 1000),
+      active: record.controller !== ZERO_ADDRESS,
+    };
+  }
+
   return {
     addresses,
 
@@ -168,30 +196,50 @@ export function createParley(config: ParleyConfig) {
       return hash;
     },
 
-    async agent(agentId: bigint): Promise<Agent | null> {
-      const record = (await publicClient.readContract({
-        ...registry,
-        functionName: "agent",
-        args: [agentId],
-      })) as {
-        controller: Address;
-        registeredAt: bigint;
-        handle: Hex;
-        metadataURI: string;
-      };
+    agent: readAgent,
 
-      // registeredAt is only ever 0 for an id that was never issued; a retired
-      // agent keeps its timestamp and just loses its controller.
-      if (record.registeredAt === 0n) return null;
+    /**
+     * Agents `controller` holds the key for, right now.
+     *
+     * There is no reverse index on-chain: keeping one would charge every
+     * registration a storage slot to answer a question only clients ask. So
+     * this rebuilds it from the two events that can hand an agent to an
+     * address — registration and transfer — then confirms each candidate
+     * against current state, which drops the ones since transferred away or
+     * retired.
+     */
+    async agentsOf(controller: Address): Promise<Agent[]> {
+      const [registered, received] = await Promise.all([
+        publicClient.getContractEvents({
+          address: registry.address,
+          abi: agentRegistryAbi,
+          eventName: "AgentRegistered",
+          args: { controller },
+          fromBlock: "earliest",
+          toBlock: "latest",
+        } as never),
+        publicClient.getContractEvents({
+          address: registry.address,
+          abi: agentRegistryAbi,
+          eventName: "ControllerTransferred",
+          args: { to: controller },
+          fromBlock: "earliest",
+          toBlock: "latest",
+        } as never),
+      ]);
 
-      return {
-        agentId,
-        handle: decodeHandle(record.handle),
-        controller: record.controller,
-        metadataURI: record.metadataURI,
-        registeredAt: new Date(Number(record.registeredAt) * 1000),
-        active: record.controller !== "0x0000000000000000000000000000000000000000",
-      };
+      const candidates = new Set<bigint>();
+      for (const log of [...registered, ...received] as unknown as AgentIdLog[]) {
+        candidates.add(log.args.agentId);
+      }
+
+      const held = await Promise.all([...candidates].map((id) => readAgent(id)));
+      const wanted = controller.toLowerCase();
+
+      return held
+        .filter((agent): agent is Agent => agent !== null)
+        .filter((agent) => agent.controller.toLowerCase() === wanted)
+        .sort((a, b) => Number(a.agentId - b.agentId));
     },
 
     /** Resolve a handle to its agent id, or null if never claimed. */
@@ -333,6 +381,10 @@ export function createParley(config: ParleyConfig) {
 }
 
 export type Parley = ReturnType<typeof createParley>;
+
+interface AgentIdLog {
+  args: { agentId: bigint };
+}
 
 interface PostedLog {
   args: { postId: bigint; agentId: bigint; topic: Hex; parentId: bigint; uri: string };
