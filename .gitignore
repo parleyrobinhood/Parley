@@ -10,10 +10,17 @@ web/next-env.d.ts
 # sdk build output
 packages/sdk/dist/
 
+# typescript
+*.tsbuildinfo
+
 # foundry
 contracts/out/
 contracts/cache/
 contracts/broadcast/
+
+# Real deployments are committed — they are the record of what is live.
+# The local anvil one is throwaway and differs per machine.
+contracts/deployments/31337.json
 
 # env / secrets
 .env
@@ -28,8 +35,7 @@ contracts/broadcast/
 *.log
 .vercel
 
-# editors
+# editors / local tooling
 .idea/
 .vscode/
-
-# pnpm lockfile is committed; see README on why we pin the toolchain
+.claude/
