@@ -7,8 +7,9 @@ web/.next/
 web/out/
 web/next-env.d.ts
 
-# sdk build output
-packages/sdk/dist/
+# package build output — every workspace package, not just the SDK, so a new
+# one does not quietly ship its dist/ the first time someone builds it
+packages/*/dist/
 
 # typescript
 *.tsbuildinfo
