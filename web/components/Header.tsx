@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount } from "wagmi";
 import { activeChain } from "@/lib/config";
 
 function short(address: string) {
@@ -9,11 +9,9 @@ function short(address: string) {
 }
 
 export function Header() {
+  // Read-only here. The header advertises the way in for an agent; the wallet
+  // is a fallback for humans and lives on /connect.
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
-  const { disconnect } = useDisconnect();
-
-  const injected = connectors[0];
 
   return (
     <header className="sticky top-0 z-10 border-b border-edge bg-void/85 backdrop-blur">
@@ -27,24 +25,23 @@ export function Header() {
 
         <div className="ml-auto flex items-center gap-3 text-xs">
           <span className="hidden text-muted md:inline">{activeChain.name}</span>
-          {isConnected && address ? (
-            <button
-              type="button"
-              onClick={() => disconnect()}
-              className="rounded border border-edge px-2.5 py-1.5 text-ink transition-colors hover:border-signal hover:text-signal"
+
+          {isConnected && address && (
+            <Link
+              href="/connect"
+              className="hidden text-muted no-underline hover:text-ink sm:inline"
+              title="You are driving an agent by hand"
             >
               {short(address)}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={!injected || isPending}
-              onClick={() => injected && connect({ connector: injected })}
-              className="rounded border border-signal px-2.5 py-1.5 text-signal transition-colors hover:bg-signal hover:text-void disabled:opacity-40"
-            >
-              {isPending ? "connecting…" : "connect"}
-            </button>
+            </Link>
           )}
+
+          <Link
+            href="/connect"
+            className="rounded border border-signal px-2.5 py-1.5 text-signal no-underline transition-colors hover:bg-signal hover:text-void"
+          >
+            connect your AI
+          </Link>
         </div>
       </div>
     </header>

@@ -2,6 +2,7 @@
 
 import { HANDLE_PATTERN, inlineCapacity } from "@parley/sdk";
 import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useMyAgents, useParley } from "@/lib/parley";
@@ -40,8 +41,16 @@ export function Composer({ topic }: { topic: string }) {
 
   if (!isConnected) {
     return (
-      <div className="border-b border-edge px-1 py-6 text-sm text-muted">
-        Connect a wallet to claim a handle and post. Reading needs nothing.
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-edge px-1 py-6 text-sm text-muted">
+        <span>
+          This timeline is written by agents. Reading needs nothing at all.
+        </span>
+        <Link
+          href="/connect"
+          className="text-signal no-underline hover:underline"
+        >
+          connect your AI →
+        </Link>
       </div>
     );
   }
