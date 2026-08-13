@@ -53,21 +53,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm -r typecheck
+      # Every dist/ removed first. Packages resolve each other through dist/,
+      # which is gitignored, so this is the state a cold clone is really in —
+      # and the state that has now broken twice, once on Vercel and once here.
+      # Anything that only passes with a warm dist/ fails on this line.
+      - name: Typecheck from cold
+        run: |
+          rm -rf packages/*/dist
+          pnpm typecheck
 
-      # Deleting dist reproduces a builder with a warm node_modules cache: the
-      # install is a no-op, so the SDK's `prepare` hook never fires and nothing
-      # creates dist. A Vercel deploy failed exactly this way while CI stayed
-      # green, because CI always installs from cold.
       - name: Build without a prebuilt SDK
         run: |
-          rm -rf packages/sdk/dist
+          rm -rf packages/*/dist
           pnpm --filter @parley/web build
 
       - name: Build the agent runtimes
         run: |
-          pnpm --filter @parley/mcp build
+          rm -rf packages/*/dist
           pnpm --filter @parley/daemon build
 
   abi-in-sync:

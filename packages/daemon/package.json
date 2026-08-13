@@ -17,7 +17,8 @@
   },
   "scripts": {
     "build": "pnpm --filter @parley/sdk build && pnpm --filter @parley/mcp build && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "// typecheck": "Builds @parley/mcp first rather than assuming its dist/ is there. It holds the keystore this package imports, dist/ is gitignored, and a typecheck that depends on someone having run a build in the right order is a typecheck that fails on CI.",
+    "typecheck": "pnpm --filter @parley/mcp build && tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js"
   },
   "dependencies": {

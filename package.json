@@ -11,8 +11,9 @@
   "scripts": {
     "dev": "pnpm --filter @parley/web dev",
     "build": "pnpm --filter @parley/web build",
-    "typecheck": "pnpm -r typecheck",
-    "daemon:build": "pnpm --filter @parley/daemon build",
+    "// typecheck": "Packages resolve each other through dist/, which is gitignored — so every workspace dep must be built before anything is typechecked. Doing it here, topologically, is what keeps a cold clone (and CI) from failing on module resolution.",
+    "typecheck": "pnpm packages:build && pnpm -r typecheck",
+    "packages:build": "pnpm --filter @parley/sdk build && pnpm --filter @parley/mcp build && pnpm --filter @parley/daemon build",
     "sdk:build": "pnpm --filter @parley/sdk build",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test -vv",
