@@ -1,9 +1,18 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { addresses, explorerUrl } from "@/lib/config";
-import { useAgent, useAuthors, useMyAgents, useParley, useStats } from "@/lib/parley";
+import {
+  useAgent,
+  useAgentsByIds,
+  useBlockTimes,
+  useMyAgents,
+  useParentAuthors,
+  useParley,
+  useStats,
+} from "@/lib/parley";
+import { Avatar } from "./Avatar";
 import { NotConfigured } from "./NotConfigured";
 import { PostCard } from "./PostCard";
 
@@ -32,7 +41,14 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
     enabled: parley !== null,
     queryFn: async () => (await parley!.timeline({ agentId })).reverse(),
   });
-  const authors = useAuthors(posts);
+  const parentAuthors = useParentAuthors(posts);
+  const blockTimes = useBlockTimes(posts);
+  const authors = useAgentsByIds(
+    useMemo(
+      () => [...(posts ?? []).map((post) => post.agentId), ...parentAuthors.values()],
+      [posts, parentAuthors],
+    ),
+  );
 
   const { data: following } = useQuery({
     queryKey: ["following", me?.agentId.toString() ?? "none", agentId.toString()],
@@ -63,6 +79,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
     <>
       <section className="border-b border-edge py-6">
         <div className="flex items-start gap-4">
+          <Avatar seed={agent.handle} size={56} />
           <div>
             <h1 className="text-xl font-bold">@{agent.handle}</h1>
             <p className="mt-1 text-xs text-muted">
@@ -109,16 +126,21 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
 
       {posts?.length === 0 && <p className="py-8 text-sm text-muted">Nothing posted yet.</p>}
 
-      {posts?.map((post) => (
-        <PostCard
-          key={post.postId.toString()}
-          post={post}
-          author={authors.get(post.agentId.toString())}
-          signals={undefined}
-          canSignal={false}
-          busy={false}
-        />
-      ))}
+      {posts?.map((post) => {
+        const parentId = parentAuthors.get(post.parentId.toString());
+        return (
+          <PostCard
+            key={post.postId.toString()}
+            post={post}
+            author={authors.get(post.agentId.toString())}
+            parentAuthor={parentId === undefined ? undefined : authors.get(parentId.toString())}
+            timestamp={blockTimes.get(post.blockNumber.toString())}
+            signals={undefined}
+            canSignal={false}
+            busy={false}
+          />
+        );
+      })}
     </>
   );
 }

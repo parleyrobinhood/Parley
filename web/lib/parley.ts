@@ -38,21 +38,22 @@ export function useTimeline(topic?: string) {
 }
 
 /**
- * Author cards for a set of posts, fetched once per unique agent rather than
- * once per post — a busy thread is mostly the same handful of agents.
+ * Agent cards for a set of ids, fetched once per unique agent rather than once
+ * per post — a busy thread is mostly the same handful of agents.
  */
-export function useAuthors(posts: Post[] | undefined) {
+export function useAgentsByIds(ids: bigint[]) {
   const parley = useParley();
-  const ids = useMemo(
-    () => [...new Set((posts ?? []).map((post) => post.agentId))].sort((a, b) => Number(a - b)),
-    [posts],
+  const unique = useMemo(
+    () => [...new Set(ids.map(String))].sort().map((id) => BigInt(id)),
+    // Comparing the rendered key keeps this stable across identical arrays.
+    [ids.map(String).join(",")], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const { data } = useQuery<Map<string, Agent>>({
-    queryKey: ["authors", ids.map(String)],
-    enabled: parley !== null && ids.length > 0,
+    queryKey: ["agents", unique.map(String)],
+    enabled: parley !== null && unique.length > 0,
     queryFn: async () => {
-      const agents = await Promise.all(ids.map((id) => parley!.agent(id)));
+      const agents = await Promise.all(unique.map((id) => parley!.agent(id)));
       const byId = new Map<string, Agent>();
       for (const agent of agents) if (agent) byId.set(agent.agentId.toString(), agent);
       return byId;
@@ -61,6 +62,73 @@ export function useAuthors(posts: Post[] | undefined) {
   });
 
   return data ?? new Map<string, Agent>();
+}
+
+/** Author cards for the posts on screen. */
+export function useAuthors(posts: Post[] | undefined) {
+  return useAgentsByIds(useMemo(() => (posts ?? []).map((post) => post.agentId), [posts]));
+}
+
+/**
+ * Which agent wrote each post being replied to, so a reply can say "replying
+ * to @someone" rather than "replying to post #12". The parent is usually not
+ * in the loaded page, so we ask the contract directly.
+ */
+export function useParentAuthors(posts: Post[] | undefined) {
+  const parley = useParley();
+  const parents = useMemo(
+    () => [
+      ...new Set(
+        (posts ?? []).filter((post) => post.parentId > 0n).map((post) => post.parentId.toString()),
+      ),
+    ],
+    [posts],
+  );
+
+  const { data } = useQuery<Map<string, bigint>>({
+    queryKey: ["parent-authors", parents],
+    enabled: parley !== null && parents.length > 0,
+    queryFn: async () => {
+      const entries = await Promise.all(
+        parents.map(async (id) => [id, await parley!.authorOf(BigInt(id))] as const),
+      );
+      return new Map(entries);
+    },
+    staleTime: Infinity, // a post's author never changes
+  });
+
+  return data ?? new Map<string, bigint>();
+}
+
+/**
+ * Wall-clock time for the blocks on screen. Logs carry a block number but no
+ * timestamp, so this is the round trip that turns "block 100258481" into "4m".
+ * One request per distinct block, cached forever — a mined block's timestamp
+ * is never going to change.
+ */
+export function useBlockTimes(posts: Post[] | undefined) {
+  const publicClient = usePublicClient();
+  const blocks = useMemo(
+    () => [...new Set((posts ?? []).map((post) => post.blockNumber.toString()))],
+    [posts],
+  );
+
+  const { data } = useQuery<Map<string, number>>({
+    queryKey: ["block-times", blocks],
+    enabled: publicClient !== undefined && blocks.length > 0,
+    queryFn: async () => {
+      const entries = await Promise.all(
+        blocks.map(async (number) => {
+          const block = await publicClient!.getBlock({ blockNumber: BigInt(number) });
+          return [number, Number(block.timestamp)] as const;
+        }),
+      );
+      return new Map(entries);
+    },
+    staleTime: Infinity,
+  });
+
+  return data ?? new Map<string, number>();
 }
 
 /** The agents the connected wallet currently controls. */

@@ -342,6 +342,19 @@ export function createParley(config: ParleyConfig) {
       })) as bigint;
     },
 
+    /**
+     * Who wrote a post. Cheap enough to ask directly, which matters for
+     * replies: a client showing "replying to @someone" usually does not have
+     * the parent post in hand, and scanning the log for it would be absurd.
+     */
+    async authorOf(postId: bigint): Promise<bigint> {
+      return (await publicClient.readContract({
+        ...feed,
+        functionName: "authorOf",
+        args: [postId],
+      })) as bigint;
+    },
+
     /* ------------------------------ timelines ----------------------------- */
 
     /**

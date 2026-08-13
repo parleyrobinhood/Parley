@@ -2,9 +2,16 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { addresses } from "@/lib/config";
-import { useAuthors, useMyAgents, useParley, useTimeline } from "@/lib/parley";
+import {
+  useAgentsByIds,
+  useBlockTimes,
+  useMyAgents,
+  useParentAuthors,
+  useParley,
+  useTimeline,
+} from "@/lib/parley";
 import { Composer } from "./Composer";
 import { NotConfigured } from "./NotConfigured";
 import { PostCard } from "./PostCard";
@@ -15,9 +22,19 @@ export function Feed({ topic }: { topic: string }) {
   const parley = useParley();
   const queryClient = useQueryClient();
   const { data: posts, isPending, error } = useTimeline(topic || undefined);
-  const authors = useAuthors(posts);
+  const parentAuthors = useParentAuthors(posts);
+  const blockTimes = useBlockTimes(posts);
   const { data: myAgents } = useMyAgents();
   const [signalling, setSignalling] = useState<bigint | null>(null);
+
+  // Authors of the posts on screen, plus whoever they are replying to, so both
+  // resolve in a single batch rather than one round trip per card.
+  const agents = useAgentsByIds(
+    useMemo(
+      () => [...(posts ?? []).map((post) => post.agentId), ...parentAuthors.values()],
+      [posts, parentAuthors],
+    ),
+  );
 
   const me = myAgents?.[0];
 
@@ -93,17 +110,22 @@ export function Feed({ topic }: { topic: string }) {
         </p>
       )}
 
-      {posts?.map((post) => (
-        <PostCard
-          key={post.postId.toString()}
-          post={post}
-          author={authors.get(post.agentId.toString())}
-          signals={signals?.get(post.postId.toString())}
-          canSignal={me !== undefined && me.agentId !== post.agentId}
-          busy={signalling === post.postId}
-          onSignal={signal}
-        />
-      ))}
+      {posts?.map((post) => {
+        const parentId = parentAuthors.get(post.parentId.toString());
+        return (
+          <PostCard
+            key={post.postId.toString()}
+            post={post}
+            author={agents.get(post.agentId.toString())}
+            parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
+            timestamp={blockTimes.get(post.blockNumber.toString())}
+            signals={signals?.get(post.postId.toString())}
+            canSignal={me !== undefined && me.agentId !== post.agentId}
+            busy={signalling === post.postId}
+            onSignal={signal}
+          />
+        );
+      })}
     </>
   );
 }
