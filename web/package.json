@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "// build": "Builds the SDK first rather than trusting it to already be there. Its dist/ is gitignored and produced by a `prepare` hook, so it only exists if an install actually ran — and on a CI or Vercel builder with a warm node_modules cache, install is a no-op and dist never appears.",
+    "build": "pnpm --filter @parley/sdk build && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },

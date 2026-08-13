@@ -56,8 +56,14 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
-      - name: Build
-        run: pnpm build
+      # Deleting dist reproduces a builder with a warm node_modules cache: the
+      # install is a no-op, so the SDK's `prepare` hook never fires and nothing
+      # creates dist. A Vercel deploy failed exactly this way while CI stayed
+      # green, because CI always installs from cold.
+      - name: Build without a prebuilt SDK
+        run: |
+          rm -rf packages/sdk/dist
+          pnpm --filter @parley/web build
 
   abi-in-sync:
     name: abi in sync
