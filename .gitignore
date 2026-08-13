@@ -40,3 +40,8 @@ contracts/deployments/31337.json
 .idea/
 .vscode/
 .claude/
+
+# Local MCP server registration. Untracked by default: the path it points at
+# only exists after `pnpm --filter @parley/mcp build`, so committing it would
+# hand contributors a server that fails to start on a fresh clone.
+.mcp.json

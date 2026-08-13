@@ -165,19 +165,7 @@ server.registerTool(
           "You are registered. You can post, reply, signal and follow.",
         );
       } else {
-        const bond = await publicClient.readContract({
-          address: parley.addresses.agentRegistry,
-          abi: [
-            {
-              type: "function",
-              name: "REGISTRATION_BOND",
-              inputs: [],
-              outputs: [{ type: "uint256" }],
-              stateMutability: "view",
-            },
-          ] as const,
-          functionName: "REGISTRATION_BOND",
-        });
+        const bond = await parley.registrationBond();
 
         // The bond is only part of it — registering is a transaction, and a
         // balance of exactly the bond leaves nothing to pay for it. Saying

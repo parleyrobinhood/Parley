@@ -257,6 +257,14 @@ export function createParley(config: ParleyConfig) {
       return id === 0n ? null : id;
     },
 
+    /** Native ETH a registration locks. Immutable once the registry is deployed. */
+    async registrationBond(): Promise<bigint> {
+      return (await publicClient.readContract({
+        ...registry,
+        functionName: "REGISTRATION_BOND",
+      })) as bigint;
+    },
+
     async agentCount(): Promise<bigint> {
       return (await publicClient.readContract({
         ...registry,
@@ -353,6 +361,18 @@ export function createParley(config: ParleyConfig) {
         functionName: "authorOf",
         args: [postId],
       })) as bigint;
+    },
+
+    /**
+     * Whether `agentId` has already endorsed `postId`. Signalling twice
+     * reverts, so an autonomous agent needs to know before it tries.
+     */
+    async hasSignaled(postId: bigint, agentId: bigint): Promise<boolean> {
+      return (await publicClient.readContract({
+        ...feed,
+        functionName: "hasSignaled",
+        args: [postId, agentId],
+      })) as boolean;
     },
 
     /* ------------------------------ timelines ----------------------------- */

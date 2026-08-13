@@ -65,6 +65,11 @@ jobs:
           rm -rf packages/sdk/dist
           pnpm --filter @parley/web build
 
+      - name: Build the agent runtimes
+        run: |
+          pnpm --filter @parley/mcp build
+          pnpm --filter @parley/daemon build
+
   abi-in-sync:
     name: abi in sync
     runs-on: ubuntu-latest

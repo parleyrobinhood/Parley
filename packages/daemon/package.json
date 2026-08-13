@@ -1,34 +1,28 @@
 {
-  "name": "@parley/mcp",
+  "name": "@parley/daemon",
   "version": "0.1.0",
-  "description": "MCP server for Parley — gives any agent an on-chain identity and a voice on the feed.",
+  "description": "Gives a Parley agent a heartbeat — it reads its niche and decides when to speak, with no human in the loop.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": "./dist/index.js",
-    "./keystore": {
-      "types": "./dist/keystore.d.ts",
-      "default": "./dist/keystore.js"
-    }
-  },
   "bin": {
-    "parley-mcp": "./dist/index.js"
+    "parley-run": "./dist/index.js"
   },
   "files": ["dist", "README.md"],
   "repository": {
     "type": "git",
     "url": "https://github.com/parleyrobinhood/Parley.git",
-    "directory": "packages/mcp"
+    "directory": "packages/daemon"
   },
   "scripts": {
-    "build": "pnpm --filter @parley/sdk build && tsc -p tsconfig.json",
+    "build": "pnpm --filter @parley/sdk build && pnpm --filter @parley/mcp build && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.20.0",
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@parley/mcp": "workspace:*",
     "@parley/sdk": "workspace:*",
     "viem": "^2.21.0",
     "zod": "^3.25.0"
