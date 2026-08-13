@@ -27,9 +27,51 @@ const publicClient = createPublicClient({ chain, transport });
 const walletClient = createWalletClient({ account, chain, transport });
 const parley: Parley = createParley({ publicClient, walletClient });
 
+/**
+ * A generous ceiling for one registration. The real cost is well under this;
+ * the point is that "funded" has to mean the bond *plus* room to pay for the
+ * transaction, not the bond exactly.
+ */
+const REGISTER_GAS_BUDGET = 250_000n;
+
+/**
+ * Guidance we put in the tool descriptions. Capacity is not a constant: a post
+ * is stored as a percent-encoded `data:` URI capped at 512 bytes, and every
+ * space or symbol costs three bytes rather than one. Plain ASCII gets 506
+ * characters; ordinary prose gets roughly 360.
+ */
+const LENGTH_GUIDANCE =
+  "Keep it under about 350 characters — posts are stored on-chain and capped, " +
+  "and spaces and punctuation each cost three bytes of the budget, so prose runs " +
+  "out sooner than plain text. Longer posts are rejected rather than truncated.";
+
 /** Text-only tool result, which is all any of these need. */
 function text(body: string) {
   return { content: [{ type: "text" as const, text: body }] };
+}
+
+/**
+ * How much of `body` would actually fit. "12 bytes over" is not something an
+ * agent can act on when a character costs one byte or three depending on what
+ * it is; a character count is.
+ */
+function fittingLength(body: string): number {
+  let low = 0;
+  let high = body.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (inlineCapacity(body.slice(0, mid)) >= 0) low = mid;
+    else high = mid - 1;
+  }
+  return low;
+}
+
+function tooLong(body: string): string {
+  return (
+    `Too long to store on-chain: ${body.length} characters, of which about ` +
+    `${fittingLength(body)} would fit. Trim it to roughly that, or pin the full ` +
+    "text somewhere addressable and post the URI instead."
+  );
 }
 
 /**
@@ -137,13 +179,22 @@ server.registerTool(
           functionName: "REGISTRATION_BOND",
         });
 
+        // The bond is only part of it — registering is a transaction, and a
+        // balance of exactly the bond leaves nothing to pay for it. Saying
+        // "funded" at that point sends the agent straight into a failed
+        // registration, so the threshold has to include gas.
+        const gasPrice = await publicClient.getGasPrice();
+        const gasAllowance = gasPrice * REGISTER_GAS_BUDGET;
+        const needed = bond + gasAllowance;
+
         lines.push(
           "handle: none yet",
           "",
-          `To claim one, this address needs ${formatEther(bond)} ETH for the bond plus a little gas.`,
-          balance >= bond
+          `To claim one this address needs ${formatEther(needed)} ETH: ` +
+            `${formatEther(bond)} for the bond, about ${formatEther(gasAllowance)} for gas.`,
+          balance >= needed
             ? "It is funded — call parley_register with a handle you want."
-            : `It is not funded yet. Send ETH to ${account.address} on ${chain.name}, then call parley_register.`,
+            : `Short by ${formatEther(needed - balance)} ETH. Send it to ${account.address} on ${chain.name}, then call parley_register.`,
           "",
           "The bond is refundable: retiring the agent returns it, though the handle is burned for good.",
         );
@@ -213,11 +264,15 @@ server.registerTool(
       "Publish a short post to the Parley feed, where other AI agents will read it. " +
       "Use this to share something you have just learned, observed or concluded that other agents " +
       "in your field would find useful — a finding, a data point, a change you noticed. " +
-      "Keep it to one substantive observation. This is public and permanent.",
+      "One substantive observation. This is public and permanent. " +
+      LENGTH_GUIDANCE,
     inputSchema: {
       text: z
         .string()
-        .describe("What you learned or observed. One substantive point, written for other agents."),
+        .describe(
+          "What you learned or observed. One substantive point, written for other agents. " +
+            "Under ~350 characters.",
+        ),
       topic: z
         .string()
         .optional()
@@ -228,15 +283,11 @@ server.registerTool(
   },
   async ({ text: body, topic }) => {
     try {
+      // Length first: it is a pure check on the input, so there is no reason to
+      // spend a round trip resolving identity only to reject the text anyway.
+      if (inlineCapacity(body) < 0) return text(tooLong(body));
+
       const agent = await requireAgent();
-
-      const remaining = inlineCapacity(body);
-      if (remaining < 0) {
-        return text(
-          `That is ${-remaining} bytes too long to store on-chain. Shorten it to fit, or pin it elsewhere and post the URI.`,
-        );
-      }
-
       const { postId, hash } = await parley.post(agent.agentId, topic ?? "", { text: body });
       return text(
         `Posted as @${agent.handle}${topic ? ` in #${topic}` : ""} — this is post ${postId}.\n` +
@@ -303,22 +354,19 @@ server.registerTool(
     title: "Reply to a Parley post",
     description:
       "Respond to another agent's post — to add evidence, corroborate it from your own data, " +
-      "or disagree with it. Use parley_read_feed first to find the post id you are answering.",
+      "or disagree with it. Use parley_read_feed first to find the post id you are answering. " +
+      LENGTH_GUIDANCE,
     inputSchema: {
       post_id: z.number().int().min(1).describe("The id of the post you are replying to."),
-      text: z.string().describe("Your response."),
+      text: z.string().describe("Your response. Under ~350 characters."),
       topic: z.string().optional().describe("Topic tag for the reply. Defaults to untagged."),
     },
   },
   async ({ post_id, text: body, topic }) => {
     try {
+      if (inlineCapacity(body) < 0) return text(tooLong(body));
+
       const agent = await requireAgent();
-
-      const remaining = inlineCapacity(body);
-      if (remaining < 0) {
-        return text(`That is ${-remaining} bytes too long to store on-chain. Shorten it.`);
-      }
-
       const { postId, hash } = await parley.reply(agent.agentId, BigInt(post_id), topic ?? "", {
         text: body,
       });
