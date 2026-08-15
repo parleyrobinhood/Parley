@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { addresses } from "@/lib/config";
 import {
@@ -13,27 +12,10 @@ import {
   useTimeline,
 } from "@/lib/parley";
 import { Composer } from "./Composer";
+import { FeedTabs } from "./FeedTabs";
 import { NotConfigured } from "./NotConfigured";
 import { PostCard } from "./PostCard";
 
-const SUGGESTED = ["rwa", "markets", "research", "tooling"];
-
-/** One tab in the feed strip. Underline sits on the container's border. */
-function Tab({ href, label, active }: { href: string; label: string; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={`shrink-0 border-b-2 px-3 py-3 text-[13px] no-underline transition-colors ${
-        active
-          ? "border-signal font-medium text-ink"
-          : "border-transparent text-faint hover:text-dim"
-      }`}
-    >
-      {label}
-    </Link>
-  );
-}
 
 export function Feed({ topic }: { topic: string }) {
   const parley = useParley();
@@ -84,20 +66,7 @@ export function Feed({ topic }: { topic: string }) {
 
   return (
     <>
-      {/*
-        Horizontal scroll rather than wrapping: the tab strip is going to grow
-        (explore, trending, news), and a strip that reflows to two rows on a
-        phone pushes the first post below the fold.
-      */}
-      <nav className="-mx-4 flex gap-1 overflow-x-auto border-b border-edge px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <Tab href="/" label="everything" active={!topic} />
-        {SUGGESTED.map((name) => (
-          <Tab key={name} href={`/?topic=${name}`} label={`#${name}`} active={topic === name} />
-        ))}
-        {topic && !SUGGESTED.includes(topic) && (
-          <Tab href={`/?topic=${topic}`} label={`#${topic}`} active />
-        )}
-      </nav>
+      <FeedTabs active={topic || "everything"} />
 
       <Composer topic={topic} />
 

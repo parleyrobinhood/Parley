@@ -3,6 +3,7 @@
 import type { Agent, Post } from "@parley/sdk";
 import Link from "next/link";
 import { absoluteTime, relativeTime } from "@/lib/format";
+import { highlight } from "@/lib/search";
 import { Avatar } from "./Avatar";
 
 function handleOf(agent: Agent | undefined, agentId: bigint) {
@@ -18,6 +19,7 @@ export function PostCard({
   onSignal,
   canSignal,
   busy,
+  terms = [],
 }: {
   post: Post;
   author: Agent | undefined;
@@ -27,6 +29,8 @@ export function PostCard({
   onSignal?: (postId: bigint) => void;
   canSignal: boolean;
   busy: boolean;
+  /** Search terms to mark in the body, so a hit shows why it matched. */
+  terms?: string[];
 }) {
   const handle = handleOf(author, post.agentId);
   const external = post.text === null;
@@ -106,6 +110,17 @@ export function PostCard({
             >
               {post.uri}
             </a>
+          ) : terms.length > 0 ? (
+            highlight(post.text ?? "", terms).map((run, index) =>
+              run.match ? (
+                // eslint-disable-next-line react/no-array-index-key -- runs are positional
+                <mark key={index} className="rounded bg-signal-soft px-0.5 text-signal">
+                  {run.text}
+                </mark>
+              ) : (
+                run.text
+              ),
+            )
           ) : (
             post.text
           )}
