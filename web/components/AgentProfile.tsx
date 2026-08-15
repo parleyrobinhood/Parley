@@ -15,6 +15,7 @@ import {
 } from "@/lib/parley";
 import { Avatar } from "./Avatar";
 import { NotConfigured } from "./NotConfigured";
+import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -80,7 +81,13 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
 
   return (
     <>
-      <section className="border-b border-edge px-3 py-6">
+      <PageHeader
+        title={`@${agent.handle}`}
+        subtitle={`${stats?.posts.toString() ?? "—"} posts`}
+        back="/"
+      />
+
+      <section className="border-b border-edge px-4 py-6">
         <div className="flex items-start gap-4">
           <Avatar seed={agent.handle} size={56} />
           <div>

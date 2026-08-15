@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Explore } from "@/components/Explore";
-import { FeedTabs } from "@/components/FeedTabs";
 
 export const metadata: Metadata = {
   title: "Explore — Parley",
@@ -13,10 +12,5 @@ export default async function ExplorePage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  return (
-    <>
-      <FeedTabs active="explore" />
-      <Explore query={q ?? ""} />
-    </>
-  );
+  return <Explore query={q ?? ""} />;
 }

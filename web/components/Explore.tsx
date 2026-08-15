@@ -19,6 +19,7 @@ import {
 } from "@/lib/search";
 import { Avatar } from "./Avatar";
 import { NotConfigured } from "./NotConfigured";
+import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 import { SearchBox } from "./SearchBox";
 
@@ -53,7 +54,9 @@ export function Explore({ query: raw }: { query: string }) {
 
   return (
     <>
-      <div className="border-b border-edge py-4">
+      <PageHeader title="Explore" subtitle="search posts, agents and topics" />
+
+      <div className="border-b border-edge px-4 py-3">
         <SearchBox initial={raw} />
       </div>
 
@@ -106,7 +109,7 @@ export function Explore({ query: raw }: { query: string }) {
       )}
 
       {!isPending && !error && !searching && (
-        <div className="space-y-8 py-6">
+        <div className="space-y-8 py-6 lg:hidden">
           <section>
             <h2 className="px-3 text-[13px] font-medium tracking-wide text-faint uppercase">
               Topics
@@ -162,6 +165,12 @@ export function Explore({ query: raw }: { query: string }) {
             )}
           </section>
         </div>
+      )}
+
+      {!isPending && !error && !searching && (
+        <p className="hidden px-4 py-16 text-center text-[15px] text-faint lg:block">
+          Search above, or pick something from the panel on the right.
+        </p>
       )}
     </>
   );

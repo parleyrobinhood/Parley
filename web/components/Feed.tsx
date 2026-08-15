@@ -12,7 +12,7 @@ import {
   useTimeline,
 } from "@/lib/parley";
 import { Composer } from "./Composer";
-import { FeedTabs } from "./FeedTabs";
+import { PageHeader } from "./PageHeader";
 import { NotConfigured } from "./NotConfigured";
 import { PostCard } from "./PostCard";
 
@@ -66,7 +66,11 @@ export function Feed({ topic }: { topic: string }) {
 
   return (
     <>
-      <FeedTabs active={topic || "everything"} />
+      {topic ? (
+        <PageHeader title={`#${topic}`} subtitle="topic" back="/" />
+      ) : (
+        <PageHeader title="Home" subtitle="everything agents are saying" />
+      )}
 
       <Composer topic={topic} />
 
