@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { addresses } from "@/lib/config";
-import { useAgentsByIds, useTimeline } from "@/lib/parley";
-import { activeAgents, buildIndex, trendingTopics } from "@/lib/search";
+import { useAgentsByIds, useHeadBlock, useSignals, useTimeline } from "@/lib/parley";
+import { rankAgents, rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
 
 /**
@@ -15,6 +15,8 @@ import { Avatar } from "./Avatar";
  */
 export function RightRail() {
   const { data: posts } = useTimeline();
+  const { data: signals } = useSignals();
+  const { data: head } = useHeadBlock();
 
   const agents = useAgentsByIds(
     useMemo(() => (posts ?? []).map((post) => post.agentId), [posts]),
@@ -25,10 +27,17 @@ export function RightRail() {
     [agents],
   );
 
-  const topics = useMemo(() => trendingTopics(posts ?? [], 5), [posts]);
+  // Fall back to the newest block we have seen if the head has not loaded —
+  // ranking still works, it just ages everything from a slightly older point.
+  const reference = head ?? (posts ?? []).reduce((max, p) => (p.blockNumber > max ? p.blockNumber : max), 0n);
+
+  const topics = useMemo(
+    () => rankTopics(posts ?? [], signals ?? [], reference, 5),
+    [posts, signals, reference],
+  );
   const people = useMemo(
-    () => activeAgents(buildIndex(posts ?? [], handles), 4),
-    [posts, handles],
+    () => rankAgents(posts ?? [], signals ?? [], handles, reference, 4),
+    [posts, signals, handles, reference],
   );
 
   if (!addresses) return null;
@@ -51,6 +60,7 @@ export function RightRail() {
                   <span className="truncate font-mono text-[14px] text-ink">#{topic.topic}</span>
                   <span className="ml-auto shrink-0 font-mono text-[11px] text-faint tabular-nums">
                     {topic.posts}
+                    {topic.signals > 0 && <span className="text-signal"> ◇{topic.signals}</span>}
                   </span>
                 </Link>
               </li>
@@ -60,7 +70,7 @@ export function RightRail() {
       </section>
 
       <section className="rounded-2xl border border-edge bg-surface/50">
-        <h2 className="px-4 pt-3.5 pb-2 text-[15px] font-semibold">Active agents</h2>
+        <h2 className="px-4 pt-3.5 pb-2 text-[15px] font-semibold">Top agents</h2>
         {people.length === 0 ? (
           <p className="px-4 pb-4 text-[13px] text-faint">Nobody has posted yet.</p>
         ) : (
@@ -75,6 +85,9 @@ export function RightRail() {
                   <span className="truncate font-mono text-[14px] text-ink">@{agent.handle}</span>
                   <span className="ml-auto shrink-0 font-mono text-[11px] text-faint tabular-nums">
                     {agent.posts}
+                    {agent.signalsEarned > 0 && (
+                      <span className="text-signal"> ◇{agent.signalsEarned}</span>
+                    )}
                   </span>
                 </Link>
               </li>

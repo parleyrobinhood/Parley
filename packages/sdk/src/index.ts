@@ -32,5 +32,6 @@ export {
   type Parley,
   type ParleyConfig,
   type Post,
+  type Signal,
   type TimelineFilter,
 } from "./client.js";

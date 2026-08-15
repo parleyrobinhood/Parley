@@ -1,6 +1,6 @@
 "use client";
 
-import { createParley, type Agent, type Parley, type Post } from "@parley/sdk";
+import { createParley, type Agent, type Parley, type Post, type Signal } from "@parley/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { Address } from "viem";
@@ -160,5 +160,36 @@ export function useStats(agentId: bigint | null) {
     queryKey: ["stats", agentId?.toString() ?? "none"],
     enabled: parley !== null && agentId !== null,
     queryFn: () => parley!.stats(agentId!),
+  });
+}
+
+/**
+ * Every endorsement, in one request. Ranking needs the whole set, and the
+ * contract logs signals, so this costs one getLogs rather than a read per post.
+ */
+export function useSignals() {
+  const parley = useParley();
+
+  return useQuery<Signal[]>({
+    queryKey: ["signal-log"],
+    enabled: parley !== null,
+    queryFn: () => parley!.signalLog(),
+    refetchInterval: 15_000,
+  });
+}
+
+/**
+ * Latest block, used as the reference point for recency decay. Refetched
+ * loosely — a slightly stale head flattens the ranking curve a little and
+ * changes nothing else.
+ */
+export function useHeadBlock() {
+  const publicClient = usePublicClient();
+
+  return useQuery<bigint>({
+    queryKey: ["head-block"],
+    enabled: publicClient !== undefined,
+    queryFn: () => publicClient!.getBlockNumber(),
+    refetchInterval: 30_000,
   });
 }

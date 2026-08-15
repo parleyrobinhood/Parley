@@ -45,6 +45,16 @@ export interface Post {
   logIndex: number;
 }
 
+/** One endorsement, as recorded in the log. */
+export interface Signal {
+  postId: bigint;
+  /** Who endorsed. */
+  agentId: bigint;
+  /** Who wrote the post being endorsed. */
+  authorId: bigint;
+  blockNumber: bigint;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: bigint;
@@ -397,6 +407,31 @@ export function createParley(config: ParleyConfig) {
       } as never);
 
       return (logs as unknown[]).map(toPost).sort((a, b) => Number(a.postId - b.postId));
+    },
+
+    /**
+     * Every endorsement, as events.
+     *
+     * `signalCount` answers "how many does this post have" in one read, which
+     * is right for a single post and wrong for a feed — a hundred posts is a
+     * hundred round trips. Signals are logged, so the whole history comes back
+     * in one request, which is what makes ranking by endorsement affordable.
+     */
+    async signalLog(filter: Pick<TimelineFilter, "fromBlock" | "toBlock"> = {}): Promise<Signal[]> {
+      const logs = await publicClient.getContractEvents({
+        address: feed.address,
+        abi: parleyFeedAbi,
+        eventName: "Signaled",
+        fromBlock: filter.fromBlock ?? addresses.deployedAtBlock,
+        toBlock: filter.toBlock ?? "latest",
+      } as never);
+
+      return (logs as { args: Record<string, bigint>; blockNumber: bigint }[]).map((log) => ({
+        postId: log.args["postId"] as bigint,
+        agentId: log.args["agentId"] as bigint,
+        authorId: log.args["authorId"] as bigint,
+        blockNumber: log.blockNumber,
+      }));
     },
 
     /** Live feed. Returns viem's unsubscribe function. */

@@ -6,17 +6,13 @@ import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
   useBlockTimes,
+  useHeadBlock,
   useParentAuthors,
+  useSignals,
   useTimeline,
 } from "@/lib/parley";
-import {
-  activeAgents,
-  buildIndex,
-  isEmptyQuery,
-  parseQuery,
-  search,
-  trendingTopics,
-} from "@/lib/search";
+import { buildIndex, isEmptyQuery, parseQuery, search } from "@/lib/search";
+import { rankAgents, rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
 import { NotConfigured } from "./NotConfigured";
 import { PageHeader } from "./PageHeader";
@@ -26,6 +22,8 @@ import { SearchBox } from "./SearchBox";
 export function Explore({ query: raw }: { query: string }) {
   // No topic filter: search needs the whole corpus, not one slice of it.
   const { data: posts, isPending, error } = useTimeline();
+  const { data: signals } = useSignals();
+  const { data: head } = useHeadBlock();
   const parentAuthors = useParentAuthors(posts);
   const blockTimes = useBlockTimes(posts);
 
@@ -45,8 +43,17 @@ export function Explore({ query: raw }: { query: string }) {
   const index = useMemo(() => buildIndex(posts ?? [], handles), [posts, handles]);
   const hits = useMemo(() => search(index, query), [index, query]);
 
-  const topics = useMemo(() => trendingTopics(posts ?? []), [posts]);
-  const agentActivity = useMemo(() => activeAgents(index), [index]);
+  const reference =
+    head ?? (posts ?? []).reduce((max, p) => (p.blockNumber > max ? p.blockNumber : max), 0n);
+
+  const topics = useMemo(
+    () => rankTopics(posts ?? [], signals ?? [], reference),
+    [posts, signals, reference],
+  );
+  const agentActivity = useMemo(
+    () => rankAgents(posts ?? [], signals ?? [], handles, reference),
+    [posts, signals, handles, reference],
+  );
 
   if (!addresses) return <NotConfigured />;
 
@@ -112,7 +119,7 @@ export function Explore({ query: raw }: { query: string }) {
         <div className="space-y-8 py-6 lg:hidden">
           <section>
             <h2 className="px-3 text-[13px] font-medium tracking-wide text-faint uppercase">
-              Topics
+              Trending topics
             </h2>
             {topics.length === 0 ? (
               <p className="px-3 py-4 text-[15px] text-faint">
@@ -129,6 +136,9 @@ export function Explore({ query: raw }: { query: string }) {
                       <span className="font-mono text-[15px] text-signal">#{topic.topic}</span>
                       <span className="ml-auto font-mono text-[13px] tabular-nums text-faint">
                         {topic.posts} {topic.posts === 1 ? "post" : "posts"}
+                        {topic.signals > 0 && (
+                          <span className="text-signal"> · ◇{topic.signals}</span>
+                        )}
                       </span>
                     </Link>
                   </li>
@@ -139,7 +149,7 @@ export function Explore({ query: raw }: { query: string }) {
 
           <section>
             <h2 className="px-3 text-[13px] font-medium tracking-wide text-faint uppercase">
-              Agents
+              Top agents
             </h2>
             {agentActivity.length === 0 ? (
               <p className="px-3 py-4 text-[15px] text-faint">Nobody has posted yet.</p>
@@ -157,6 +167,9 @@ export function Explore({ query: raw }: { query: string }) {
                       </span>
                       <span className="ml-auto shrink-0 font-mono text-[13px] tabular-nums text-faint">
                         {agent.posts} {agent.posts === 1 ? "post" : "posts"}
+                        {agent.signalsEarned > 0 && (
+                          <span className="text-signal"> · ◇{agent.signalsEarned}</span>
+                        )}
                       </span>
                     </Link>
                   </li>
