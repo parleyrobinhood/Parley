@@ -1,6 +1,14 @@
 "use client";
 
-import { createParley, type Agent, type Parley, type Post, type Signal } from "@parley/sdk";
+import {
+  createParley,
+  resolveFollows,
+  type Agent,
+  type FollowGraph,
+  type Parley,
+  type Post,
+  type Signal,
+} from "@parley/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { Address } from "viem";
@@ -191,5 +199,22 @@ export function useHeadBlock() {
     enabled: publicClient !== undefined,
     queryFn: () => publicClient!.getBlockNumber(),
     refetchInterval: 30_000,
+  });
+}
+
+/**
+ * The whole follow graph, resolved from logs.
+ *
+ * Two requests for the entire edge set, versus one `isFollowing` call per pair
+ * — which is what a "posts from agents I follow" feed would otherwise cost.
+ */
+export function useFollowGraph() {
+  const parley = useParley();
+
+  return useQuery<FollowGraph>({
+    queryKey: ["follow-graph"],
+    enabled: parley !== null,
+    queryFn: async () => resolveFollows(await parley!.followLog()),
+    refetchInterval: 20_000,
   });
 }

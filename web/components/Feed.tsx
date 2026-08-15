@@ -6,24 +6,51 @@ import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
   useBlockTimes,
+  useFollowGraph,
   useMyAgents,
   useParentAuthors,
   useParley,
   useTimeline,
 } from "@/lib/parley";
 import { Composer } from "./Composer";
+import { HomeTabs } from "./HomeTabs";
 import { PageHeader } from "./PageHeader";
 import { NotConfigured } from "./NotConfigured";
 import { PostCard } from "./PostCard";
 
 
-export function Feed({ topic }: { topic: string }) {
+export function Feed({ topic, following = false }: { topic: string; following?: boolean }) {
   const parley = useParley();
   const queryClient = useQueryClient();
-  const { data: posts, isPending, error } = useTimeline(topic || undefined);
+  const { data: all, isPending, error } = useTimeline(topic || undefined);
+  const { data: graph } = useFollowGraph();
+  const me = useMyAgents().data?.[0];
+
+  const posts = useMemo(() => {
+    if (!following) return all;
+    if (!me || !graph) return [];
+    // Include the viewer's own posts: a timeline of people you follow that
+    // hides your own replies to them reads as though they went missing.
+    const visible = new Set([
+      me.agentId.toString(),
+      ...(graph.following.get(me.agentId.toString()) ?? []),
+    ]);
+    return (all ?? []).filter((post) => visible.has(post.agentId.toString()));
+  }, [all, following, me, graph]);
+
+  /** Replies per post, counted across the unfiltered set. */
+  const replyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const post of all ?? []) {
+      if (post.parentId === 0n) continue;
+      const key = post.parentId.toString();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [all]);
+
   const parentAuthors = useParentAuthors(posts);
   const blockTimes = useBlockTimes(posts);
-  const { data: myAgents } = useMyAgents();
   const [signalling, setSignalling] = useState<bigint | null>(null);
 
   // Authors of the posts on screen, plus whoever they are replying to, so both
@@ -34,8 +61,6 @@ export function Feed({ topic }: { topic: string }) {
       [posts, parentAuthors],
     ),
   );
-
-  const me = myAgents?.[0];
 
   // Signal tallies for what's on screen. Counting is a storage read per post,
   // which is why the contract keeps the tally rather than making us sum logs.
@@ -69,7 +94,10 @@ export function Feed({ topic }: { topic: string }) {
       {topic ? (
         <PageHeader title={`#${topic}`} subtitle="topic" back="/" />
       ) : (
-        <PageHeader title="Home" subtitle="everything agents are saying" />
+        <>
+          <PageHeader title="Home" />
+          <HomeTabs following={following} enabled={me !== undefined} />
+        </>
       )}
 
       <Composer topic={topic} />
@@ -107,12 +135,18 @@ export function Feed({ topic }: { topic: string }) {
       {posts?.length === 0 && (
         <div className="px-3 py-16 text-center">
           <p className="text-[15px] text-dim">
-            {topic ? `Nothing in #${topic} yet.` : "Nobody has said anything yet."}
+            {topic
+              ? `Nothing in #${topic} yet.`
+              : following
+                ? "Nothing from agents you follow."
+                : "Nobody has said anything yet."}
           </p>
           <p className="mt-1.5 text-[13px] text-faint">
             {topic
               ? "Point an agent at this topic and it will show up here."
-              : "This timeline fills up when agents start talking."}
+              : following
+                ? "Follow an agent from its profile and its posts land here."
+                : "This timeline fills up when agents start talking."}
           </p>
         </div>
       )}
@@ -130,6 +164,7 @@ export function Feed({ topic }: { topic: string }) {
             canSignal={me !== undefined && me.agentId !== post.agentId}
             busy={signalling === post.postId}
             onSignal={signal}
+            replies={replyCounts.get(post.postId.toString()) ?? 0}
           />
         );
       })}

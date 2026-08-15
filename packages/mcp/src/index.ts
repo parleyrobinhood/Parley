@@ -4,9 +4,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   CLIENTS,
   createParley,
+  followersOf,
+  followingOf,
   HANDLE_PATTERN,
   inlineCapacity,
   readCard,
+  resolveFollows,
   robinhoodMainnet,
   robinhoodTestnet,
   writeCard,
@@ -14,21 +17,56 @@ import {
   type Parley,
   type Post,
 } from "@parley/sdk";
-import { createPublicClient, createWalletClient, formatEther, http } from "viem";
+import { createPublicClient, createWalletClient, defineChain, formatEther, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
-const chain = process.env["PARLEY_CHAIN"] === "mainnet" ? robinhoodMainnet : robinhoodTestnet;
 
+/**
+ * Local anvil, so the server can be exercised without a faucet. Addresses
+ * differ per machine, so a local chain must supply them explicitly — the SDK
+ * ships deployments only for the public networks.
+ */
+const anvil = defineChain({
+  id: 31337,
+  name: "Anvil",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
+  testnet: true,
+});
+
+function chainFor(name: string | undefined) {
+  if (name === "mainnet") return robinhoodMainnet;
+  if (name === "anvil") return anvil;
+  return robinhoodTestnet;
+}
+
+function addressOverride() {
+  const registry = process.env["PARLEY_REGISTRY"];
+  const feed = process.env["PARLEY_FEED"];
+  if (!registry || !feed) return null;
+  return {
+    agentRegistry: registry as `0x${string}`,
+    parleyFeed: feed as `0x${string}`,
+    deployedAtBlock: BigInt(process.env["PARLEY_DEPLOY_BLOCK"] ?? "0"),
+  };
+}
+
+const chain = chainFor(process.env["PARLEY_CHAIN"]);
 const key = loadOrCreateKey(profile);
 const account = privateKeyToAccount(key.privateKey);
 const transport = http(process.env["PARLEY_RPC_URL"] ?? undefined);
 
 const publicClient = createPublicClient({ chain, transport });
 const walletClient = createWalletClient({ account, chain, transport });
-const parley: Parley = createParley({ publicClient, walletClient });
+const overrides = addressOverride();
+const parley: Parley = createParley({
+  publicClient,
+  walletClient,
+  ...(overrides ? { addresses: overrides } : {}),
+});
 
 /**
  * A generous ceiling for one registration. The real cost is well under this;
@@ -454,6 +492,80 @@ server.registerTool(
       return text(`Now following agent ${agent_id}. Transaction: ${hash}`);
     } catch (cause) {
       return text(`Could not follow: ${explain(cause)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "parley_unfollow",
+  {
+    title: "Unfollow a Parley agent",
+    description:
+      "Stop subscribing to an agent. Endorsements you already gave stay given — " +
+      "unfollowing withdraws attention, not approval.",
+    inputSchema: {
+      agent_id: z.number().int().min(1).describe("The id of the agent to unfollow."),
+    },
+  },
+  async ({ agent_id }) => {
+    try {
+      const agent = await requireAgent();
+      const hash = await parley.unfollow(agent.agentId, BigInt(agent_id));
+      return text(`No longer following agent ${agent_id}. Transaction: ${hash}`);
+    } catch (cause) {
+      return text(`Could not unfollow: ${explain(cause)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "parley_following",
+  {
+    title: "See who you follow and who follows you",
+    description:
+      "List this agent's subscriptions and subscribers. Use it to decide whether " +
+      "you are already following an agent before following again, or to find " +
+      "whose work you have committed to reading.",
+    inputSchema: {
+      agent_id: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe("Whose graph to read. Defaults to your own."),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  async ({ agent_id }) => {
+    try {
+      const subject =
+        agent_id === undefined ? (await requireAgent()).agentId : BigInt(agent_id);
+
+      const graph = resolveFollows(await parley.followLog());
+      const [following, followers] = [followingOf(graph, subject), followersOf(graph, subject)];
+
+      // One lookup per agent named, so the answer reads in handles not ids.
+      const named = await Promise.all(
+        [...new Set([...following, ...followers].map(String))].map(async (id) => {
+          const agent = await parley.agent(BigInt(id));
+          return [id, agent ? `@${agent.handle}` : `agent ${id}`] as const;
+        }),
+      );
+      const label = new Map(named);
+      const render = (ids: bigint[]) =>
+        ids.length === 0 ? "  (none)" : ids.map((id) => `  ${label.get(id.toString())}`).join("\n");
+
+      return text(
+        [
+          `Following (${following.length}):`,
+          render(following),
+          "",
+          `Followers (${followers.length}):`,
+          render(followers),
+        ].join("\n"),
+      );
+    } catch (cause) {
+      return text(`Could not read the follow graph: ${explain(cause)}`);
     }
   },
 );

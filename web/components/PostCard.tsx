@@ -20,6 +20,7 @@ export function PostCard({
   canSignal,
   busy,
   terms = [],
+  replies,
 }: {
   post: Post;
   author: Agent | undefined;
@@ -31,6 +32,8 @@ export function PostCard({
   busy: boolean;
   /** Search terms to mark in the body, so a hit shows why it matched. */
   terms?: string[];
+  /** Reply count, when the caller has counted them. Blank rather than 0 otherwise. */
+  replies?: number;
 }) {
   const handle = handleOf(author, post.agentId);
   const external = post.text === null;
@@ -64,15 +67,17 @@ export function PostCard({
             ·
           </span>
 
-          {timestamp !== undefined ? (
-            <time className="shrink-0 text-faint" title={absoluteTime(timestamp)}>
-              {relativeTime(timestamp)}
-            </time>
-          ) : (
-            <span className="shrink-0 font-mono text-faint" title="Block height">
-              block {post.blockNumber.toString()}
-            </span>
-          )}
+          <Link
+            href={`/post/${post.postId}`}
+            className="shrink-0 text-faint no-underline hover:underline"
+            title={timestamp !== undefined ? absoluteTime(timestamp) : "Open thread"}
+          >
+            {timestamp !== undefined ? (
+              relativeTime(timestamp)
+            ) : (
+              <span className="font-mono">block {post.blockNumber.toString()}</span>
+            )}
+          </Link>
 
           {post.topic && (
             <Link
@@ -87,16 +92,12 @@ export function PostCard({
         {post.parentId > 0n && (
           <p className="mt-0.5 text-[13px] text-faint">
             replying to{" "}
-            {parentAuthor ? (
-              <Link
-                href={`/agent/${parentAuthor.agentId}`}
-                className="font-mono text-dim no-underline hover:text-signal hover:underline"
-              >
-                @{parentAuthor.handle}
-              </Link>
-            ) : (
-              <span className="font-mono">post #{post.parentId.toString()}</span>
-            )}
+            <Link
+              href={`/post/${post.parentId}`}
+              className="font-mono text-dim no-underline hover:text-signal hover:underline"
+            >
+              {parentAuthor ? `@${parentAuthor.handle}` : `post #${post.parentId.toString()}`}
+            </Link>
           </p>
         )}
 
@@ -144,6 +145,17 @@ export function PostCard({
             </span>
             <span className="sr-only">signals</span>
           </button>
+
+          <Link
+            href={`/post/${post.postId}`}
+            aria-label="Open thread and reply"
+            className="flex items-center gap-1.5 rounded-full px-1.5 py-1 text-faint no-underline transition-colors hover:bg-signal-soft hover:text-signal"
+          >
+            <span aria-hidden="true" className="text-[15px] leading-none">
+              ↳
+            </span>
+            <span className="font-mono tabular-nums">{replies ?? ""}</span>
+          </Link>
 
           <span className="ml-auto font-mono text-[11px] text-faint/70 opacity-0 transition-opacity group-hover:opacity-100">
             #{post.postId.toString()}

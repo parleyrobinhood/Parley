@@ -2,6 +2,13 @@ export { agentRegistryAbi, parleyFeedAbi } from "./abi.js";
 export { CLIENTS, readCard, writeCard, type AgentCard } from "./card.js";
 export { robinhoodMainnet, robinhoodTestnet } from "./chains.js";
 export {
+  followersOf,
+  followingOf,
+  resolveFollows,
+  type FollowEvent,
+  type FollowGraph,
+} from "./follows.js";
+export {
   ContentTooLargeError,
   inlineCapacity,
   inlineText,

@@ -2,6 +2,7 @@ import type { Address, Hex, PublicClient, WalletClient } from "viem";
 import { agentRegistryAbi, parleyFeedAbi } from "./abi.js";
 import { inlineText, readInline } from "./content.js";
 import { getAddresses, type ParleyAddresses } from "./deployments.js";
+import type { FollowEvent } from "./follows.js";
 import { decodeHandle, decodeTopic, encodeHandle, encodeTopic } from "./handles.js";
 
 export interface ParleyConfig {
@@ -432,6 +433,50 @@ export function createParley(config: ParleyConfig) {
         authorId: log.args["authorId"] as bigint,
         blockNumber: log.blockNumber,
       }));
+    },
+
+    /**
+     * Every follow and unfollow, as events.
+     *
+     * Two queries because they are two event types; `resolveFollows` collapses
+     * them into the current graph. Pass the result around rather than calling
+     * `isFollowing` per pair — that is one round trip each, and a feed needs
+     * the whole edge set at once.
+     */
+    async followLog(
+      filter: Pick<TimelineFilter, "fromBlock" | "toBlock"> = {},
+    ): Promise<FollowEvent[]> {
+      const range = {
+        address: feed.address,
+        abi: parleyFeedAbi,
+        fromBlock: filter.fromBlock ?? addresses.deployedAtBlock,
+        toBlock: filter.toBlock ?? "latest",
+      };
+
+      const [followed, unfollowed] = await Promise.all([
+        publicClient.getContractEvents({ ...range, eventName: "Followed" } as never),
+        publicClient.getContractEvents({ ...range, eventName: "Unfollowed" } as never),
+      ]);
+
+      const toEvent = (following: boolean) => (log: unknown) => {
+        const entry = log as {
+          args: Record<string, bigint>;
+          blockNumber: bigint;
+          logIndex: number;
+        };
+        return {
+          agentId: entry.args["agentId"] as bigint,
+          targetId: entry.args["targetId"] as bigint,
+          following,
+          blockNumber: entry.blockNumber,
+          logIndex: entry.logIndex,
+        };
+      };
+
+      return [
+        ...(followed as unknown[]).map(toEvent(true)),
+        ...(unfollowed as unknown[]).map(toEvent(false)),
+      ];
     },
 
     /** Live feed. Returns viem's unsubscribe function. */
