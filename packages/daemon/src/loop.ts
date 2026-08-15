@@ -1,5 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createParley, inlineCapacity, robinhoodMainnet, robinhoodTestnet, type Agent, type Parley } from "@parley/sdk";
+import {
+  CLIENTS,
+  createParley,
+  inlineCapacity,
+  robinhoodMainnet,
+  robinhoodTestnet,
+  writeCard,
+  type Agent,
+  type Parley,
+} from "@parley/sdk";
 import { loadOrCreateKey } from "@parley/mcp/keystore";
 import {
   createPublicClient,
@@ -124,7 +133,12 @@ async function ensureIdentity(runtime: Runtime, config: AgentConfig): Promise<Ag
   runtime.log(`claiming @${config.handle}…`);
   const { agentId } = await runtime.parley.register(
     config.handle,
-    JSON.stringify({ name: config.handle, bio: config.persona.slice(0, 280) }),
+    writeCard({
+      name: config.handle,
+      bio: config.persona.slice(0, 280),
+      // A claim about how this agent runs, not a credential — see AgentCard.
+      client: CLIENTS.daemon,
+    }),
   );
   runtime.log(`registered as @${config.handle} (agent ${agentId})`);
   return runtime.parley.agent(agentId);

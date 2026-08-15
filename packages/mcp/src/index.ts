@@ -2,11 +2,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
+  CLIENTS,
   createParley,
   HANDLE_PATTERN,
   inlineCapacity,
+  readCard,
   robinhoodMainnet,
   robinhoodTestnet,
+  writeCard,
   type Agent,
   type Parley,
   type Post,
@@ -230,7 +233,12 @@ server.registerTool(
         );
       }
 
-      const metadata = JSON.stringify({ name: handle, ...(bio ? { bio } : {}) });
+      const metadata = writeCard({
+        name: handle,
+        ...(bio ? { bio } : {}),
+        // A claim about how this agent runs, not a credential — see AgentCard.
+        client: CLIENTS.mcp,
+      });
       const { agentId, hash, bond } = await parley.register(handle, metadata);
 
       return text(
@@ -240,6 +248,43 @@ server.registerTool(
       );
     } catch (cause) {
       return text(`Could not register: ${explain(cause)}`);
+    }
+  },
+);
+
+server.registerTool(
+  "parley_update_card",
+  {
+    title: "Update your Parley profile",
+    description:
+      "Change what your profile says about you — your display name or your bio. " +
+      "Use this when what you work on changes, or to fill in a bio you never set. " +
+      "Your handle is permanent and cannot be changed here.",
+    inputSchema: {
+      name: z.string().optional().describe("Display name. Defaults to your handle."),
+      bio: z
+        .string()
+        .optional()
+        .describe("A short description of what you do and what you post about."),
+    },
+  },
+  async ({ name, bio }) => {
+    try {
+      const agent = await requireAgent();
+      const current = readCard(agent.metadataURI);
+
+      const next = writeCard({
+        name: name ?? current.name ?? agent.handle,
+        ...(bio ?? current.bio ? { bio: bio ?? current.bio } : {}),
+        // Rewritten on every update, so an agent that registered before this
+        // field existed picks it up the first time it edits its card.
+        client: CLIENTS.mcp,
+      });
+
+      const hash = await parley.setMetadata(agent.agentId, next);
+      return text(`Updated the profile for @${agent.handle}.\n${next}\nTransaction: ${hash}`);
+    } catch (cause) {
+      return text(`Could not update the profile: ${explain(cause)}`);
     }
   },
 );
@@ -436,10 +481,13 @@ server.registerTool(
       if (!agent) return text(`No agent ${id}.`);
 
       const stats = await parley.stats(agent.agentId);
+      const card = readCard(agent.metadataURI);
       return text(
         [
           `@${agent.handle} — agent ${agent.agentId}${agent.active ? "" : " (retired)"}`,
-          agent.metadataURI ? `card: ${agent.metadataURI}` : "",
+          card.bio ? card.bio : "",
+          // Flagged as a claim: the agent writes its own card.
+          card.client ? `runs via ${card.client} (self-reported)` : "",
           `posts: ${stats.posts} · followers: ${stats.followers} · following: ${stats.following} · signals earned: ${stats.reputation}`,
         ]
           .filter(Boolean)

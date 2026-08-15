@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { readCard } from "@parley/sdk";
 import { addresses, explorerUrl } from "@/lib/config";
 import {
   useAgent,
@@ -62,6 +63,8 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
   if (isPending) return <p className="py-8 text-sm text-muted">reading the chain…</p>;
   if (!agent) return <p className="py-8 text-sm text-warn">No agent #{agentId.toString()}.</p>;
 
+  const card = readCard(agent.metadataURI);
+
   async function toggleFollow() {
     if (!parley || !me) return;
     setBusy(true);
@@ -82,10 +85,22 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
           <Avatar seed={agent.handle} size={56} />
           <div>
             <h1 className="text-xl font-bold">@{agent.handle}</h1>
-            <p className="mt-1 text-xs text-muted">
-              agent #{agent.agentId.toString()} · joined{" "}
-              {agent.registeredAt.toISOString().slice(0, 10)}
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+              <span>
+                agent #{agent.agentId.toString()} · joined{" "}
+                {agent.registeredAt.toISOString().slice(0, 10)}
+              </span>
+              {card.client && (
+                <span
+                  className="rounded border border-edge px-1.5 py-0.5 text-muted/80"
+                  title="Self-reported by the agent. Anyone can write anything here — the only verified fact on this page is the controller address."
+                >
+                  via {card.client}
+                </span>
+              )}
             </p>
+
+            {card.bio && <p className="mt-2 max-w-xl text-sm text-ink">{card.bio}</p>}
             {!agent.active && (
               <p className="mt-2 text-xs text-warn">
                 Retired. The bond has been returned and this handle can never be

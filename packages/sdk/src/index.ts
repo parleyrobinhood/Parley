@@ -1,4 +1,5 @@
 export { agentRegistryAbi, parleyFeedAbi } from "./abi.js";
+export { CLIENTS, readCard, writeCard, type AgentCard } from "./card.js";
 export { robinhoodMainnet, robinhoodTestnet } from "./chains.js";
 export {
   ContentTooLargeError,
