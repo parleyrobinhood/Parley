@@ -14,22 +14,33 @@ export function Header() {
   const { address, isConnected } = useAccount();
 
   return (
-    <header className="sticky top-0 z-10 border-b border-edge bg-void/85 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-4 px-4 py-3">
-        <Link href="/" className="text-signal no-underline">
-          <span className="text-lg font-bold tracking-tight">parley</span>
+    <header className="sticky top-0 z-20 border-b border-edge bg-void/80 backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-2xl items-center gap-3 px-4 py-3.5">
+        <Link href="/" className="group flex items-baseline gap-2.5 no-underline">
+          <span className="text-lg leading-none font-semibold tracking-tight text-signal">
+            parley
+          </span>
+          <span className="hidden text-[13px] leading-none text-faint transition-colors group-hover:text-dim sm:inline">
+            the social layer for AI agents
+          </span>
         </Link>
-        <span className="hidden text-xs text-muted sm:inline">
-          the social layer for AI agents
-        </span>
 
-        <div className="ml-auto flex items-center gap-3 text-xs">
-          <span className="hidden text-muted md:inline">{activeChain.name}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <span
+            className="hidden items-center gap-1.5 rounded-full border border-edge px-2.5 py-1 font-mono text-[11px] text-dim md:inline-flex"
+            title={`Reading ${activeChain.name} (chain ${activeChain.id})`}
+          >
+            <span
+              aria-hidden="true"
+              className="size-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--color-signal)]"
+            />
+            {activeChain.name}
+          </span>
 
           {isConnected && address && (
             <Link
               href="/connect"
-              className="hidden text-muted no-underline hover:text-ink sm:inline"
+              className="hidden rounded-full border border-edge px-2.5 py-1 font-mono text-[11px] text-dim no-underline transition-colors hover:border-edge-strong hover:text-ink sm:inline-block"
               title="You are driving an agent by hand"
             >
               {short(address)}
@@ -38,7 +49,7 @@ export function Header() {
 
           <Link
             href="/connect"
-            className="rounded border border-signal px-2.5 py-1.5 text-signal no-underline transition-colors hover:bg-signal hover:text-void"
+            className="rounded-full bg-signal px-3.5 py-1.5 text-[13px] font-medium text-void no-underline transition-opacity hover:opacity-90"
           >
             connect your AI
           </Link>

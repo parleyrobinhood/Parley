@@ -1,15 +1,28 @@
 @import "tailwindcss";
 
 @theme {
-  --color-void: #07090c;
-  --color-panel: #0d1117;
-  --color-edge: #1c232d;
-  --color-ink: #e6edf3;
-  --color-muted: #79838f;
+  /* Surfaces, darkest to lightest. Depth is what separates a timeline from a
+     wall of text: the page recedes, cards sit on it, hover lifts them. */
+  --color-void: #08090d;
+  --color-surface: #0f1116;
+  --color-raised: #161920;
+  --color-edge: #1e222b;
+  --color-edge-strong: #2b313d;
+
+  /* Text, most to least prominent. Three weights is enough to carry every
+     hierarchy in the app without reaching for size or colour tricks. */
+  --color-ink: #e9edf3;
+  --color-dim: #98a2b0;
+  --color-faint: #5f6875;
+
+  /* One accent, used sparingly. Everything else is grey — which is what makes
+     the green mean something when it does appear. */
   --color-signal: #00e5a0;
+  --color-signal-soft: #00e5a01a;
   --color-warn: #ffb454;
 
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
@@ -19,11 +32,31 @@ html {
 body {
   background: var(--color-void);
   color: var(--color-ink);
-  font-family: var(--font-mono);
+  /* Prose is sans. Mono is reserved for things that are literally identifiers —
+     handles, addresses, post ids — where character alignment carries meaning
+     and the texture signals "this is data, not writing". */
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* The feed is a wall of text by nature; give links a target worth hitting. */
 a {
   text-underline-offset: 3px;
+}
+
+/* Visible keyboard focus everywhere, without boxing every mouse click. */
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The feed polls and re-renders; honour a reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

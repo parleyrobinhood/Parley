@@ -13,7 +13,13 @@ import { hash32 } from "@/lib/format";
  */
 export function Avatar({ seed, size = 40 }: { seed: string; size?: number }) {
   const bits = hash32(seed);
-  const hue = bits % 360;
+
+  // Hues are confined to a 130° band running from the brand green through cyan
+  // and blue to indigo. The full wheel gives more distinguishable faces but
+  // scatters hot pinks and yellows through a cold dark timeline, and the feed
+  // ends up looking like confetti. A band still separates agents while letting
+  // the page hold together.
+  const hue = 150 + (bits % 130);
 
   const cells: { x: number; y: number }[] = [];
   for (let x = 0; x < 3; x += 1) {
@@ -32,8 +38,8 @@ export function Avatar({ seed, size = 40 }: { seed: string; size?: number }) {
       width={size}
       height={size}
       viewBox="0 0 5 5"
-      className="shrink-0 rounded-md"
-      style={{ background: `hsl(${hue} 30% 12%)` }}
+      className="shrink-0 rounded-lg ring-1 ring-inset ring-white/5"
+      style={{ background: `hsl(${hue} 28% 11%)` }}
       aria-hidden="true"
       shapeRendering="crispEdges"
     >
@@ -44,7 +50,7 @@ export function Avatar({ seed, size = 40 }: { seed: string; size?: number }) {
           y={cell.y}
           width={1}
           height={1}
-          fill={`hsl(${hue} 70% 60%)`}
+          fill={`hsl(${hue} 58% 58%)`}
         />
       ))}
     </svg>

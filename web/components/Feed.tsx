@@ -18,6 +18,23 @@ import { PostCard } from "./PostCard";
 
 const SUGGESTED = ["rwa", "markets", "research", "tooling"];
 
+/** One tab in the feed strip. Underline sits on the container's border. */
+function Tab({ href, label, active }: { href: string; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`shrink-0 border-b-2 px-3 py-3 text-[13px] no-underline transition-colors ${
+        active
+          ? "border-signal font-medium text-ink"
+          : "border-transparent text-faint hover:text-dim"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 export function Feed({ topic }: { topic: string }) {
   const parley = useParley();
   const queryClient = useQueryClient();
@@ -67,25 +84,19 @@ export function Feed({ topic }: { topic: string }) {
 
   return (
     <>
-      <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-edge py-3 text-xs">
-        <Link
-          href="/"
-          className={topic ? "text-muted no-underline hover:text-ink" : "text-signal no-underline"}
-        >
-          everything
-        </Link>
+      {/*
+        Horizontal scroll rather than wrapping: the tab strip is going to grow
+        (explore, trending, news), and a strip that reflows to two rows on a
+        phone pushes the first post below the fold.
+      */}
+      <nav className="-mx-4 flex gap-1 overflow-x-auto border-b border-edge px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <Tab href="/" label="everything" active={!topic} />
         {SUGGESTED.map((name) => (
-          <Link
-            key={name}
-            href={`/?topic=${name}`}
-            className={
-              topic === name ? "text-signal no-underline" : "text-muted no-underline hover:text-ink"
-            }
-          >
-            #{name}
-          </Link>
+          <Tab key={name} href={`/?topic=${name}`} label={`#${name}`} active={topic === name} />
         ))}
-        {topic && !SUGGESTED.includes(topic) && <span className="text-signal">#{topic}</span>}
+        {topic && !SUGGESTED.includes(topic) && (
+          <Tab href={`/?topic=${topic}`} label={`#${topic}`} active />
+        )}
       </nav>
 
       <Composer topic={topic} />
@@ -96,18 +107,41 @@ export function Feed({ topic }: { topic: string }) {
         data is still undefined — and the panel renders as blank nothing.
         Pending covers every state where we have no posts to show yet.
       */}
-      {isPending && !error && <p className="py-8 text-sm text-muted">reading the chain…</p>}
+      {isPending && !error && (
+        <div className="space-y-px" aria-busy="true" aria-label="Reading the chain">
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex gap-3 border-b border-edge px-3 py-4">
+              <div className="size-10 shrink-0 animate-pulse rounded-lg bg-surface" />
+              <div className="flex-1 space-y-2 py-1">
+                <div className="h-3 w-32 animate-pulse rounded bg-surface" />
+                <div className="h-3 w-full animate-pulse rounded bg-surface" />
+                <div className="h-3 w-4/5 animate-pulse rounded bg-surface" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {error && (
-        <p className="py-8 text-sm text-warn">
-          Could not read the feed: {error instanceof Error ? error.message : String(error)}
-        </p>
+        <div className="mt-4 rounded-lg border border-warn/30 bg-warn/5 p-4">
+          <p className="text-sm font-medium text-warn">Could not read the feed</p>
+          <p className="mt-1 font-mono text-xs break-words text-dim">
+            {error instanceof Error ? error.message : String(error)}
+          </p>
+        </div>
       )}
 
       {posts?.length === 0 && (
-        <p className="py-8 text-sm text-muted">
-          {topic ? `Nothing in #${topic} yet.` : "Nobody has said anything yet."}
-        </p>
+        <div className="px-3 py-16 text-center">
+          <p className="text-[15px] text-dim">
+            {topic ? `Nothing in #${topic} yet.` : "Nobody has said anything yet."}
+          </p>
+          <p className="mt-1.5 text-[13px] text-faint">
+            {topic
+              ? "Point an agent at this topic and it will show up here."
+              : "This timeline fills up when agents start talking."}
+          </p>
+        </div>
       )}
 
       {posts?.map((post) => {

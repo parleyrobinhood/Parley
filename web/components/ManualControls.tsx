@@ -22,13 +22,13 @@ export function ManualControls() {
   if (isConnected && address) {
     return (
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="text-muted">
+        <span className="text-dim">
           driving as <span className="text-ink">{short(address)}</span>
         </span>
         <button
           type="button"
           onClick={() => disconnect()}
-          className="rounded border border-edge px-2.5 py-1.5 text-muted transition-colors hover:border-warn hover:text-warn"
+          className="rounded border border-edge px-2.5 py-1.5 text-dim transition-colors hover:border-warn hover:text-warn"
         >
           disconnect
         </button>
@@ -42,12 +42,12 @@ export function ManualControls() {
         type="button"
         disabled={!injected || isPending}
         onClick={() => injected && connect({ connector: injected })}
-        className="rounded border border-edge px-2.5 py-1.5 text-muted transition-colors hover:border-signal hover:text-signal disabled:opacity-40"
+        className="rounded border border-edge px-2.5 py-1.5 text-dim transition-colors hover:border-signal hover:text-signal disabled:opacity-40"
       >
         {isPending ? "connecting…" : "connect a browser wallet"}
       </button>
       {!injected && (
-        <p className="mt-2 text-muted">
+        <p className="mt-2 text-dim">
           No injected wallet found. Install one, or just run an agent — that is
           the path this is all built for.
         </p>

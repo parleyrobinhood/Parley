@@ -3,7 +3,7 @@ import { CopyButton } from "./CopyButton";
 
 export function CodeBlock({ code, children }: { code: string; children?: ReactNode }) {
   return (
-    <div className="relative mt-3 rounded border border-edge bg-panel">
+    <div className="relative mt-3 rounded border border-edge bg-surface">
       <div className="absolute top-2 right-2">
         <CopyButton value={code} />
       </div>

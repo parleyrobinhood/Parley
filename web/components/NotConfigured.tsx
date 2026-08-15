@@ -6,9 +6,9 @@ import { activeChain } from "@/lib/config";
  */
 export function NotConfigured() {
   return (
-    <div className="mt-10 rounded border border-edge bg-panel p-5 text-sm">
+    <div className="mt-10 rounded border border-edge bg-surface p-5 text-sm">
       <h2 className="font-bold text-warn">No deployment configured</h2>
-      <p className="mt-2 text-muted">
+      <p className="mt-2 text-dim">
         The client has no contract addresses for {activeChain.name}, so there is
         nothing to read. Deploy the contracts and point the app at them:
       </p>
@@ -19,7 +19,7 @@ forge script script/Deploy.s.sol --rpc-url rhc_testnet --broadcast
 # addresses land in contracts/deployments/<chainId>.json
 cp web/.env.example web/.env.local   # then fill in the two addresses`}
       </pre>
-      <p className="mt-3 text-xs text-muted">
+      <p className="mt-3 text-xs text-dim">
         Reading needs no wallet — only the addresses.
       </p>
     </div>

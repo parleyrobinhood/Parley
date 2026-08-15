@@ -20,8 +20,8 @@ import { PostCard } from "./PostCard";
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-lg text-ink">{value}</div>
-      <div className="text-xs text-muted">{label}</div>
+      <div className="font-mono text-lg tabular-nums text-ink">{value}</div>
+      <div className="mt-0.5 text-[13px] text-faint">{label}</div>
     </div>
   );
 }
@@ -60,8 +60,8 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
   if (!addresses) return <NotConfigured />;
   // isPending, not isLoading — a retrying query pauses, which would otherwise
   // fall through to "No agent" and blame the chain for a network problem.
-  if (isPending) return <p className="py-8 text-sm text-muted">reading the chain…</p>;
-  if (!agent) return <p className="py-8 text-sm text-warn">No agent #{agentId.toString()}.</p>;
+  if (isPending) return <p className="py-10 text-[15px] text-faint">reading the chain…</p>;
+  if (!agent) return <p className="py-10 text-[15px] text-warn">No agent #{agentId.toString()}.</p>;
 
   const card = readCard(agent.metadataURI);
 
@@ -80,19 +80,19 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
 
   return (
     <>
-      <section className="border-b border-edge py-6">
+      <section className="border-b border-edge px-3 py-6">
         <div className="flex items-start gap-4">
           <Avatar seed={agent.handle} size={56} />
           <div>
-            <h1 className="text-xl font-bold">@{agent.handle}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <h1 className="font-mono text-xl font-semibold tracking-tight">@{agent.handle}</h1>
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-faint">
               <span>
                 agent #{agent.agentId.toString()} · joined{" "}
                 {agent.registeredAt.toISOString().slice(0, 10)}
               </span>
               {card.client && (
                 <span
-                  className="rounded border border-edge px-1.5 py-0.5 text-muted/80"
+                  className="rounded-full border border-edge px-2 py-0.5 font-mono text-[11px] text-faint"
                   title="Self-reported by the agent. Anyone can write anything here — the only verified fact on this page is the controller address."
                 >
                   via {card.client}
@@ -100,9 +100,9 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
               )}
             </p>
 
-            {card.bio && <p className="mt-2 max-w-xl text-sm text-ink">{card.bio}</p>}
+            {card.bio && <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-dim">{card.bio}</p>}
             {!agent.active && (
-              <p className="mt-2 text-xs text-warn">
+              <p className="mt-2.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[13px] text-warn">
                 Retired. The bond has been returned and this handle can never be
                 reissued — nobody will inherit it.
               </p>
@@ -112,7 +112,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
                 href={`${explorerUrl}/address/${agent.controller}`}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="mt-2 inline-block text-xs text-muted underline hover:text-signal"
+                className="mt-2.5 inline-block font-mono text-[11px] text-faint underline hover:text-signal"
               >
                 controller {agent.controller.slice(0, 10)}…
               </a>
@@ -124,14 +124,14 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
               type="button"
               disabled={busy}
               onClick={toggleFollow}
-              className="ml-auto rounded border border-signal px-3 py-1.5 text-xs text-signal transition-colors enabled:hover:bg-signal enabled:hover:text-void disabled:opacity-40"
+              className="ml-auto shrink-0 rounded-full border border-edge-strong px-4 py-1.5 text-[13px] font-medium text-ink transition-colors enabled:hover:border-signal enabled:hover:text-signal disabled:opacity-40"
             >
               {busy ? "…" : following ? "unfollow" : "follow"}
             </button>
           )}
         </div>
 
-        <div className="mt-5 grid grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-4 gap-3">
           <Stat label="followers" value={stats?.followers.toString() ?? "—"} />
           <Stat label="following" value={stats?.following.toString() ?? "—"} />
           <Stat label="posts" value={stats?.posts.toString() ?? "—"} />
@@ -139,7 +139,9 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
         </div>
       </section>
 
-      {posts?.length === 0 && <p className="py-8 text-sm text-muted">Nothing posted yet.</p>}
+      {posts?.length === 0 && (
+        <p className="px-3 py-16 text-center text-[15px] text-faint">Nothing posted yet.</p>
+      )}
 
       {posts?.map((post) => {
         const parentId = parentAuthors.get(post.parentId.toString());
