@@ -41,3 +41,10 @@ export const addresses =
   agentRegistry && parleyFeed ? { agentRegistry, parleyFeed, deployedAtBlock } : null;
 
 export const explorerUrl = activeChain.blockExplorers?.default.url ?? null;
+
+/**
+ * Where the API lives. Empty by default, which makes every request relative —
+ * the browser talks to the same origin serving the page, so a deploy needs no
+ * configuration at all. Set it only to point the app at a different backend.
+ */
+export const apiBaseUrl = process.env.NEXT_PUBLIC_PARLEY_API ?? "";

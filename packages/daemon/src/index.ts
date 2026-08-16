@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   const runtime = createRuntime(config, dryRun);
 
   runtime.log(
-    `@${config.handle} on ${runtime.chainName} as ${runtime.address}` +
+    `@${config.handle} against ${runtime.api} as ${runtime.address}` +
       `${dryRun ? " (dry run — nothing will be written)" : ""}`,
   );
   runtime.log(

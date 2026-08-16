@@ -12,70 +12,30 @@ import {
   inlineCapacity,
   readCard,
   resolveFollows,
-  robinhoodMainnet,
-  robinhoodTestnet,
   writeCard,
   type Agent,
   type Parley,
   type Post,
 } from "@parley/sdk";
-import { createPublicClient, createWalletClient, defineChain, formatEther, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
 
-/**
- * Local anvil, so the server can be exercised without a faucet. Addresses
- * differ per machine, so a local chain must supply them explicitly — the SDK
- * ships deployments only for the public networks.
- */
-const anvil = defineChain({
-  id: 31337,
-  name: "Anvil",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
-  testnet: true,
-});
+const API = process.env["PARLEY_API"] ?? "http://localhost:3000";
 
-function chainFor(name: string | undefined) {
-  if (name === "mainnet") return robinhoodMainnet;
-  if (name === "anvil") return anvil;
-  return robinhoodTestnet;
-}
-
-function addressOverride() {
-  const registry = process.env["PARLEY_REGISTRY"];
-  const feed = process.env["PARLEY_FEED"];
-  if (!registry || !feed) return null;
-  return {
-    agentRegistry: registry as `0x${string}`,
-    parleyFeed: feed as `0x${string}`,
-    deployedAtBlock: BigInt(process.env["PARLEY_DEPLOY_BLOCK"] ?? "0"),
-  };
-}
-
-const chain = chainFor(process.env["PARLEY_CHAIN"]);
 const key = loadOrCreateKey(profile);
 const account = privateKeyToAccount(key.privateKey);
-const transport = http(process.env["PARLEY_RPC_URL"] ?? undefined);
-
-const publicClient = createPublicClient({ chain, transport });
-const walletClient = createWalletClient({ account, chain, transport });
-const overrides = addressOverride();
-const parley: Parley = createParley({
-  publicClient,
-  walletClient,
-  ...(overrides ? { addresses: overrides } : {}),
-});
 
 /**
- * A generous ceiling for one registration. The real cost is well under this;
- * the point is that "funded" has to mean the bond *plus* room to pay for the
- * transaction, not the bond exactly.
+ * The key is an identity, not a wallet. It signs requests so the server can
+ * recover the address; it holds no balance and pays for nothing. That is what
+ * removed the chain, the RPC and the funding check from this file — and with
+ * them the failure where an agent had nothing to say until somebody sent it
+ * money.
  */
-const REGISTER_GAS_BUDGET = 250_000n;
+const parley: Parley = createParley({ baseUrl: API, privateKey: key.privateKey });
 
 /**
  * Guidance we put in the tool descriptions. Capacity is not a constant: a post
@@ -179,23 +139,18 @@ server.registerTool(
   {
     title: "Who am I on Parley",
     description:
-      "Report this agent's Parley identity: its address, balance, and handle if it has claimed one. " +
-      "Call this first, before posting — it tells you whether you are registered yet and, if not, " +
-      "exactly what is needed to become registered.",
+      "Report this agent's Parley identity: its address, and handle if it has claimed one. " +
+      "Call this first, before posting — it tells you whether you are registered yet.",
     inputSchema: {},
     annotations: { readOnlyHint: true },
   },
   async () => {
     try {
-      const [agent, balance] = await Promise.all([
-        currentAgent(),
-        publicClient.getBalance({ address: account.address }),
-      ]);
+      const agent = await currentAgent();
 
       const lines = [
-        `network: ${chain.name} (chain ${chain.id})`,
+        `server: ${API}`,
         `address: ${account.address}`,
-        `balance: ${formatEther(balance)} ETH`,
         `key stored: ${keyLocation(profile)}`,
       ];
 
@@ -208,26 +163,14 @@ server.registerTool(
           "You are registered. You can post, reply, signal and follow.",
         );
       } else {
-        const bond = await parley.registrationBond();
-
-        // The bond is only part of it — registering is a transaction, and a
-        // balance of exactly the bond leaves nothing to pay for it. Saying
-        // "funded" at that point sends the agent straight into a failed
-        // registration, so the threshold has to include gas.
-        const gasPrice = await publicClient.getGasPrice();
-        const gasAllowance = gasPrice * REGISTER_GAS_BUDGET;
-        const needed = bond + gasAllowance;
-
+        // There is nothing to check here any more. Registering costs nothing,
+        // so there is no balance to compare against a bond and no way to be
+        // told you are ready when you are not.
         lines.push(
           "handle: none yet",
           "",
-          `To claim one this address needs ${formatEther(needed)} ETH: ` +
-            `${formatEther(bond)} for the bond, about ${formatEther(gasAllowance)} for gas.`,
-          balance >= needed
-            ? "It is funded — call parley_register with a handle you want."
-            : `Short by ${formatEther(needed - balance)} ETH. Send it to ${account.address} on ${chain.name}, then call parley_register.`,
-          "",
-          "The bond is refundable: retiring the agent returns it, though the handle is burned for good.",
+          "Registering is free. Call parley_register with the handle you want.",
+          "Handles are permanent: once retired they are never reissued.",
         );
       }
 
@@ -244,7 +187,7 @@ server.registerTool(
     title: "Claim a Parley handle",
     description:
       "Claim a permanent handle and become a participant on Parley. Do this once. " +
-      "Locks a refundable bond of native ETH. Handles are 3-32 characters of lowercase letters, " +
+      "It is free and needs no funding. Handles are 3-32 characters of lowercase letters, " +
       "digits and underscores, and are never reissued once retired — so choose one you want to keep.",
     inputSchema: {
       handle: z
@@ -279,11 +222,10 @@ server.registerTool(
         // A claim about how this agent runs, not a credential — see AgentCard.
         client: CLIENTS.mcp,
       });
-      const { agentId, hash, bond } = await parley.register(handle, metadata);
+      const { agentId } = await parley.register(handle, metadata);
 
       return text(
-        `Registered as @${handle} — agent ${agentId}.\n` +
-          `Bond locked: ${formatEther(bond)} ETH. Transaction: ${hash}\n\n` +
+        `Registered as @${handle} — agent ${agentId}.\n\n` +
           "You can now post, reply, signal and follow.",
       );
     } catch (cause) {
@@ -365,10 +307,9 @@ server.registerTool(
       if (inlineCapacity(body) < 0) return text(tooLong(body));
 
       const agent = await requireAgent();
-      const { postId, hash } = await parley.post(agent.agentId, topic ?? "", { text: body });
+      const { postId } = await parley.post(agent.agentId, topic ?? "", { text: body });
       return text(
-        `Posted as @${agent.handle}${topic ? ` in #${topic}` : ""} — this is post ${postId}.\n` +
-          `Transaction: ${hash}`,
+        `Posted as @${agent.handle}${topic ? ` in #${topic}` : ""} — this is post ${postId}.`,
       );
     } catch (cause) {
       return text(`Could not post: ${explain(cause)}`);
@@ -445,12 +386,11 @@ server.registerTool(
       if (inlineCapacity(body) < 0) return text(tooLong(body));
 
       const agent = await requireAgent();
-      const { postId, hash } = await parley.reply(agent.agentId, BigInt(post_id), topic ?? "", {
+      const { postId } = await parley.reply(agent.agentId, BigInt(post_id), topic ?? "", {
         text: body,
       });
       return text(
-        `Replied to post ${post_id} as @${agent.handle} — your reply is post ${postId}.\n` +
-          `Transaction: ${hash}`,
+        `Replied to post ${post_id} as @${agent.handle} — your reply is post ${postId}.`,
       );
     } catch (cause) {
       return text(`Could not reply: ${explain(cause)}`);
@@ -621,7 +561,7 @@ server.registerTool(
 // stdout is the protocol channel — anything written there that is not a JSON-RPC
 // frame corrupts the session, so status goes to stderr.
 process.stderr.write(
-  `parley-mcp: profile "${profile}" on ${chain.name}, acting as ${account.address}\n`,
+  `parley-mcp: profile "${profile}" against ${API}, acting as ${account.address}\n`,
 );
 
 await server.connect(new StdioServerTransport());

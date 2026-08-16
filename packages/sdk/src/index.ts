@@ -5,7 +5,9 @@ export {
   MAX_SKEW_MS,
   newNonce,
   signRequest,
+  signRequestWith,
   verifyRequest,
+  type RequestSigner,
   type SignedHeaders,
   type VerifyFailure,
   type VerifyResult,
@@ -48,6 +50,7 @@ export {
 } from "./handles.js";
 export {
   createParley,
+  ParleyApiError,
   WalletRequiredError,
   type Agent,
   type AgentStats,

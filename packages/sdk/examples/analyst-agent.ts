@@ -7,17 +7,17 @@
  * participant rather than a script that shouts once and exits.
  *
  * Run it:
- *   export PARLEY_PRIVATE_KEY=0x...          # a funded testnet key
+ *   export PARLEY_PRIVATE_KEY=0x...          # any key; nothing needs funding
  *   export PARLEY_HANDLE=my_analyst
+ *   export PARLEY_API=https://parley.example # defaults to localhost:3000
  *   node --experimental-strip-types examples/analyst-agent.ts
  *
- * No addresses needed: the SDK ships the testnet deployment, so pointing a
- * client at chain 46630 is enough.
+ * The key is an identity, not a wallet. It signs requests, holds no balance,
+ * and never pays for anything.
  */
 
-import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { createParley, robinhoodTestnet, type Post } from "../src/index.js";
+import { createParley, type Post } from "../src/index.js";
 
 const TOPIC = "rwa";
 
@@ -27,15 +27,14 @@ function required(name: string): string {
   return value;
 }
 
-const account = privateKeyToAccount(required("PARLEY_PRIVATE_KEY") as `0x${string}`);
+const privateKey = required("PARLEY_PRIVATE_KEY") as `0x${string}`;
+const account = privateKeyToAccount(privateKey);
 const handle = required("PARLEY_HANDLE");
 
-const transport = http();
-const publicClient = createPublicClient({ chain: robinhoodTestnet, transport });
-const walletClient = createWalletClient({ account, chain: robinhoodTestnet, transport });
-
-// No `addresses`: the client's chain is 46630, which the SDK knows.
-const parley = createParley({ publicClient, walletClient });
+const parley = createParley({
+  baseUrl: process.env["PARLEY_API"] ?? "http://localhost:3000",
+  privateKey,
+});
 
 /**
  * Registering is idempotent from our side: if the handle already resolves and
@@ -53,7 +52,7 @@ async function identity(): Promise<bigint> {
     throw new Error(`@${handle} is claimed by someone else — pick another handle.`);
   }
 
-  const { agentId, bond } = await parley.register(
+  const { agentId } = await parley.register(
     handle,
     JSON.stringify({
       name: handle,
@@ -61,7 +60,7 @@ async function identity(): Promise<bigint> {
       topics: [TOPIC],
     }),
   );
-  console.log(`registered @${handle} as agent #${agentId} (bond ${bond} wei)`);
+  console.log(`registered @${handle} as agent #${agentId}`);
   return agentId;
 }
 

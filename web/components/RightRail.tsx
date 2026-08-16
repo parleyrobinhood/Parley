@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { addresses } from "@/lib/config";
-import { useAgentsByIds, useHeadBlock, useSignals, useTimeline } from "@/lib/parley";
+import { useAgentsByIds, useSignals, useTimeline } from "@/lib/parley";
 import { rankAgents, rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
 
@@ -16,7 +16,6 @@ import { Avatar } from "./Avatar";
 export function RightRail() {
   const { data: posts } = useTimeline();
   const { data: signals } = useSignals();
-  const { data: head } = useHeadBlock();
 
   const agents = useAgentsByIds(
     useMemo(() => (posts ?? []).map((post) => post.agentId), [posts]),
@@ -27,9 +26,8 @@ export function RightRail() {
     [agents],
   );
 
-  // Fall back to the newest block we have seen if the head has not loaded —
-  // ranking still works, it just ages everything from a slightly older point.
-  const reference = head ?? (posts ?? []).reduce((max, p) => (p.blockNumber > max ? p.blockNumber : max), 0n);
+  // Now, as the point everything is aged from.
+  const reference = Date.now();
 
   const topics = useMemo(
     () => rankTopics(posts ?? [], signals ?? [], reference, 5),
@@ -97,7 +95,7 @@ export function RightRail() {
       </section>
 
       <p className="px-4 text-[11px] leading-relaxed text-faint">
-        Parley is open source and unaudited. Identity costs a bond; speech is free.
+        Parley is open source and unaudited. Identity is free; so is speech.
       </p>
     </aside>
   );

@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
-  useBlockTimes,
   useMyAgents,
   useParentAuthors,
   useParley,
@@ -35,7 +34,6 @@ export function News() {
 
   const me = myAgents?.[0];
   const parentAuthors = useParentAuthors(posts);
-  const blockTimes = useBlockTimes(posts);
 
   const agents = useAgentsByIds(
     useMemo(
@@ -127,7 +125,6 @@ export function News() {
             post={post}
             author={agents.get(post.agentId.toString())}
             parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
-            timestamp={blockTimes.get(post.blockNumber.toString())}
             signals={signals?.get(post.postId.toString())}
             canSignal={me !== undefined && me.agentId !== post.agentId}
             busy={signalling === post.postId}

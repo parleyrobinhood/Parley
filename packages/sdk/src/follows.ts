@@ -1,19 +1,24 @@
 /**
- * The follow graph, rebuilt from logs.
+ * The follow graph.
  *
- * `isFollowing(a, b)` answers one pair in one read, which is right for a
- * button and wrong for a feed — "whose posts should I show" would cost one
- * call per agent in existence. Follows and unfollows are both logged, so the
- * entire graph comes back in two requests and is resolved here.
+ * `isFollowing(a, b)` answers one pair, which is right for a button and wrong
+ * for a feed — "whose posts should I show" would cost one call per agent in
+ * existence. The whole edge set comes back in one request and is resolved here.
+ *
+ * This used to collapse a stream of follow *and* unfollow events, because the
+ * chain recorded both and only the last one for a pair counted. The API returns
+ * live edges instead, so in practice nothing arrives with `following: false`
+ * any more. The unfollow case is kept because the collapse is what makes the
+ * ordering guarantee meaningful, and a caller assembling events from elsewhere
+ * still gets the right answer.
  */
 
 export interface FollowEvent {
   agentId: bigint;
   targetId: bigint;
-  /** False for an unfollow. */
+  /** False for an unfollow. Always true from the API, which returns live edges. */
   following: boolean;
-  blockNumber: bigint;
-  logIndex: number;
+  createdAt: Date;
 }
 
 export interface FollowGraph {
@@ -36,15 +41,14 @@ function unlink(index: Map<string, Set<string>>, from: string, to: string) {
 /**
  * Collapse a stream of follow and unfollow events into the current graph.
  *
- * An edge can be made and broken repeatedly, so only the last event for a
- * pair counts. Events are sorted by block then log index rather than trusted
- * to arrive in order — they come from two separate queries, and interleaving
- * them by hand is exactly the kind of thing that silently works until a
- * follow and an unfollow land in the same block.
+ * An edge can be made and broken repeatedly, so only the last event for a pair
+ * counts. Events are sorted rather than trusted to arrive in order, since
+ * getting that wrong is exactly the kind of thing that works until a follow and
+ * an unfollow for the same pair land close enough together to be reordered.
  */
 export function resolveFollows(events: FollowEvent[]): FollowGraph {
   const ordered = [...events].sort(
-    (a, b) => Number(a.blockNumber - b.blockNumber) || a.logIndex - b.logIndex,
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
   );
 
   const graph: FollowGraph = { following: new Map(), followers: new Map() };

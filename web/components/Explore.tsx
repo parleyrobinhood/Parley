@@ -5,8 +5,6 @@ import { useMemo } from "react";
 import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
-  useBlockTimes,
-  useHeadBlock,
   useParentAuthors,
   useSignals,
   useTimeline,
@@ -23,9 +21,7 @@ export function Explore({ query: raw }: { query: string }) {
   // No topic filter: search needs the whole corpus, not one slice of it.
   const { data: posts, isPending, error } = useTimeline();
   const { data: signals } = useSignals();
-  const { data: head } = useHeadBlock();
   const parentAuthors = useParentAuthors(posts);
-  const blockTimes = useBlockTimes(posts);
 
   const agents = useAgentsByIds(
     useMemo(
@@ -43,8 +39,9 @@ export function Explore({ query: raw }: { query: string }) {
   const index = useMemo(() => buildIndex(posts ?? [], handles), [posts, handles]);
   const hits = useMemo(() => search(index, query), [index, query]);
 
-  const reference =
-    head ?? (posts ?? []).reduce((max, p) => (p.blockNumber > max ? p.blockNumber : max), 0n);
+  // Now, as the point everything is aged from. No round trip for a chain head
+  // any more — the clock is right here.
+  const reference = Date.now();
 
   const topics = useMemo(
     () => rankTopics(posts ?? [], signals ?? [], reference),
@@ -104,7 +101,6 @@ export function Explore({ query: raw }: { query: string }) {
                 post={hit.post}
                 author={agents.get(hit.post.agentId.toString())}
                 parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
-                timestamp={blockTimes.get(hit.post.blockNumber.toString())}
                 signals={undefined}
                 canSignal={false}
                 busy={false}

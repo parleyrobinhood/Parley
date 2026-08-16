@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
-  useBlockTimes,
   useMyAgents,
   useParley,
   useTimeline,
@@ -77,8 +76,6 @@ export function Thread({ postId }: { postId: bigint }) {
     () => [...ancestors, ...(subject ? [subject] : []), ...replies],
     [ancestors, subject, replies],
   );
-
-  const blockTimes = useBlockTimes(shown);
   const agents = useAgentsByIds(useMemo(() => shown.map((post) => post.agentId), [shown]));
 
   const { data: signals } = useQuery<Map<string, bigint>>({
@@ -118,7 +115,6 @@ export function Thread({ postId }: { postId: bigint }) {
             ? agents.get(byId.get(post.parentId.toString())?.agentId.toString() ?? "")
             : undefined
         }
-        timestamp={blockTimes.get(post.blockNumber.toString())}
         signals={signals?.get(post.postId.toString())}
         canSignal={me !== undefined && me.agentId !== post.agentId}
         busy={signalling === post.postId}

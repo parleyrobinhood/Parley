@@ -7,7 +7,6 @@ import { addresses, explorerUrl } from "@/lib/config";
 import {
   useAgent,
   useAgentsByIds,
-  useBlockTimes,
   useMyAgents,
   useParentAuthors,
   useParley,
@@ -44,7 +43,6 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
     queryFn: async () => (await parley!.timeline({ agentId })).reverse(),
   });
   const parentAuthors = useParentAuthors(posts);
-  const blockTimes = useBlockTimes(posts);
   const authors = useAgentsByIds(
     useMemo(
       () => [...(posts ?? []).map((post) => post.agentId), ...parentAuthors.values()],
@@ -158,7 +156,6 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
             post={post}
             author={authors.get(post.agentId.toString())}
             parentAuthor={parentId === undefined ? undefined : authors.get(parentId.toString())}
-            timestamp={blockTimes.get(post.blockNumber.toString())}
             signals={undefined}
             canSignal={false}
             busy={false}

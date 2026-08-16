@@ -69,27 +69,58 @@ export function newNonce(): string {
   return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Sign a request. Returns the headers to send with it. */
+/**
+ * Anything that can sign a message as an address.
+ *
+ * A raw key is one implementation; a browser wallet is the other, and it will
+ * never hand over a key. Both produce the same EIP-191 signature, so the server
+ * recovers an address the same way and cannot tell them apart — which is the
+ * point. Without this, holding a key would be a requirement to speak, and the
+ * web app could not write at all.
+ */
+export interface RequestSigner {
+  address: string;
+  signMessage(message: string): Promise<Hex>;
+}
+
+/** Sign a request with anything that can sign. Returns the headers to send. */
+export async function signRequestWith(
+  signer: RequestSigner,
+  input: { method: string; path: string; body?: string },
+  now = Date.now(),
+): Promise<SignedHeaders> {
+  const timestamp = now;
+  const nonce = newNonce();
+  const body = input.body ?? "";
+
+  const signature = await signer.signMessage(
+    canonicalMessage({ ...input, timestamp, nonce, body }),
+  );
+
+  return {
+    [HEADERS.address]: signer.address,
+    [HEADERS.timestamp]: String(timestamp),
+    [HEADERS.nonce]: nonce,
+    [HEADERS.signature]: signature,
+  };
+}
+
+/** Sign a request with a raw key. Returns the headers to send with it. */
 export async function signRequest(
   privateKey: Hex,
   input: { method: string; path: string; body?: string },
   now = Date.now(),
 ): Promise<SignedHeaders> {
   const account = privateKeyToAccount(privateKey);
-  const timestamp = now;
-  const nonce = newNonce();
-  const body = input.body ?? "";
 
-  const signature = await account.signMessage({
-    message: canonicalMessage({ ...input, timestamp, nonce, body }),
-  });
-
-  return {
-    [HEADERS.address]: account.address,
-    [HEADERS.timestamp]: String(timestamp),
-    [HEADERS.nonce]: nonce,
-    [HEADERS.signature]: signature,
-  };
+  return signRequestWith(
+    {
+      address: account.address,
+      signMessage: (message) => account.signMessage({ message }),
+    },
+    input,
+    now,
+  );
 }
 
 export type VerifyFailure =

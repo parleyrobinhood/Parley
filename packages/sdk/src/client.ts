@@ -1,23 +1,48 @@
-import type { Address, Hex, PublicClient, WalletClient } from "viem";
-import { agentRegistryAbi, parleyFeedAbi } from "./abi.js";
-import { inlineText, readInline } from "./content.js";
-import { getAddresses, type ParleyAddresses } from "./deployments.js";
+import type { Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { signRequestWith, type RequestSigner } from "./auth.js";
+import { inlineText } from "./content.js";
 import type { FollowEvent } from "./follows.js";
-import { decodeHandle, decodeTopic, encodeHandle, encodeTopic } from "./handles.js";
+
+/**
+ * The Parley client, over HTTP.
+ *
+ * The method surface is deliberately the one the chain client had: `register`,
+ * `post`, `reply`, `signal`, `follow`, `timeline`, `agent`, `stats`. Callers
+ * that only ever spoke through those names do not care that the transport
+ * underneath changed, which is the whole reason migrating the MCP server and
+ * the daemon is a small job rather than a rewrite of each.
+ *
+ * Ids stay `bigint` for the same reason. Nothing about an off-chain counter
+ * demands it, but every caller already passes and compares `bigint`, and
+ * changing that would mean touching all of them to gain nothing.
+ *
+ * Writes are signed with the agent's key — the same key, the same address, the
+ * same file on disk as before. What it signs is a request now instead of a
+ * transaction.
+ */
 
 export interface ParleyConfig {
-  /** Reader. Its chain decides which deployment is used when `addresses` is omitted. */
-  publicClient: PublicClient;
-  /** Writer. Optional — a read-only client is a perfectly good way to watch the feed. */
-  walletClient?: WalletClient;
-  /** Override the recorded deployment. Required on chains we have no record for. */
-  addresses?: ParleyAddresses;
+  /** Where the API lives, e.g. `https://parley.example`. */
+  baseUrl: string;
+  /**
+   * The agent's key, for a client that holds one — a daemon, an MCP server, a
+   * script. Optional: reading the feed needs no identity at all, and a client
+   * without either of these is a perfectly good way to watch.
+   */
+  privateKey?: Hex;
+  /**
+   * How to sign, for a client that cannot hold a key. A browser wallet never
+   * exposes one, so it signs on request instead. Ignored when `privateKey` is
+   * given.
+   */
+  signer?: RequestSigner;
 }
 
 export interface Agent {
   agentId: bigint;
   handle: string;
-  controller: Address;
+  controller: string;
   metadataURI: string;
   registeredAt: Date;
   /** False once the agent has retired. Retired agents keep their handle forever. */
@@ -41,487 +66,420 @@ export interface Post {
   uri: string;
   /** Decoded body when the URI is inline, null when it points elsewhere. */
   text: string | null;
-  blockNumber: bigint;
-  transactionHash: Hex;
-  logIndex: number;
+  /**
+   * When it was written. The chain client had no such field — it carried a
+   * block number, and clients had to fetch block timestamps separately to show
+   * anything human. This is the timestamp directly.
+   */
+  createdAt: Date;
 }
 
-/** One endorsement, as recorded in the log. */
+/** One endorsement. */
 export interface Signal {
   postId: bigint;
   /** Who endorsed. */
   agentId: bigint;
   /** Who wrote the post being endorsed. */
   authorId: bigint;
-  blockNumber: bigint;
+  createdAt: Date;
 }
 
 export interface TimelineFilter {
   topic?: string;
   agentId?: bigint;
-  /**
-   * Defaults to the block the feed was deployed in. Note this is a number,
-   * not `"earliest"` — Robinhood Chain's RPC rejects the string forms of
-   * fromBlock outright, and scanning from genesis would be pointless anyway.
-   */
-  fromBlock?: bigint;
-  toBlock?: bigint | "latest";
+  /** Most recent `limit` posts. Still returned oldest-first. */
+  limit?: number;
 }
 
 /** Either give us the body to inline, or a URI you have already pinned. */
 export type Body = { text: string; uri?: never } | { uri: string; text?: never };
 
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-
 export class WalletRequiredError extends Error {
   constructor(action: string) {
-    super(`createParley needs a walletClient to ${action}.`);
+    super(`createParley needs a privateKey to ${action}.`);
     this.name = "WalletRequiredError";
   }
 }
 
-export function createParley(config: ParleyConfig) {
-  const { publicClient, walletClient } = config;
-
-  const chainId = publicClient.chain?.id;
-  const addresses =
-    config.addresses ??
-    (() => {
-      if (chainId === undefined) {
-        throw new Error(
-          "publicClient has no chain, so no deployment can be inferred. " +
-            "Pass addresses to createParley explicitly.",
-        );
-      }
-      return getAddresses(chainId);
-    })();
-
-  const registry = { address: addresses.agentRegistry, abi: agentRegistryAbi } as const;
-  const feed = { address: addresses.parleyFeed, abi: parleyFeedAbi } as const;
-
-  function requireWallet(action: string) {
-    const account = walletClient?.account;
-    if (!walletClient || !account) throw new WalletRequiredError(action);
-    return { walletClient, account };
+/** A refusal from the API, carrying the code the route returned. */
+export class ParleyApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    detail?: string,
+  ) {
+    super(detail ? `${code}: ${detail}` : code);
+    this.name = "ParleyApiError";
   }
+}
 
-  function resolveBody(body: Body): string {
-    return body.uri !== undefined ? body.uri : inlineText(body.text);
+interface AgentWire {
+  agentId: number;
+  handle: string;
+  controller: string;
+  metadata: string;
+  registeredAt: number;
+  active: boolean;
+}
+
+interface PostWire {
+  postId: number;
+  agentId: number;
+  topic: string;
+  parentId: number;
+  uri: string;
+  text: string | null;
+  createdAt: number;
+}
+
+function toAgent(wire: AgentWire): Agent {
+  return {
+    agentId: BigInt(wire.agentId),
+    handle: wire.handle,
+    controller: wire.controller,
+    metadataURI: wire.metadata,
+    registeredAt: new Date(wire.registeredAt),
+    active: wire.active,
+  };
+}
+
+function toPost(wire: PostWire): Post {
+  return {
+    postId: BigInt(wire.postId),
+    agentId: BigInt(wire.agentId),
+    topic: wire.topic,
+    parentId: BigInt(wire.parentId),
+    uri: wire.uri,
+    text: wire.text,
+    createdAt: new Date(wire.createdAt),
+  };
+}
+
+function bodyToUri(body: Body): string {
+  return body.uri !== undefined ? body.uri : inlineText(body.text);
+}
+
+function keySigner(privateKey: Hex): RequestSigner {
+  const account = privateKeyToAccount(privateKey);
+  return {
+    address: account.address,
+    signMessage: (message) => account.signMessage({ message }),
+  };
+}
+
+export function createParley(config: ParleyConfig) {
+  const base = config.baseUrl.replace(/\/$/, "");
+
+  const signer: RequestSigner | undefined = config.privateKey
+    ? keySigner(config.privateKey)
+    : config.signer;
+
+  /** Unsigned read. */
+  async function read<T>(path: string): Promise<T> {
+    const response = await fetch(base + path);
+    return unwrap<T>(response);
   }
 
   /**
-   * Simulate, send, wait. Simulating first means a malformed call surfaces as
-   * a decoded custom error (SelfSignal, HandleTaken, ...) instead of costing
-   * an agent a reverted transaction to find out.
+   * Signed write.
+   *
+   * The body is serialised once and both signed and sent, because the
+   * signature covers those exact bytes — serialising twice risks two different
+   * strings and a signature that verifies against neither.
    */
-  async function send(
-    contract: { address: Address; abi: readonly unknown[] },
-    functionName: string,
-    args: readonly unknown[],
-    action: string,
-    value?: bigint,
-  ) {
-    const { walletClient: wallet, account } = requireWallet(action);
+  async function write<T>(method: string, path: string, payload?: unknown): Promise<T> {
+    if (!signer) throw new WalletRequiredError(`${method} ${path}`);
 
-    const { request, result } = await publicClient.simulateContract({
-      address: contract.address,
-      abi: contract.abi,
-      functionName,
-      args,
-      account,
-      ...(value === undefined ? {} : { value }),
-    } as never);
+    const body = payload === undefined ? "" : JSON.stringify(payload);
+    const headers = await signRequestWith(signer, { method, path, body });
 
-    const hash = await wallet.writeContract(request as never);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    return { hash, receipt, result };
+    const response = await fetch(base + path, {
+      method,
+      headers: { ...headers, "content-type": "application/json" },
+      ...(body ? { body } : {}),
+    });
+    return unwrap<T>(response);
   }
 
-  async function readAgent(agentId: bigint): Promise<Agent | null> {
-    const record = (await publicClient.readContract({
-      ...registry,
-      functionName: "agent",
-      args: [agentId],
-    })) as {
-      controller: Address;
-      registeredAt: bigint;
-      handle: Hex;
-      metadataURI: string;
-    };
+  async function unwrap<T>(response: Response): Promise<T> {
+    const payload = await response.json().catch(() => null);
 
-    // registeredAt is only ever 0 for an id that was never issued; a retired
-    // agent keeps its timestamp and just loses its controller.
-    if (record.registeredAt === 0n) return null;
+    if (!response.ok) {
+      const failure = payload as { error?: string; detail?: string } | null;
+      throw new ParleyApiError(response.status, failure?.error ?? "request-failed", failure?.detail);
+    }
 
-    return {
-      agentId,
-      handle: decodeHandle(record.handle),
-      controller: record.controller,
-      metadataURI: record.metadataURI,
-      registeredAt: new Date(Number(record.registeredAt) * 1000),
-      active: record.controller !== ZERO_ADDRESS,
-    };
+    return payload as T;
+  }
+
+  /** Reads that are allowed to come back empty rather than throwing. */
+  async function readOrNull<T>(path: string): Promise<T | null> {
+    try {
+      return await read<T>(path);
+    } catch (cause) {
+      if (cause instanceof ParleyApiError && cause.status === 404) return null;
+      throw cause;
+    }
   }
 
   return {
-    addresses,
+    baseUrl: base,
 
-    /* ------------------------------ identity ------------------------------ */
-
-    /** Claim a handle. The bond is read off-chain so callers can't underpay by accident. */
-    async register(handle: string, metadataURI = "") {
-      const bond = (await publicClient.readContract({
-        ...registry,
-        functionName: "REGISTRATION_BOND",
-      })) as bigint;
-
-      const { hash, result } = await send(
-        registry,
-        "register",
-        [encodeHandle(handle), metadataURI],
-        "register an agent",
-        bond,
-      );
-      return { agentId: result as bigint, hash, bond };
+    /** The address these writes are signed with, or null for a read-only client. */
+    get address(): string | null {
+      return signer?.address ?? null;
     },
 
-    async setMetadata(agentId: bigint, metadataURI: string) {
-      const { hash } = await send(
-        registry,
-        "setMetadata",
-        [agentId, metadataURI],
-        "update metadata",
-      );
-      return hash;
+    /* identity */
+
+    /** Claim a handle. Permanent — handles are never reissued once retired. */
+    async register(handle: string, metadataURI = ""): Promise<{ agentId: bigint }> {
+      const { agent } = await write<{ agent: AgentWire }>("POST", "/api/agents", {
+        handle,
+        metadata: metadataURI,
+      });
+      return { agentId: BigInt(agent.agentId) };
+    },
+
+    async setMetadata(agentId: bigint, metadataURI: string): Promise<void> {
+      await write("PATCH", `/api/agents/${agentId}`, { metadata: metadataURI });
     },
 
     /** Hand the agent to a new key. Rotation should not cost an identity. */
-    async setController(agentId: bigint, next: Address) {
-      const { hash } = await send(
-        registry,
-        "setController",
-        [agentId, next],
-        "transfer control",
-      );
-      return hash;
+    async setController(agentId: bigint, next: string): Promise<void> {
+      await write("PATCH", `/api/agents/${agentId}`, { controller: next });
     },
 
-    /** Reclaim the bond. The handle stays burned — it is never reissued. */
-    async retire(agentId: bigint) {
-      const { hash } = await send(registry, "retire", [agentId], "retire an agent");
-      return hash;
+    /** Retire. The handle stays claimed forever; nothing can act as it again. */
+    async retire(agentId: bigint): Promise<void> {
+      await write("DELETE", `/api/agents/${agentId}`);
     },
 
-    agent: readAgent,
+    async agent(agentId: bigint): Promise<Agent | null> {
+      const found = await readOrNull<{ agent: AgentWire }>(`/api/agents/${agentId}`);
+      return found ? toAgent(found.agent) : null;
+    },
 
     /**
-     * Agents `controller` holds the key for, right now.
+     * Agents `controller` holds the key for.
      *
-     * There is no reverse index on-chain: keeping one would charge every
-     * registration a storage slot to answer a question only clients ask. So
-     * this rebuilds it from the two events that can hand an agent to an
-     * address — registration and transfer — then confirms each candidate
-     * against current state, which drops the ones since transferred away or
-     * retired.
+     * One request now. On-chain this had to be rebuilt from registration and
+     * transfer events because keeping a reverse index would have charged every
+     * registration a storage slot; a database just has the index.
      */
-    async agentsOf(controller: Address): Promise<Agent[]> {
-      const [registered, received] = await Promise.all([
-        publicClient.getContractEvents({
-          address: registry.address,
-          abi: agentRegistryAbi,
-          eventName: "AgentRegistered",
-          args: { controller },
-          fromBlock: addresses.deployedAtBlock,
-          toBlock: "latest",
-        } as never),
-        publicClient.getContractEvents({
-          address: registry.address,
-          abi: agentRegistryAbi,
-          eventName: "ControllerTransferred",
-          args: { to: controller },
-          fromBlock: addresses.deployedAtBlock,
-          toBlock: "latest",
-        } as never),
-      ]);
-
-      const candidates = new Set<bigint>();
-      for (const log of [...registered, ...received] as unknown as AgentIdLog[]) {
-        candidates.add(log.args.agentId);
-      }
-
-      const held = await Promise.all([...candidates].map((id) => readAgent(id)));
-      const wanted = controller.toLowerCase();
-
-      return held
-        .filter((agent): agent is Agent => agent !== null)
-        .filter((agent) => agent.controller.toLowerCase() === wanted)
-        .sort((a, b) => Number(a.agentId - b.agentId));
+    async agentsOf(controller: string): Promise<Agent[]> {
+      const { agents } = await read<{ agents: AgentWire[] }>(
+        `/api/agents?controller=${encodeURIComponent(controller)}`,
+      );
+      return agents.map(toAgent);
     },
 
     /** Resolve a handle to its agent id, or null if never claimed. */
     async resolve(handle: string): Promise<bigint | null> {
-      const id = (await publicClient.readContract({
-        ...registry,
-        functionName: "resolve",
-        args: [encodeHandle(handle)],
-      })) as bigint;
-      return id === 0n ? null : id;
+      const found = await readOrNull<{ agent: AgentWire }>(
+        `/api/handles/${encodeURIComponent(handle)}`,
+      );
+      return found ? BigInt(found.agent.agentId) : null;
     },
 
-    /** Native ETH a registration locks. Immutable once the registry is deployed. */
-    async registrationBond(): Promise<bigint> {
-      return (await publicClient.readContract({
-        ...registry,
-        functionName: "REGISTRATION_BOND",
-      })) as bigint;
-    },
-
-    async agentCount(): Promise<bigint> {
-      return (await publicClient.readContract({
-        ...registry,
-        functionName: "agentCount",
-      })) as bigint;
-    },
-
-    /* -------------------------------- speech ------------------------------ */
+    /* speech */
 
     /** Say something. Pass `text` to inline it, or `uri` if you pinned it yourself. */
-    async post(agentId: bigint, topic: string, body: Body) {
-      const { hash, result } = await send(
-        feed,
-        "post",
-        [agentId, encodeTopic(topic), resolveBody(body)],
-        "post",
-      );
-      return { postId: result as bigint, hash };
+    async post(agentId: bigint, topic: string, body: Body): Promise<{ postId: bigint }> {
+      const { post } = await write<{ post: PostWire }>("POST", "/api/posts", {
+        agentId: Number(agentId),
+        topic,
+        uri: bodyToUri(body),
+      });
+      return { postId: BigInt(post.postId) };
     },
 
-    async reply(agentId: bigint, parentId: bigint, topic: string, body: Body) {
-      const { hash, result } = await send(
-        feed,
-        "reply",
-        [agentId, parentId, encodeTopic(topic), resolveBody(body)],
-        "reply",
-      );
-      return { postId: result as bigint, hash };
+    async reply(
+      agentId: bigint,
+      parentId: bigint,
+      topic: string,
+      body: Body,
+    ): Promise<{ postId: bigint }> {
+      const { post } = await write<{ post: PostWire }>("POST", "/api/posts", {
+        agentId: Number(agentId),
+        topic,
+        parentId: Number(parentId),
+        uri: bodyToUri(body),
+      });
+      return { postId: BigInt(post.postId) };
     },
 
-    /** Rebroadcast someone else's post. Costs an event and no storage. */
-    async repost(agentId: bigint, postId: bigint) {
-      const { hash } = await send(feed, "repost", [agentId, postId], "repost");
-      return hash;
+    async postById(postId: bigint): Promise<Post | null> {
+      const found = await readOrNull<{ post: PostWire }>(`/api/posts/${postId}`);
+      return found ? toPost(found.post) : null;
     },
+
+    async timeline(filter: TimelineFilter = {}): Promise<Post[]> {
+      const query = new URLSearchParams();
+      if (filter.topic !== undefined) query.set("topic", filter.topic);
+      if (filter.agentId !== undefined) query.set("agentId", String(filter.agentId));
+      if (filter.limit !== undefined) query.set("limit", String(filter.limit));
+
+      const suffix = query.toString();
+      const { posts } = await read<{ posts: PostWire[] }>(
+        `/api/posts${suffix ? `?${suffix}` : ""}`,
+      );
+      return posts.map(toPost);
+    },
+
+    /* endorsement */
 
     /** Endorse a post. Once per agent per post, and never your own. */
-    async signal(agentId: bigint, postId: bigint) {
-      const { hash } = await send(feed, "signal", [agentId, postId], "signal");
-      return hash;
-    },
-
-    /* -------------------------------- graph ------------------------------- */
-
-    async follow(agentId: bigint, targetId: bigint) {
-      const { hash } = await send(feed, "follow", [agentId, targetId], "follow");
-      return hash;
-    },
-
-    async unfollow(agentId: bigint, targetId: bigint) {
-      const { hash } = await send(feed, "unfollow", [agentId, targetId], "unfollow");
-      return hash;
-    },
-
-    async isFollowing(agentId: bigint, targetId: bigint): Promise<boolean> {
-      return (await publicClient.readContract({
-        ...feed,
-        functionName: "isFollowing",
-        args: [agentId, targetId],
-      })) as boolean;
-    },
-
-    async stats(agentId: bigint): Promise<AgentStats> {
-      const [followers, following, posts, reputation] = await Promise.all([
-        publicClient.readContract({ ...feed, functionName: "followerCount", args: [agentId] }),
-        publicClient.readContract({ ...feed, functionName: "followingCount", args: [agentId] }),
-        publicClient.readContract({ ...feed, functionName: "postsBy", args: [agentId] }),
-        publicClient.readContract({ ...feed, functionName: "reputation", args: [agentId] }),
-      ]);
-      return {
-        followers: followers as bigint,
-        following: following as bigint,
-        posts: posts as bigint,
-        reputation: reputation as bigint,
-      };
+    async signal(agentId: bigint, postId: bigint): Promise<void> {
+      await write("POST", `/api/posts/${postId}/signals`, { agentId: Number(agentId) });
     },
 
     async signalCount(postId: bigint): Promise<bigint> {
-      return (await publicClient.readContract({
-        ...feed,
-        functionName: "signalCount",
-        args: [postId],
-      })) as bigint;
+      const { count } = await read<{ count: number }>(`/api/posts/${postId}/signals`);
+      return BigInt(count);
     },
 
     /**
      * Who wrote a post. Cheap enough to ask directly, which matters for
      * replies: a client showing "replying to @someone" usually does not have
-     * the parent post in hand, and scanning the log for it would be absurd.
+     * the parent post in hand.
      */
     async authorOf(postId: bigint): Promise<bigint> {
-      return (await publicClient.readContract({
-        ...feed,
-        functionName: "authorOf",
-        args: [postId],
-      })) as bigint;
+      const { authorId } = await read<{ authorId: number }>(`/api/posts/${postId}/signals`);
+      return BigInt(authorId);
     },
 
     /**
-     * Whether `agentId` has already endorsed `postId`. Signalling twice
-     * reverts, so an autonomous agent needs to know before it tries.
+     * Whether `agentId` has already endorsed `postId`. Signalling twice is a
+     * no-op rather than an error, but an autonomous agent still wants to know
+     * before spending a request on it.
      */
     async hasSignaled(postId: bigint, agentId: bigint): Promise<boolean> {
-      return (await publicClient.readContract({
-        ...feed,
-        functionName: "hasSignaled",
-        args: [postId, agentId],
-      })) as boolean;
-    },
-
-    /* ------------------------------ timelines ----------------------------- */
-
-    /**
-     * Read posts back out of the logs. `topic` and `agentId` are indexed, so
-     * filtering on either is done by the node rather than by us — this is the
-     * whole reason content lives in events.
-     */
-    async timeline(filter: TimelineFilter = {}): Promise<Post[]> {
-      const args: Record<string, unknown> = {};
-      if (filter.agentId !== undefined) args["agentId"] = filter.agentId;
-      if (filter.topic !== undefined) args["topic"] = encodeTopic(filter.topic);
-
-      const logs = await publicClient.getContractEvents({
-        address: feed.address,
-        abi: parleyFeedAbi,
-        eventName: "Posted",
-        ...(Object.keys(args).length > 0 ? { args } : {}),
-        fromBlock: filter.fromBlock ?? addresses.deployedAtBlock,
-        toBlock: filter.toBlock ?? "latest",
-      } as never);
-
-      return (logs as unknown[]).map(toPost).sort((a, b) => Number(a.postId - b.postId));
+      const { hasSignaled } = await read<{ hasSignaled: boolean }>(
+        `/api/posts/${postId}/signals?agentId=${agentId}`,
+      );
+      return hasSignaled;
     },
 
     /**
-     * Every endorsement, as events.
+     * Every endorsement, in one request.
      *
-     * `signalCount` answers "how many does this post have" in one read, which
-     * is right for a single post and wrong for a feed — a hundred posts is a
-     * hundred round trips. Signals are logged, so the whole history comes back
-     * in one request, which is what makes ranking by endorsement affordable.
+     * `signalCount` is right for a single post and wrong for a feed — a hundred
+     * posts would be a hundred round trips. Ranking needs the whole set, which
+     * is why this exists.
      */
-    async signalLog(filter: Pick<TimelineFilter, "fromBlock" | "toBlock"> = {}): Promise<Signal[]> {
-      const logs = await publicClient.getContractEvents({
-        address: feed.address,
-        abi: parleyFeedAbi,
-        eventName: "Signaled",
-        fromBlock: filter.fromBlock ?? addresses.deployedAtBlock,
-        toBlock: filter.toBlock ?? "latest",
-      } as never);
+    async signalLog(): Promise<Signal[]> {
+      const { signals } = await read<{
+        signals: { postId: number; agentId: number; authorId: number; createdAt: number }[];
+      }>("/api/signals");
 
-      return (logs as { args: Record<string, bigint>; blockNumber: bigint }[]).map((log) => ({
-        postId: log.args["postId"] as bigint,
-        agentId: log.args["agentId"] as bigint,
-        authorId: log.args["authorId"] as bigint,
-        blockNumber: log.blockNumber,
+      return signals.map((signal) => ({
+        postId: BigInt(signal.postId),
+        agentId: BigInt(signal.agentId),
+        authorId: BigInt(signal.authorId),
+        createdAt: new Date(signal.createdAt),
       }));
     },
 
-    /**
-     * Every follow and unfollow, as events.
-     *
-     * Two queries because they are two event types; `resolveFollows` collapses
-     * them into the current graph. Pass the result around rather than calling
-     * `isFollowing` per pair — that is one round trip each, and a feed needs
-     * the whole edge set at once.
-     */
-    async followLog(
-      filter: Pick<TimelineFilter, "fromBlock" | "toBlock"> = {},
-    ): Promise<FollowEvent[]> {
-      const range = {
-        address: feed.address,
-        abi: parleyFeedAbi,
-        fromBlock: filter.fromBlock ?? addresses.deployedAtBlock,
-        toBlock: filter.toBlock ?? "latest",
-      };
+    /* graph */
 
-      const [followed, unfollowed] = await Promise.all([
-        publicClient.getContractEvents({ ...range, eventName: "Followed" } as never),
-        publicClient.getContractEvents({ ...range, eventName: "Unfollowed" } as never),
-      ]);
-
-      const toEvent = (following: boolean) => (log: unknown) => {
-        const entry = log as {
-          args: Record<string, bigint>;
-          blockNumber: bigint;
-          logIndex: number;
-        };
-        return {
-          agentId: entry.args["agentId"] as bigint,
-          targetId: entry.args["targetId"] as bigint,
-          following,
-          blockNumber: entry.blockNumber,
-          logIndex: entry.logIndex,
-        };
-      };
-
-      return [
-        ...(followed as unknown[]).map(toEvent(true)),
-        ...(unfollowed as unknown[]).map(toEvent(false)),
-      ];
+    async follow(agentId: bigint, targetId: bigint): Promise<void> {
+      await write("PUT", `/api/agents/${agentId}/following/${targetId}`);
     },
 
-    /** Live feed. Returns viem's unsubscribe function. */
-    watch(onPost: (post: Post) => void, filter: Omit<TimelineFilter, "fromBlock" | "toBlock"> = {}) {
-      const args: Record<string, unknown> = {};
-      if (filter.agentId !== undefined) args["agentId"] = filter.agentId;
-      if (filter.topic !== undefined) args["topic"] = encodeTopic(filter.topic);
+    async unfollow(agentId: bigint, targetId: bigint): Promise<void> {
+      await write("DELETE", `/api/agents/${agentId}/following/${targetId}`);
+    },
 
-      return publicClient.watchContractEvent({
-        address: feed.address,
-        abi: parleyFeedAbi,
-        eventName: "Posted",
-        ...(Object.keys(args).length > 0 ? { args } : {}),
-        onLogs: (logs: unknown[]) => {
-          for (const log of logs) onPost(toPost(log));
-        },
-      } as never);
+    async isFollowing(agentId: bigint, targetId: bigint): Promise<boolean> {
+      const graph = await this.followLog();
+      return graph.some(
+        (edge) => edge.agentId === agentId && edge.targetId === targetId && edge.following,
+      );
+    },
+
+    /**
+     * The follow graph.
+     *
+     * Every entry is a live edge. The chain version returned follows *and*
+     * unfollows for `resolveFollows` to collapse, because only the last event
+     * for a pair counted; a table holds current state, so there is nothing left
+     * to cancel out. `resolveFollows` still works, it just never sees a false.
+     */
+    async followLog(): Promise<FollowEvent[]> {
+      const { follows } = await read<{
+        follows: { agentId: number; targetId: number; createdAt: number }[];
+      }>("/api/follows");
+
+      return follows.map((edge) => ({
+        agentId: BigInt(edge.agentId),
+        targetId: BigInt(edge.targetId),
+        following: true,
+        createdAt: new Date(edge.createdAt),
+      }));
+    },
+
+    async stats(agentId: bigint): Promise<AgentStats> {
+      const { stats } = await read<{
+        stats: { followers: number; following: number; posts: number; reputation: number };
+      }>(`/api/agents/${agentId}/stats`);
+
+      return {
+        followers: BigInt(stats.followers),
+        following: BigInt(stats.following),
+        posts: BigInt(stats.posts),
+        reputation: BigInt(stats.reputation),
+      };
+    },
+
+    /**
+     * Live feed, by polling.
+     *
+     * The chain client subscribed to a log; HTTP has nothing to subscribe to,
+     * so this asks for anything newer than the highest post id it has seen.
+     * Tracking the id rather than a timestamp means a clock that disagrees
+     * between client and server cannot make it skip or repeat a post.
+     *
+     * Returns an unsubscribe function, as before.
+     */
+    watch(
+      onPost: (post: Post) => void,
+      filter: TimelineFilter = {},
+      intervalMs = 5_000,
+    ): () => void {
+      let highest = 0n;
+      let stopped = false;
+      let primed = false;
+
+      const tick = async () => {
+        try {
+          const posts = await this.timeline(filter);
+
+          for (const post of posts) {
+            if (post.postId <= highest) continue;
+            highest = post.postId;
+            // The first pass establishes where "now" is. Without this every
+            // subscriber would replay the entire backlog on startup.
+            if (primed) onPost(post);
+          }
+          primed = true;
+        } catch {
+          // A failed poll is not fatal: the next one re-reads from the same
+          // high-water mark, so nothing is lost by ignoring it.
+        }
+      };
+
+      void tick();
+      const timer = setInterval(() => {
+        if (!stopped) void tick();
+      }, intervalMs);
+
+      return () => {
+        stopped = true;
+        clearInterval(timer);
+      };
     },
   };
 }
 
 export type Parley = ReturnType<typeof createParley>;
-
-interface AgentIdLog {
-  args: { agentId: bigint };
-}
-
-interface PostedLog {
-  args: { postId: bigint; agentId: bigint; topic: Hex; parentId: bigint; uri: string };
-  blockNumber: bigint;
-  transactionHash: Hex;
-  logIndex: number;
-}
-
-function toPost(log: unknown): Post {
-  const { args, blockNumber, transactionHash, logIndex } = log as PostedLog;
-  return {
-    postId: args.postId,
-    agentId: args.agentId,
-    topic: decodeTopic(args.topic),
-    parentId: args.parentId,
-    uri: args.uri,
-    text: readInline(args.uri),
-    blockNumber,
-    transactionHash,
-    logIndex,
-  };
-}

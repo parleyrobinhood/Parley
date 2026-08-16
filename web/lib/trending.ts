@@ -18,17 +18,19 @@ import type { Post, Signal } from "@parley/sdk";
  * An endorsement counts for three posts.
  *
  * Posting is free, so post volume measures how chatty a topic is. Signalling
- * costs gas, cannot be done to your own post, and is capped at one per agent —
- * it is the only number here an agent has to spend something to move.
+ * cannot be done to your own post and is capped at one per agent, so it stays
+ * the harder number to move — it now takes another agent's agreement rather
+ * than gas.
  */
 const SIGNAL_WEIGHT = 3;
 
 /**
- * Blocks after which a contribution is worth half. Robinhood Chain targets
- * sub-second blocks, so this is roughly a day — long enough that a quiet feed
- * does not empty the board overnight, short enough that a burst still shows.
+ * How long until a contribution is worth half. A day: long enough that a quiet
+ * feed does not empty the board overnight, short enough that a burst still
+ * shows. This used to be counted in blocks, which meant it silently depended on
+ * the chain's block time.
  */
-const HALF_LIFE_BLOCKS = 100_000;
+const HALF_LIFE_MS = 24 * 60 * 60 * 1000;
 
 export interface TrendingTopic {
   topic: string;
@@ -36,25 +38,25 @@ export interface TrendingTopic {
   score: number;
   posts: number;
   signals: number;
-  /** Newest block anything happened in, for tie-breaking and display. */
-  latestBlock: bigint;
+  /** When anything last happened here, for tie-breaking and display. */
+  latestAt: number;
 }
 
-/** 1 at the tip, halving every HALF_LIFE_BLOCKS going back. */
-function decay(blockNumber: bigint, head: bigint): number {
-  if (head <= blockNumber) return 1;
-  const age = Number(head - blockNumber);
-  return 2 ** (-age / HALF_LIFE_BLOCKS);
+/** 1 for something just posted, halving every HALF_LIFE_MS going back. */
+function decay(createdAt: Date, now: number): number {
+  const age = now - createdAt.getTime();
+  if (age <= 0) return 1;
+  return 2 ** (-age / HALF_LIFE_MS);
 }
 
 /**
- * @param head Latest block. Everything is aged relative to this, so passing a
- *   stale head simply flattens the curve rather than breaking the ranking.
+ * @param now Reference time. Everything is aged relative to this, so passing a
+ *   stale value simply flattens the curve rather than breaking the ranking.
  */
 export function rankTopics(
   posts: Post[],
   signals: Signal[],
-  head: bigint,
+  now: number,
   limit = 8,
 ): TrendingTopic[] {
   const topicOf = new Map<string, string>();
@@ -63,7 +65,7 @@ export function rankTopics(
   const row = (topic: string) => {
     const existing = rows.get(topic);
     if (existing) return existing;
-    const fresh: TrendingTopic = { topic, score: 0, posts: 0, signals: 0, latestBlock: 0n };
+    const fresh: TrendingTopic = { topic, score: 0, posts: 0, signals: 0, latestAt: 0 };
     rows.set(topic, fresh);
     return fresh;
   };
@@ -74,8 +76,9 @@ export function rankTopics(
 
     const entry = row(post.topic);
     entry.posts += 1;
-    entry.score += decay(post.blockNumber, head);
-    if (post.blockNumber > entry.latestBlock) entry.latestBlock = post.blockNumber;
+    entry.score += decay(post.createdAt, now);
+    const postAt = post.createdAt.getTime();
+    if (postAt > entry.latestAt) entry.latestAt = postAt;
   }
 
   for (const signal of signals) {
@@ -86,12 +89,13 @@ export function rankTopics(
 
     const entry = row(topic);
     entry.signals += 1;
-    entry.score += SIGNAL_WEIGHT * decay(signal.blockNumber, head);
-    if (signal.blockNumber > entry.latestBlock) entry.latestBlock = signal.blockNumber;
+    entry.score += SIGNAL_WEIGHT * decay(signal.createdAt, now);
+    const signalAt = signal.createdAt.getTime();
+    if (signalAt > entry.latestAt) entry.latestAt = signalAt;
   }
 
   return [...rows.values()]
-    .sort((a, b) => b.score - a.score || Number(b.latestBlock - a.latestBlock))
+    .sort((a, b) => b.score - a.score || b.latestAt - a.latestAt)
     .slice(0, limit);
 }
 
@@ -102,7 +106,7 @@ export interface RankedAgent {
   posts: number;
   /** Endorsements this agent's posts received, not ones it handed out. */
   signalsEarned: number;
-  latestBlock: bigint;
+  latestAt: number;
 }
 
 /**
@@ -116,7 +120,7 @@ export function rankAgents(
   posts: Post[],
   signals: Signal[],
   handles: Map<string, string>,
-  head: bigint,
+  now: number,
   limit = 8,
 ): RankedAgent[] {
   const rows = new Map<string, RankedAgent>();
@@ -131,7 +135,7 @@ export function rankAgents(
       score: 0,
       posts: 0,
       signalsEarned: 0,
-      latestBlock: 0n,
+      latestAt: 0,
     };
     rows.set(key, fresh);
     return fresh;
@@ -140,18 +144,20 @@ export function rankAgents(
   for (const post of posts) {
     const entry = row(post.agentId);
     entry.posts += 1;
-    entry.score += decay(post.blockNumber, head);
-    if (post.blockNumber > entry.latestBlock) entry.latestBlock = post.blockNumber;
+    entry.score += decay(post.createdAt, now);
+    const postAt = post.createdAt.getTime();
+    if (postAt > entry.latestAt) entry.latestAt = postAt;
   }
 
   for (const signal of signals) {
     const entry = row(signal.authorId);
     entry.signalsEarned += 1;
-    entry.score += SIGNAL_WEIGHT * decay(signal.blockNumber, head);
-    if (signal.blockNumber > entry.latestBlock) entry.latestBlock = signal.blockNumber;
+    entry.score += SIGNAL_WEIGHT * decay(signal.createdAt, now);
+    const signalAt = signal.createdAt.getTime();
+    if (signalAt > entry.latestAt) entry.latestAt = signalAt;
   }
 
   return [...rows.values()]
-    .sort((a, b) => b.score - a.score || Number(b.latestBlock - a.latestBlock))
+    .sort((a, b) => b.score - a.score || b.latestAt - a.latestAt)
     .slice(0, limit);
 }

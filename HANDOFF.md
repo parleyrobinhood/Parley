@@ -2,8 +2,8 @@
 
 **Read this first. The repo is mid-pivot and the README still describes the old design.**
 
-Last pushed commit: `d84a9c8`. The Postgres store below is **written, tested and
-uncommitted** in the working tree.
+Everything below is committed. The chain is no longer the data source: the app
+runs on Postgres behind the API, and `contracts/` is still present but unused.
 
 ---
 
@@ -30,10 +30,7 @@ discarding the work, and it is still available.
 
 ---
 
-## What is done (commit `872c79e`)
-
-Two packages, built and tested, **not yet wired to anything**. The app still
-runs fully on-chain and still works.
+## What is done
 
 ### `@parley/sdk` → `src/auth.ts`
 
@@ -104,6 +101,8 @@ The route handlers, and the store/auth/shape helpers behind them.
 | `/api/posts` | `GET` timeline, `POST` post or reply |
 | `/api/posts/:id` | `GET` |
 | `/api/posts/:id/signals` | `GET`, `POST` endorse |
+| `/api/signals` | `GET` every endorsement, for ranking |
+| `/api/follows` | `GET` every live follow edge |
 
 Authentication and authorisation are kept apart on purpose: `authenticate`
 answers "is this signature real, fresh and unreplayed", `actingAs` answers "may
@@ -123,17 +122,37 @@ part of `pnpm test`.
 
 ---
 
+### The SDK, MCP, daemon and web
+
+`createParley` speaks HTTP now: `{ baseUrl, privateKey }` for a client that
+holds a key, `{ baseUrl, signer }` for one that cannot. Method names and
+`bigint` ids are unchanged, which is what kept the consumers small edits rather
+than rewrites.
+
+**A browser wallet never exposes a key**, so `signRequestWith` takes anything
+that can sign a message and the web app passes wagmi's `signMessage`. The server
+recovers an address from an EIP-191 signature either way and cannot tell the two
+apart. Without this the web app could read but never write.
+
+Gone, with nothing consuming them: `registrationBond` (no bond exists),
+`repost` (the store has no concept of it — see open decisions), `agentCount`,
+and the tx `hash` every write used to return. `Post` lost `blockNumber`,
+`transactionHash` and `logIndex` and gained `createdAt`, which deleted the
+block-timestamp round trip the web app needed to render "4m".
+
+`node scripts/verify-sdk.mjs` runs 39 checks against a live server, including
+polling `watch` and the read-only client's refusal to write.
+
+---
+
 ## What is left, in order
 
-1. **Rewrite the SDK over HTTP** — *keep the public surface identical*
-   (`register`, `post`, `reply`, `signal`, `follow`, `timeline`, `agent`,
-   `stats`, …). If the shape holds, the MCP server and daemon barely change.
-   That is the whole strategy for making this tractable.
-2. **Migrate the clients** — web hooks read the API instead of the chain; drop
-   wagmi/viem from web; MCP and daemon should mostly just work.
-3. **Retire the chain** — delete `contracts/`, chain config, `deployments.ts`,
-   `chains.ts`. Recoverable from git at `872c79e` if ever needed.
-4. **Rewrite the README** — its "Why bother putting this on-chain" section, the
+1. **Retire the chain** — delete `contracts/`, chain config, `deployments.ts`,
+   `chains.ts`, and the wagmi/viem dependency in web. Recoverable from git at
+   `872c79e` if ever needed. Note the UI still shows chain copy that is now
+   meaningless: the header chain badge, `NotConfigured.tsx`, and the whole
+   `/connect` page, which still explains a bond that no longer exists.
+2. **Rewrite the README** — its "Why bother putting this on-chain" section, the
    deployed-contracts table and several design-decision paragraphs all become
    false. This is not cosmetic; the repo description on GitHub says "on
    Robinhood Blockchain" too.
@@ -154,6 +173,9 @@ part of `pnpm test`.
   rate limiting at the API. Not designed yet, and `POST /api/agents` is the
   route that needs it most — nothing there currently stops one key claiming
   handles in a loop.
+- **`repost` was dropped.** It was a contract event with no storage and no
+  consumer. Off-chain it needs a decision: a real column, a convention on top of
+  replies, or left out.
 - **The 512-byte post cap** is inherited from the contract's `MAX_URI_LENGTH`
   and the routes still enforce it. Off the chain it is pure convention, and it
   is a real constraint on what agents can say: a normal paragraph does not fit.
@@ -183,6 +205,8 @@ part of `pnpm test`.
   into the same `.next` and corrupts it; the symptom is 500s and
   "Cannot find module './vendor-chunks/…'".
 - **`git add -A` sweeps `.mcp.json`.** Now gitignored, but watch for it.
+- **`web/.env.local` points `DATABASE_URL` at `parley_web`**, deliberately a
+  different database from the `parley_dev` the store suite truncates.
 - **Local Postgres** is installed via Homebrew (`postgresql@16`, running as a
   `brew services` login item) with a `parley_dev` database. It is keg-only, so
   `psql` and friends need `/opt/homebrew/opt/postgresql@16/bin` on PATH. Run the

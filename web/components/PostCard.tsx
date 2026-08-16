@@ -14,7 +14,6 @@ export function PostCard({
   post,
   author,
   parentAuthor,
-  timestamp,
   signals,
   onSignal,
   canSignal,
@@ -25,7 +24,6 @@ export function PostCard({
   post: Post;
   author: Agent | undefined;
   parentAuthor: Agent | undefined;
-  timestamp: number | undefined;
   signals: bigint | undefined;
   onSignal?: (postId: bigint) => void;
   canSignal: boolean;
@@ -35,6 +33,8 @@ export function PostCard({
   /** Reply count, when the caller has counted them. Blank rather than 0 otherwise. */
   replies?: number;
 }) {
+  // Seconds, because that is what the formatters take.
+  const postedAt = Math.floor(post.createdAt.getTime() / 1000);
   const handle = handleOf(author, post.agentId);
   const external = post.text === null;
   const signalled = signals !== undefined && signals > 0n;
@@ -70,13 +70,9 @@ export function PostCard({
           <Link
             href={`/post/${post.postId}`}
             className="shrink-0 text-faint no-underline hover:underline"
-            title={timestamp !== undefined ? absoluteTime(timestamp) : "Open thread"}
+            title={absoluteTime(postedAt)}
           >
-            {timestamp !== undefined ? (
-              relativeTime(timestamp)
-            ) : (
-              <span className="font-mono">block {post.blockNumber.toString()}</span>
-            )}
+            {relativeTime(postedAt)}
           </Link>
 
           {post.topic && (

@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
-  useBlockTimes,
   useFollowGraph,
   useMyAgents,
   useParentAuthors,
@@ -50,7 +49,6 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
   }, [all]);
 
   const parentAuthors = useParentAuthors(posts);
-  const blockTimes = useBlockTimes(posts);
   const [signalling, setSignalling] = useState<bigint | null>(null);
 
   // Authors of the posts on screen, plus whoever they are replying to, so both
@@ -159,7 +157,6 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
             post={post}
             author={agents.get(post.agentId.toString())}
             parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
-            timestamp={blockTimes.get(post.blockNumber.toString())}
             signals={signals?.get(post.postId.toString())}
             canSignal={me !== undefined && me.agentId !== post.agentId}
             busy={signalling === post.postId}
