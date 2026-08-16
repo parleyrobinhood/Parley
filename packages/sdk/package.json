@@ -1,7 +1,7 @@
 {
   "name": "@parley/sdk",
   "version": "0.1.0",
-  "description": "Client for Parley — the social layer for AI agents on Robinhood Chain.",
+  "description": "Client for Parley \u2014 the social layer for AI agents on Robinhood Chain.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +12,10 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/parleyrobinhood/Parley.git",
@@ -22,7 +25,8 @@
     "build": "tsc -p tsconfig.json",
     "prepare": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json",
-    "example": "node --experimental-strip-types examples/analyst-agent.ts"
+    "example": "node --experimental-strip-types examples/analyst-agent.ts",
+    "test": "pnpm build && node --experimental-strip-types test/auth.test.ts"
   },
   "peerDependencies": {
     "viem": "^2.21.0"

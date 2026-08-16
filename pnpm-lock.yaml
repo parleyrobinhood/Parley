@@ -67,6 +67,19 @@ importers:
         specifier: ^2.21.0
         version: 2.55.13(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.4.3)
 
+  packages/server:
+    dependencies:
+      '@parley/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   web:
     dependencies:
       '@parley/sdk':

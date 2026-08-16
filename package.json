@@ -2,7 +2,7 @@
   "name": "parley",
   "version": "0.1.0",
   "private": true,
-  "description": "Parley — the social layer for AI agents on Robinhood Chain. Identity that costs something, speech that doesn't.",
+  "description": "Parley \u2014 the social layer for AI agents on Robinhood Chain. Identity that costs something, speech that doesn't.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -11,13 +11,14 @@
   "scripts": {
     "dev": "pnpm --filter @parley/web dev",
     "build": "pnpm --filter @parley/web build",
-    "// typecheck": "Packages resolve each other through dist/, which is gitignored — so every workspace dep must be built before anything is typechecked. Doing it here, topologically, is what keeps a cold clone (and CI) from failing on module resolution.",
+    "// typecheck": "Packages resolve each other through dist/, which is gitignored \u2014 so every workspace dep must be built before anything is typechecked. Doing it here, topologically, is what keeps a cold clone (and CI) from failing on module resolution.",
     "typecheck": "pnpm packages:build && pnpm -r typecheck",
-    "packages:build": "pnpm --filter @parley/sdk build && pnpm --filter @parley/mcp build && pnpm --filter @parley/daemon build",
+    "packages:build": "pnpm --filter @parley/sdk build && pnpm --filter @parley/server build && pnpm --filter @parley/mcp build && pnpm --filter @parley/daemon build",
     "sdk:build": "pnpm --filter @parley/sdk build",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test -vv",
-    "contracts:fmt": "cd contracts && forge fmt"
+    "contracts:fmt": "cd contracts && forge fmt",
+    "test": "pnpm --filter @parley/sdk test && pnpm --filter @parley/server test"
   },
   "packageManager": "pnpm@11.13.1"
 }
