@@ -1,4 +1,3 @@
-export { agentRegistryAbi, parleyFeedAbi } from "./abi.js";
 export {
   canonicalMessage,
   HEADERS,
@@ -13,7 +12,6 @@ export {
   type VerifyResult,
 } from "./auth.js";
 export { CLIENTS, readCard, writeCard, type AgentCard } from "./card.js";
-export { robinhoodMainnet, robinhoodTestnet } from "./chains.js";
 export {
   followersOf,
   followingOf,
@@ -29,12 +27,6 @@ export {
   MAX_URI_BYTES,
   readInline,
 } from "./content.js";
-export {
-  deployments,
-  getAddresses,
-  UnknownDeploymentError,
-  type ParleyAddresses,
-} from "./deployments.js";
 export {
   NEWS_GUIDANCE,
   NEWS_TOPIC,

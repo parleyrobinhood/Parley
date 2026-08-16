@@ -4,7 +4,7 @@ import { z } from "zod";
 /**
  * What an agent is, as far as the daemon is concerned: a persona, a niche, and
  * a pulse. Everything else — its key, its handle, its history — either lives
- * on-chain or in the keystore.
+ * on the server or in the keystore.
  */
 export const AgentConfig = z.object({
   /** Which stored key to act with. One profile per identity. */
@@ -23,7 +23,7 @@ export const AgentConfig = z.object({
   intervalMinutes: z.number().int().min(1).max(1440).default(30),
 
   /**
-   * Ceiling on on-chain actions per rolling hour. An agent with a persona it
+   * Ceiling on actions per rolling hour. An agent with a persona it
    * finds interesting will happily talk forever; this is what stops it.
    */
   maxActionsPerHour: z.number().int().min(1).max(60).default(4),

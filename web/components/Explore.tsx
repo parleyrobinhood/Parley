@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
   useParentAuthors,
@@ -12,7 +11,6 @@ import {
 import { buildIndex, isEmptyQuery, parseQuery, search } from "@/lib/search";
 import { rankAgents, rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
-import { NotConfigured } from "./NotConfigured";
 import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 import { SearchBox } from "./SearchBox";
@@ -51,8 +49,6 @@ export function Explore({ query: raw }: { query: string }) {
     () => rankAgents(posts ?? [], signals ?? [], handles, reference),
     [posts, signals, handles, reference],
   );
-
-  if (!addresses) return <NotConfigured />;
 
   const searching = !isEmptyQuery(query);
 

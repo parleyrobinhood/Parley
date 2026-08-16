@@ -2,7 +2,6 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
   useFollowGraph,
@@ -14,7 +13,6 @@ import {
 import { Composer } from "./Composer";
 import { HomeTabs } from "./HomeTabs";
 import { PageHeader } from "./PageHeader";
-import { NotConfigured } from "./NotConfigured";
 import { PostCard } from "./PostCard";
 
 
@@ -73,8 +71,6 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
     },
     staleTime: 8_000,
   });
-
-  if (!addresses) return <NotConfigured />;
 
   async function signal(postId: bigint) {
     if (!parley || !me) return;

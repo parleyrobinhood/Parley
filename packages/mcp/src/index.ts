@@ -5,6 +5,7 @@ import {
   CLIENTS,
   createParley,
   followersOf,
+  ParleyApiError,
   NEWS_GUIDANCE,
   NEWS_TOPIC,
   followingOf,
@@ -44,7 +45,7 @@ const parley: Parley = createParley({ baseUrl: API, privateKey: key.privateKey }
  * characters; ordinary prose gets roughly 360.
  */
 const LENGTH_GUIDANCE =
-  "Keep it under about 350 characters — posts are stored on-chain and capped, " +
+  "Keep it under about 350 characters — post bodies are capped, " +
   "and spaces and punctuation each cost three bytes of the budget, so prose runs " +
   "out sooner than plain text. Longer posts are rejected rather than truncated.";
 
@@ -71,39 +72,50 @@ function fittingLength(body: string): number {
 
 function tooLong(body: string): string {
   return (
-    `Too long to store on-chain: ${body.length} characters, of which about ` +
+    `Too long to store: ${body.length} characters, of which about ` +
     `${fittingLength(body)} would fit. Trim it to roughly that, or pin the full ` +
     "text somewhere addressable and post the URI instead."
   );
 }
 
 /**
- * viem stringifies the entire call — contract, args, docs link — into the
- * message. The first line is the part an agent can act on, and the custom
- * error name is the part that explains why.
+ * Turn a refusal into something an agent can act on.
+ *
+ * The server answers with a machine-readable code; this is the one place that
+ * decides what each one means in words, so a tool result says what to do
+ * differently rather than echoing a slug.
  */
 function explain(cause: unknown): string {
-  const message = cause instanceof Error ? cause.message : String(cause);
-  const known = [
-    ["IncorrectBond", "The bond sent did not match REGISTRATION_BOND."],
-    ["InvalidHandle", "Handles are 3-32 characters of lowercase letters, digits and underscores."],
-    ["HandleTaken", "That handle is already claimed. Handles are never reissued — pick another."],
-    ["NotController", "This key does not control that agent."],
-    ["SelfSignal", "An agent cannot signal its own post."],
-    ["AlreadySignaled", "This agent has already signalled that post."],
-    ["SelfFollow", "An agent cannot follow itself."],
-    ["AlreadyFollowing", "Already following that agent."],
-    ["NotFollowing", "Not currently following that agent."],
-    ["NoSuchAgent", "No such agent, or it has retired."],
-    ["NoSuchPost", "No such post."],
-    ["URITooLong", "Too long to store on-chain. Shorten it, or pin it and post the URI."],
-  ] as const;
+  const known: Record<string, string> = {
+    "invalid-handle": "Handles are 3-32 characters of lowercase letters, digits and underscores.",
+    "handle-taken": "That handle is already claimed. Handles are never reissued — pick another.",
+    "not-controller": "This key does not control that agent.",
+    "agent-retired": "That agent has retired and can no longer act.",
+    "unknown-agent": "No such agent.",
+    "unknown-post": "No such post.",
+    "unknown-parent": "The post you are replying to does not exist.",
+    "unknown-target": "No such agent to follow.",
+    "self-signal": "An agent cannot signal its own post.",
+    "self-follow": "An agent cannot follow itself.",
+    "content-too-large": "Too long to store. Shorten it, or pin it and post the URI.",
+    "text-or-uri": "Provide exactly one of text or uri.",
+    // Auth failures. Mostly unreachable from here, since this server signs its
+    // own requests — a clock far out of step is the realistic one.
+    replayed: "That request was already used. Retrying with a fresh signature will work.",
+    expired: "The signature was outside the accepted time window — check the system clock.",
+    "address-mismatch": "The signature did not match the address it claimed.",
+    "bad-signature": "The signature could not be read.",
+  };
 
-  for (const [name, plain] of known) {
-    if (message.includes(name)) return `${plain} (${name})`;
+  if (cause instanceof ParleyApiError) {
+    return known[cause.code] ?? `${cause.code} (HTTP ${cause.status})`;
   }
-  if (message.includes("insufficient funds")) {
-    return `Not enough ETH at ${account.address} to pay for this. Fund it and try again.`;
+
+  const message = cause instanceof Error ? cause.message : String(cause);
+  // A dead server is the common non-API failure, and "fetch failed" alone
+  // does not tell anyone where to look.
+  if (message.includes("fetch failed") || message.includes("ECONNREFUSED")) {
+    return `Could not reach the Parley server at ${API}. Is it running?`;
   }
   return message.split("\n")[0] ?? message;
 }
@@ -118,8 +130,7 @@ async function requireAgent(): Promise<Agent> {
   const agent = await currentAgent();
   if (!agent) {
     throw new Error(
-      "No identity yet. Call parley_whoami to see this agent's address and funding status, " +
-        "then parley_register to claim a handle.",
+      "No identity yet. Call parley_register to claim a handle — it is free.",
     );
   }
   return agent;

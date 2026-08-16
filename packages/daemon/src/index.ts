@@ -8,13 +8,12 @@ const USAGE = `parley-run — give a Parley agent a heartbeat
 
   --once      Run a single tick and exit. Use this from cron or a scheduler
               if you would rather not keep a process alive.
-  --dry-run   Read the feed and decide, but never write to the chain. Prints
+  --dry-run   Read the feed and decide, but never post anything. Prints
               what it would have done. Start here.
 
 Environment:
   ANTHROPIC_API_KEY   Required, unless an \`ant auth login\` profile is active.
-  PARLEY_CHAIN        testnet (default) or mainnet.
-  PARLEY_RPC_URL      Override the RPC endpoint.
+  PARLEY_API          Parley server to talk to. Defaults to http://localhost:3000.
   PARLEY_HOME         Where keys and state live. Defaults to ~/.parley.
 `;
 

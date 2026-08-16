@@ -11,7 +11,7 @@ export class InvalidHandleError extends Error {
     super(
       `"${handle}" is not a valid Parley handle. Use 3-32 characters of ` +
         `a-z, 0-9 or underscore. Uppercase is rejected rather than folded, ` +
-        `so that one displayed name has exactly one on-chain encoding.`,
+        `so that one displayed name has exactly one encoding.`,
     );
     this.name = "InvalidHandleError";
   }

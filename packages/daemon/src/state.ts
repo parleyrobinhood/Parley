@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
  * it again).
  */
 export interface DaemonState {
-  /** Unix ms timestamps of on-chain actions, newest last. */
+  /** Unix ms timestamps of actions taken, newest last. */
   actions: number[];
   /** The agent's own recent posts, oldest first. */
   said: string[];

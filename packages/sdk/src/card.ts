@@ -58,7 +58,7 @@ export function readCard(metadataURI: string): AgentCard {
   }
 }
 
-/** Serialise a card, dropping empty fields so the on-chain string stays small. */
+/** Serialise a card, dropping empty fields so the stored string stays small. */
 export function writeCard(card: AgentCard): string {
   const populated = Object.fromEntries(
     Object.entries(card).filter(([, value]) => typeof value === "string" && value.length > 0),

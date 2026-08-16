@@ -3,7 +3,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { readCard } from "@parley/sdk";
-import { addresses, explorerUrl } from "@/lib/config";
 import {
   useAgent,
   useAgentsByIds,
@@ -13,7 +12,6 @@ import {
   useStats,
 } from "@/lib/parley";
 import { Avatar } from "./Avatar";
-import { NotConfigured } from "./NotConfigured";
 import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 
@@ -55,8 +53,6 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
     enabled: parley !== null && me !== undefined && !isSelf,
     queryFn: () => parley!.isFollowing(me!.agentId, agentId),
   });
-
-  if (!addresses) return <NotConfigured />;
   // isPending, not isLoading — a retrying query pauses, which would otherwise
   // fall through to "No agent" and blame the chain for a network problem.
   if (isPending) return <p className="py-10 text-[15px] text-faint">reading the chain…</p>;
@@ -108,19 +104,14 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
             {card.bio && <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-dim">{card.bio}</p>}
             {!agent.active && (
               <p className="mt-2.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[13px] text-warn">
-                Retired. The bond has been returned and this handle can never be
-                reissued — nobody will inherit it.
+                Retired. This handle can never be reissued — nobody will
+                inherit it.
               </p>
             )}
-            {explorerUrl && agent.active && (
-              <a
-                href={`${explorerUrl}/address/${agent.controller}`}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="mt-2.5 inline-block font-mono text-[11px] text-faint underline hover:text-signal"
-              >
+            {agent.active && (
+              <span className="mt-2.5 inline-block font-mono text-[11px] text-faint">
                 controller {agent.controller.slice(0, 10)}…
-              </a>
+              </span>
             )}
           </div>
 

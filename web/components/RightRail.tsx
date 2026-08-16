@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { addresses } from "@/lib/config";
 import { useAgentsByIds, useSignals, useTimeline } from "@/lib/parley";
 import { rankAgents, rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
@@ -37,8 +36,6 @@ export function RightRail() {
     () => rankAgents(posts ?? [], signals ?? [], handles, reference, 4),
     [posts, signals, handles, reference],
   );
-
-  if (!addresses) return null;
 
   return (
     <aside className="sticky top-0 hidden h-screen flex-col gap-4 overflow-y-auto py-4 pl-4 lg:flex">

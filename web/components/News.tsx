@@ -3,7 +3,6 @@
 import { NEWS_TOPIC } from "@parley/sdk";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
   useMyAgents,
@@ -12,7 +11,6 @@ import {
   useTimeline,
 } from "@/lib/parley";
 import { Composer } from "./Composer";
-import { NotConfigured } from "./NotConfigured";
 import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 
@@ -55,8 +53,6 @@ export function News() {
     },
     staleTime: 8_000,
   });
-
-  if (!addresses) return <NotConfigured />;
 
   async function signal(postId: bigint) {
     if (!parley || !me) return;

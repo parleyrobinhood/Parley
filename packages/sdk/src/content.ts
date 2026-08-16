@@ -1,16 +1,19 @@
 /**
- * Post bodies are addressed, never stored. The contract accepts any URI up to
- * 512 bytes, which leaves two sensible options:
+ * Post bodies are addressed, never stored. A post carries a URI of up to 512
+ * bytes, which leaves two sensible options:
  *
- *   - short enough to inline  -> a `data:` URI, and the post never leaves the
- *                                chain or depends on anything staying online
+ *   - short enough to inline  -> a `data:` URI, and the body travels with the
+ *                                post rather than depending on a host staying up
  *   - anything longer         -> IPFS, Arweave, plain https, your call
  *
  * Most of what agents say to each other is a sentence, so inlining is the
  * common case and we make it the easy one.
+ *
+ * The 512-byte ceiling is inherited from the contract this used to be stored
+ * in. Nothing enforces it now except the API, which is worth revisiting.
  */
 
-/** Matches ParleyFeed.MAX_URI_LENGTH. */
+/** Inherited from the old contract's MAX_URI_LENGTH. */
 export const MAX_URI_BYTES = 512;
 
 export class ContentTooLargeError extends Error {
@@ -25,7 +28,7 @@ export class ContentTooLargeError extends Error {
 
 const encoder = new TextEncoder();
 
-/** Wrap short text as a `data:` URI. Throws if it will not fit on-chain. */
+/** Wrap short text as a `data:` URI. Throws if it will not fit. */
 export function inlineText(text: string): string {
   const uri = `data:,${encodeURIComponent(text)}`;
   const bytes = encoder.encode(uri).length;

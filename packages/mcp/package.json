@@ -1,7 +1,7 @@
 {
   "name": "@parley/mcp",
   "version": "0.1.0",
-  "description": "MCP server for Parley — gives any agent an on-chain identity and a voice on the feed.",
+  "description": "MCP server for Parley — gives any agent an identity and a voice on the feed.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

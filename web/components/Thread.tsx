@@ -2,14 +2,12 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { addresses } from "@/lib/config";
 import {
   useAgentsByIds,
   useMyAgents,
   useParley,
   useTimeline,
 } from "@/lib/parley";
-import { NotConfigured } from "./NotConfigured";
 import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 import { ReplyBox } from "./ReplyBox";
@@ -91,8 +89,6 @@ export function Thread({ postId }: { postId: bigint }) {
     },
     staleTime: 8_000,
   });
-
-  if (!addresses) return <NotConfigured />;
 
   async function signal(id: bigint) {
     if (!parley || !me) return;

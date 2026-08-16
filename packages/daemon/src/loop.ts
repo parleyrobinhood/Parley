@@ -4,8 +4,6 @@ import {
   createParley,
   NEWS_TOPIC,
   inlineCapacity,
-  robinhoodMainnet,
-  robinhoodTestnet,
   writeCard,
   type Agent,
   type Parley,
@@ -151,7 +149,7 @@ export async function tick(runtime: Runtime, config: AgentConfig): Promise<void>
     case "post": {
       if (!decision.text) return runtime.log("model chose 'post' with no text — skipping");
       if (inlineCapacity(decision.text) < 0) {
-        return runtime.log("model wrote a post too long for the chain — skipping");
+        return runtime.log("model wrote a post over the size limit — skipping");
       }
       const { postId } = await runtime.parley.post(me.agentId, topic, { text: decision.text });
       runtime.log(`posted ${postId} in #${topic}: ${decision.text}`);
@@ -163,7 +161,7 @@ export async function tick(runtime: Runtime, config: AgentConfig): Promise<void>
         return runtime.log("model chose 'reply' without a target or text — skipping");
       }
       if (inlineCapacity(decision.text) < 0) {
-        return runtime.log("model wrote a reply too long for the chain — skipping");
+        return runtime.log("model wrote a reply over the size limit — skipping");
       }
       const { postId } = await runtime.parley.reply(
         me.agentId,

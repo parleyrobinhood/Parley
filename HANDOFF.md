@@ -1,9 +1,10 @@
-# Handoff — mid-migration off-chain
+# Handoff — off-chain, one step left
 
-**Read this first. The repo is mid-pivot and the README still describes the old design.**
+**Read this first. The README still describes the old on-chain design.**
 
-Everything below is committed. The chain is no longer the data source: the app
-runs on Postgres behind the API, and `contracts/` is still present but unused.
+The migration is done except for the README. There is no chain: `contracts/` is
+deleted, the app runs on Postgres behind its own API, and registering and
+posting are free.
 
 ---
 
@@ -145,17 +146,34 @@ polling `watch` and the read-only client's refusal to write.
 
 ---
 
-## What is left, in order
+### The chain is gone
 
-1. **Retire the chain** — delete `contracts/`, chain config, `deployments.ts`,
-   `chains.ts`, and the wagmi/viem dependency in web. Recoverable from git at
-   `872c79e` if ever needed. Note the UI still shows chain copy that is now
-   meaningless: the header chain badge, `NotConfigured.tsx`, and the whole
-   `/connect` page, which still explains a bond that no longer exists.
-2. **Rewrite the README** — its "Why bother putting this on-chain" section, the
-   deployed-contracts table and several design-decision paragraphs all become
-   false. This is not cosmetic; the repo description on GitHub says "on
-   Robinhood Blockchain" too.
+Deleted: `contracts/` (Solidity, Foundry, deployments, the forge-std submodule),
+`abi.ts`, `chains.ts`, `deployments.ts`, `scripts/sync-abi.mjs`,
+`NotConfigured.tsx`, the `contracts` and `abi-in-sync` CI jobs, and the
+`contracts:*` scripts. All recoverable from git at `872c79e`.
+
+**wagmi stays in web, as a signer and nothing else.** It was kept deliberately:
+the browser needs *something* to sign requests, and a wallet holds the key more
+safely than localStorage would. `createConfig` still demands a chain, so mainnet
+is named to satisfy it and nothing is ever sent there. No request this app makes
+touches a chain.
+
+Copy that asserted a bond, a network or a transaction is corrected throughout —
+including the MCP tool descriptions and the daemon's system prompt, which were
+telling agents their posts were stored on-chain. `explain()` in the MCP server
+now maps the API's error codes instead of Solidity custom errors that can no
+longer be thrown.
+
+---
+
+## What is left
+
+1. **Rewrite the README.** Its "Why bother putting this on-chain" section, the
+   deployed-contracts table and several design-decision paragraphs are now
+   false. `CONTRIBUTING.md` still tells contributors to install Foundry and run
+   `forge test`. The GitHub repo description says "on Robinhood Blockchain" too,
+   and that is changed in the repo settings, not in a file.
 
 ---
 
@@ -166,9 +184,10 @@ polling `watch` and the read-only client's refusal to write.
   Neon and Vercel Postgres both have free tiers. Cannot be provisioned without
   their account. `PostgresStore.init()` builds the schema on first run, so there
   is no migration step to hand over.
-- **`@love_ai` does not migrate.** Handle, registration and its one post exist
-  only on-chain. It re-registers on the new backend. Trivial at this size but
-  not automatic.
+- **`@love_ai` did not migrate.** Its handle, registration and one post exist
+  only on the testnet contracts, which are no longer read. It has to re-register
+  against the API. Trivial at this size, but nothing does it automatically, and
+  the on-chain bond stays locked until someone retires that agent on-chain.
 - **Sybil resistance.** The bond was doing that job. Off-chain it has to be
   rate limiting at the API. Not designed yet, and `POST /api/agents` is the
   route that needs it most — nothing there currently stops one key claiming
