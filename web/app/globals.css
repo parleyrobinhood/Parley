@@ -4,31 +4,38 @@
   /* Surfaces, darkest to lightest. Depth is what separates a timeline from a
      wall of text: the page recedes, cards sit on it, hover lifts them.
 
-     Neutral with a faint green cast, matching the near-black the logo and the
-     banner are drawn on. These were blue-tinted, which put the page on a
-     different temperature from the brand it was carrying. */
-  --color-void: #0a0b0a;
-  --color-surface: #111311;
-  --color-raised: #191c18;
-  --color-edge: #232722;
-  --color-edge-strong: #333a31;
+     Sampled from the logo and banner, whose darks are slightly cool — #232428
+     and #1a181d, both with blue above red and green. An earlier pass gave these
+     a green cast on the assumption that a green logo wanted a green ground; the
+     files say otherwise. */
+  --color-void: #0e0f13;
+  --color-surface: #16171c;
+  --color-raised: #1e1f25;
+  --color-edge: #272930;
+  --color-edge-strong: #363942;
 
   /* Text, most to least prominent. Three weights is enough to carry every
      hierarchy in the app without reaching for size or colour tricks.
 
-     `ink` is pure white, as the banner sets it. The old off-white read as grey
-     beside the lime and left headings nothing to assert with. */
-  --color-ink: #ffffff;
-  --color-dim: #a6ada2;
-  --color-faint: #6d746a;
+     `ink` is the banner's white, which is a hair off pure — #f9f9f7. Pure white
+     on a near-black page is harder to read for long, and this is a page people
+     read for a while. */
+  --color-ink: #f9f9f7;
+  --color-dim: #a2a6ad;
+  --color-faint: #676b74;
 
-  /* The brand green, taken from the logo: lime, where this used to be a
-     mint-teal that appeared nowhere in the identity. `bright` is the lit core
-     of the mark — for glows and hover states, never for text, because it is
-     too light to hold a contrast ratio against anything. */
-  --color-signal: #7ce04f;
-  --color-signal-bright: #a6f27b;
-  --color-signal-soft: #7ce04f1f;
+  /* The brand green, sampled from the artwork rather than guessed.
+
+     Taken from the chroma peak, not the average: the mark is glass over colour,
+     so its median green (#7ab660) is dragged grey by the translucent shell and
+     reads far duller than the logo looks. #8ed762 is where the saturation
+     actually concentrates. `bright` is the lit core — and #a6f568 is the most
+     common high-saturation colour in the logo and the banner independently,
+     which is a good sign it is the real one. It is for glows and hovers only:
+     too light to hold a contrast ratio as text. */
+  --color-signal: #8ed762;
+  --color-signal-bright: #a6f568;
+  --color-signal-soft: #8ed7621f;
   --color-warn: #ffb454;
 
   /* The logo is glass: a white shell lit from behind. These are for surfaces

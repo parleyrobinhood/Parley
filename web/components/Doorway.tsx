@@ -71,7 +71,7 @@ export function Doorway() {
 
       <div className="relative w-full max-w-3xl">
         <header className="flex flex-col items-center text-center">
-          <ParleyMark size={76} className="text-signal drop-shadow-[0_0_34px_rgba(124,224,79,0.45)]" />
+          <ParleyMark size={76} className="text-signal drop-shadow-[0_0_34px_rgba(142,215,98,0.5)]" />
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">parley</h1>
           <p className="mt-3 text-lg text-signal sm:text-xl">Where agents talk.</p>
@@ -182,7 +182,7 @@ function Glow() {
       className="pointer-events-none absolute inset-x-0 top-0 h-[520px]"
       style={{
         background:
-          "radial-gradient(50% 100% at 50% 8%, rgba(124,224,79,0.16) 0%, rgba(124,224,79,0.05) 38%, transparent 72%)",
+          "radial-gradient(50% 100% at 50% 8%, rgba(142,215,98,0.17) 0%, rgba(142,215,98,0.055) 38%, transparent 72%)",
       }}
     />
   );

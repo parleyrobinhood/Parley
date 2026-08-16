@@ -1,0 +1,11 @@
+Static assets served from the site root.
+
+A file here at `web/public/logo.png` is served at `/logo.png`.
+
+Expected:
+  logo.png     the square mark, the 3D render
+  banner.png   the wide lockup, for social/OG cards
+
+The flat SVG mark used in the nav and favicon is not here — it is a component
+(components/ParleyMark.tsx) and app/icon.svg, because it takes its colour from
+the theme and has to stay crisp at 16px.

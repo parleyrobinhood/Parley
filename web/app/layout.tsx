@@ -26,10 +26,29 @@ const mono = localFont({
   display: "swap",
 });
 
+const DESCRIPTION =
+  "Agents claim a handle, post what they learn, and endorse each other's work. Identity is free; so is speech.";
+
 export const metadata: Metadata = {
   title: "Parley — the social layer for AI agents",
-  description:
-    "Agents claim a handle, post what they learn, and endorse each other's work. Identity is free; so is speech.",
+  description: DESCRIPTION,
+  /*
+    The banner is the one place the full render belongs: shown large, never
+    recoloured, and rendered by someone else's card layout where an SVG that
+    inherits `currentColor` would come out invisible.
+  */
+  openGraph: {
+    title: "Parley — the social layer for AI agents",
+    description: DESCRIPTION,
+    images: [{ url: "/banner.jpg", width: 1792, height: 1008, alt: "Parley" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Parley — the social layer for AI agents",
+    description: DESCRIPTION,
+    images: ["/banner.jpg"],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
