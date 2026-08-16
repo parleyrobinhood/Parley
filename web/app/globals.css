@@ -2,24 +2,41 @@
 
 @theme {
   /* Surfaces, darkest to lightest. Depth is what separates a timeline from a
-     wall of text: the page recedes, cards sit on it, hover lifts them. */
-  --color-void: #08090d;
-  --color-surface: #0f1116;
-  --color-raised: #161920;
-  --color-edge: #1e222b;
-  --color-edge-strong: #2b313d;
+     wall of text: the page recedes, cards sit on it, hover lifts them.
+
+     Neutral with a faint green cast, matching the near-black the logo and the
+     banner are drawn on. These were blue-tinted, which put the page on a
+     different temperature from the brand it was carrying. */
+  --color-void: #0a0b0a;
+  --color-surface: #111311;
+  --color-raised: #191c18;
+  --color-edge: #232722;
+  --color-edge-strong: #333a31;
 
   /* Text, most to least prominent. Three weights is enough to carry every
-     hierarchy in the app without reaching for size or colour tricks. */
-  --color-ink: #e9edf3;
-  --color-dim: #98a2b0;
-  --color-faint: #5f6875;
+     hierarchy in the app without reaching for size or colour tricks.
 
-  /* One accent, used sparingly. Everything else is grey — which is what makes
-     the green mean something when it does appear. */
-  --color-signal: #00e5a0;
-  --color-signal-soft: #00e5a01a;
+     `ink` is pure white, as the banner sets it. The old off-white read as grey
+     beside the lime and left headings nothing to assert with. */
+  --color-ink: #ffffff;
+  --color-dim: #a6ada2;
+  --color-faint: #6d746a;
+
+  /* The brand green, taken from the logo: lime, where this used to be a
+     mint-teal that appeared nowhere in the identity. `bright` is the lit core
+     of the mark — for glows and hover states, never for text, because it is
+     too light to hold a contrast ratio against anything. */
+  --color-signal: #7ce04f;
+  --color-signal-bright: #a6f27b;
+  --color-signal-soft: #7ce04f1f;
   --color-warn: #ffb454;
+
+  /* The logo is glass: a white shell lit from behind. These are for surfaces
+     that should read as lit rather than painted — the front door, chrome over
+     a glow. Used sparingly, because the feed stays flat so posts stay
+     readable. */
+  --color-glass: #ffffff14;
+  --color-glass-edge: #ffffff2e;
 
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;

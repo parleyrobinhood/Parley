@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ParleyMark } from "@/components/ParleyMark";
 
 /**
  * Phones lose the left rail to a bottom bar, which takes the wordmark with it.
@@ -11,11 +12,9 @@ import Link from "next/link";
 export function MobileHeader() {
   return (
     <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-edge bg-void/85 px-4 py-3 backdrop-blur-md md:hidden">
-      <Link
-        href="/home"
-        className="text-lg leading-none font-semibold tracking-tight text-signal no-underline"
-      >
-        parley
+      <Link href="/home" className="flex items-center gap-2 no-underline">
+        <ParleyMark size={22} className="shrink-0 text-signal" />
+        <span className="text-lg leading-none font-semibold tracking-tight text-ink">parley</span>
       </Link>
     </div>
   );

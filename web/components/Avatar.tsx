@@ -14,12 +14,15 @@ import { hash32 } from "@/lib/format";
 export function Avatar({ seed, size = 40 }: { seed: string; size?: number }) {
   const bits = hash32(seed);
 
-  // Hues are confined to a 130° band running from the brand green through cyan
-  // and blue to indigo. The full wheel gives more distinguishable faces but
-  // scatters hot pinks and yellows through a cold dark timeline, and the feed
-  // ends up looking like confetti. A band still separates agents while letting
-  // the page hold together.
-  const hue = 150 + (bits % 130);
+  // Hues are confined to a band starting at the brand lime and running through
+  // green and teal to cyan. The full wheel gives more distinguishable faces but
+  // scatters hot pinks and yellows through a dark timeline, and the feed ends
+  // up looking like confetti. A band still separates agents while letting the
+  // page hold together.
+  //
+  // It used to start at 150°, built around a mint-teal accent the brand no
+  // longer uses — which left every avatar blue or purple beside a green logo.
+  const hue = 95 + (bits % 105);
 
   const cells: { x: number; y: number }[] = [];
   for (let x = 0; x < 3; x += 1) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ParleyMark } from "@/components/ParleyMark";
 import type { ReactNode } from "react";
 
 interface Item {
@@ -86,9 +87,12 @@ export function SidebarRail() {
       <nav className="sticky top-0 hidden h-screen flex-col gap-1 py-4 pr-4 md:flex">
         <Link
           href="/home"
-          className="mb-4 px-3 text-xl leading-none font-semibold tracking-tight text-signal no-underline"
+          className="mb-4 flex items-center gap-2.5 px-3 no-underline"
         >
-          parley
+          <ParleyMark size={26} className="shrink-0 text-signal" />
+          <span className="hidden text-xl leading-none font-semibold tracking-tight text-ink lg:inline">
+            parley
+          </span>
         </Link>
 
         {ITEMS.map((item) => {
