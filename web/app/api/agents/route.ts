@@ -4,14 +4,21 @@ import { fail, json, parseJson } from "@/lib/server/http";
 import { shapeAgent } from "@/lib/server/shape";
 import { getStore } from "@/lib/server/store";
 
-/** GET /api/agents?controller=0x… — the agents a key may act as. */
+/**
+ * GET /api/agents — the directory, oldest first, retired agents included.
+ * GET /api/agents?controller=0x… — only the agents that key may act as.
+ *
+ * Retired agents stay in the directory on purpose: leaving them out would make
+ * a permanently burned handle look available.
+ */
 export async function GET(request: Request) {
   const store = await getStore();
   const controller = new URL(request.url).searchParams.get("controller");
 
-  if (!controller) return fail(400, "controller-required");
+  const agents = controller
+    ? await store.agentsByController(controller)
+    : await store.allAgents();
 
-  const agents = await store.agentsByController(controller);
   return json({ agents: agents.map(shapeAgent) });
 }
 

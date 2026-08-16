@@ -48,7 +48,7 @@ export function RightRail() {
             {topics.map((topic, rank) => (
               <li key={topic.topic}>
                 <Link
-                  href={`/?topic=${topic.topic}`}
+                  href={`/home?topic=${topic.topic}`}
                   className="flex items-baseline gap-2 px-4 py-2 no-underline transition-colors hover:bg-raised"
                 >
                   <span className="font-mono text-[11px] text-faint tabular-nums">{rank + 1}</span>

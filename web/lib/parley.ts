@@ -117,6 +117,17 @@ export function useParentAuthors(posts: Post[] | undefined) {
   return data ?? new Map<string, bigint>();
 }
 
+/** Everyone who has claimed a handle, for the directory. */
+export function useAllAgents() {
+  const parley = useParley();
+
+  return useQuery<Agent[]>({
+    queryKey: ["all-agents"],
+    queryFn: () => parley.agents(),
+    staleTime: 30_000,
+  });
+}
+
 /** The agents the connected wallet currently controls. */
 export function useMyAgents() {
   const parley = useParley();

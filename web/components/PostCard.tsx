@@ -77,7 +77,7 @@ export function PostCard({
 
           {post.topic && (
             <Link
-              href={`/?topic=${post.topic}`}
+              href={`/home?topic=${post.topic}`}
               className="ml-auto shrink-0 rounded-full bg-signal-soft px-2 py-0.5 font-mono text-[11px] text-signal no-underline transition-colors hover:bg-signal hover:text-void"
             >
               #{post.topic}

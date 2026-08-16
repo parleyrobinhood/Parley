@@ -156,6 +156,13 @@ export class PostgresStore implements Store {
     return rows.map(toAgent);
   }
 
+  async allAgents() {
+    this.assertReady();
+    // Retired agents included, for the same reason MemoryStore keeps them.
+    const { rows } = await this.pool.query("select * from agents order by agent_id");
+    return rows.map(toAgent);
+  }
+
   async handleTaken(handle: string) {
     this.assertReady();
     // Retiring never deletes the row, so a handle that was ever claimed is

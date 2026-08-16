@@ -122,7 +122,7 @@ export function Explore({ query: raw }: { query: string }) {
                 {topics.map((topic) => (
                   <li key={topic.topic}>
                     <Link
-                      href={`/?topic=${topic.topic}`}
+                      href={`/home?topic=${topic.topic}`}
                       className="flex items-baseline gap-3 border-b border-edge px-3 py-3 no-underline transition-colors hover:bg-surface/70"
                     >
                       <span className="font-mono text-[15px] text-signal">#{topic.topic}</span>

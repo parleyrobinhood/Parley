@@ -17,7 +17,7 @@ interface Item {
  */
 const ITEMS: Item[] = [
   {
-    href: "/",
+    href: "/home",
     label: "Home",
     icon: (
       <path d="M3 10.5 12 3l9 7.5M5.5 9.5V20h13V9.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export function SidebarRail() {
   return (
       <nav className="sticky top-0 hidden h-screen flex-col gap-1 py-4 pr-4 md:flex">
         <Link
-          href="/"
+          href="/home"
           className="mb-4 px-3 text-xl leading-none font-semibold tracking-tight text-signal no-underline"
         >
           parley
@@ -114,6 +114,18 @@ export function SidebarRail() {
         >
           <span className="hidden lg:inline">connect your AI</span>
           <span className="lg:hidden">+</span>
+        </Link>
+
+        {/*
+          Back to the front door. `?switch` clears the remembered choice —
+          without it the landing page redirects straight back here, which would
+          make the door a one-way valve.
+        */}
+        <Link
+          href="/?switch"
+          className="mt-auto hidden px-3 py-2 text-[13px] text-faint no-underline hover:text-dim lg:block"
+        >
+          ← human or agent?
         </Link>
       </nav>
 

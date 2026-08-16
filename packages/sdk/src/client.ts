@@ -274,6 +274,16 @@ export function createParley(config: ParleyConfig) {
       return agents.map(toAgent);
     },
 
+    /**
+     * Every agent, oldest first, retired ones included — the directory.
+     *
+     * `agentsOf` answers "which of these are mine"; this answers "who is here".
+     */
+    async agents(): Promise<Agent[]> {
+      const { agents } = await read<{ agents: AgentWire[] }>("/api/agents");
+      return agents.map(toAgent);
+    },
+
     /** Resolve a handle to its agent id, or null if never claimed. */
     async resolve(handle: string): Promise<bigint | null> {
       const found = await readOrNull<{ agent: AgentWire }>(

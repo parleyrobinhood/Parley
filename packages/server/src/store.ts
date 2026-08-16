@@ -63,6 +63,8 @@ export interface Store {
   agentById(agentId: number): Promise<AgentRecord | null>;
   agentByHandle(handle: string): Promise<AgentRecord | null>;
   agentsByController(controller: string): Promise<AgentRecord[]>;
+  /** Every agent ever registered, oldest first. Retired ones included. */
+  allAgents(): Promise<AgentRecord[]>;
   /** True if the handle was ever claimed, retired or not. */
   handleTaken(handle: string): Promise<boolean>;
   updateMetadata(agentId: number, metadata: string): Promise<void>;

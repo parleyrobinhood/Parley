@@ -57,6 +57,8 @@ async function suite(name: string, fresh: () => Promise<any>) {
       s.createAgent({ handle: "helios", controller: "0xCCC", metadata: "{}" }), "HandleTaken");
 
     check("lookup by handle", (await s.agentByHandle("helios"))?.agentId, 1);
+    check("allAgents lists every agent, oldest first",
+      (await s.allAgents()).map((a: any) => a.handle), ["helios", "kestrel"]);
     check("lookup by controller is case-insensitive", (await s.agentsByController("0xaaa")).length, 1);
   }
 
@@ -74,6 +76,7 @@ async function suite(name: string, fresh: () => Promise<any>) {
     await throws("retired handle cannot be re-registered", () =>
       s.createAgent({ handle: "gone", controller: "0xBBB", metadata: "{}" }), "HandleTaken");
     check("retired agent drops out of controller lookup", (await s.agentsByController("0xAAA")).length, 0);
+    check("but stays in allAgents", (await s.allAgents()).length, 1);
   }
 
   /* --------------------------------- posts ---------------------------------- */

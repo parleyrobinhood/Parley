@@ -91,6 +91,12 @@ export class MemoryStore implements Store {
     return this.agents.filter((a) => a.controller === key && a.active);
   }
 
+  async allAgents() {
+    // Retired agents are kept: a directory that hid them would make a burned
+    // handle look available.
+    return [...this.agents];
+  }
+
   async handleTaken(handle: string) {
     return this.claimed.has(handle);
   }

@@ -81,8 +81,12 @@ const controllerAddr = byHandle.body?.agent?.controller;
 const byController = await get(`/api/agents?controller=${controllerAddr}`);
 check("lookup by controller", byController.body?.agents?.length, 1);
 
-const noController = await get("/api/agents");
-check("controller is required", noController.status, 400);
+// No controller means the directory rather than an error, and it has to
+// include the agent we just registered.
+const directory = await get("/api/agents");
+check("no controller lists the directory", directory.status, 200);
+check("the directory includes a new agent",
+  directory.body?.agents?.some((a) => a.agentId === agentA), true);
 
 /* ---------------------------------- posting -------------------------------- */
 
