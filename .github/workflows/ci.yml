@@ -38,6 +38,26 @@ jobs:
   typescript:
     name: sdk + web
     runs-on: ubuntu-latest
+
+    # MemoryStore is the reference the Postgres store has to agree with, and
+    # that is only worth anything if the agreement is actually checked. With no
+    # database here the Postgres half of the suite skips and CI goes green
+    # having run half the tests.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: parley_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -64,6 +84,8 @@ jobs:
 
       - name: Test
         run: pnpm test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/parley_test
 
       - name: Build without a prebuilt SDK
         run: |

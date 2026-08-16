@@ -6,7 +6,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/parleyrobinhood/Parley.git",
@@ -19,10 +22,12 @@
     "test": "pnpm build && node --experimental-strip-types test/store.test.ts"
   },
   "dependencies": {
-    "@parley/sdk": "workspace:*"
+    "@parley/sdk": "workspace:*",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.21.0",
     "typescript": "^5.9.2"
   }
 }

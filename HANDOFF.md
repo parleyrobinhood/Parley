@@ -2,7 +2,8 @@
 
 **Read this first. The repo is mid-pivot and the README still describes the old design.**
 
-Last commit: `872c79e`. Working tree clean, everything pushed, CI green.
+Last pushed commit: `d84a9c8`. The Postgres store below is **written, tested and
+uncommitted** in the working tree.
 
 ---
 
@@ -65,26 +66,44 @@ to violate and are now only as good as this code:
 reference a Postgres implementation must agree with — every rule in one obvious
 place, so "does Postgres match?" is checkable.
 
-`pnpm test` runs both suites; CI runs it.
+### `@parley/server` → `src/postgres-store.ts`
+
+`PostgresStore`, the production `Store`. `init()` creates the schema (idempotent,
+safe from several processes), `reset()` truncates for tests, `close()` ends the
+pool.
+
+The store test file now runs its 41 assertions against **both** backends and
+reports which one each result came from. `DATABASE_URL` selects whether Postgres
+joins in; without it that half prints `SKIP` rather than passing silently. CI has
+a `postgres:16` service so the agreement is actually checked there.
+
+Two places it deliberately does not do what a fresh schema would:
+
+- **No foreign keys.** MemoryStore happily posts as a nonexistent agent, so
+  adding referential integrity would make Postgres stricter than the reference
+  and the two would stop agreeing. Existence belongs to the API layer, which has
+  to check anyway to return a decent error.
+- **`bigint` epoch milliseconds, not `timestamptz`.** The records carry
+  `Date.now()` numbers; a timestamp column rounds them and returns a `Date`.
+
+`pnpm test` runs all suites; CI runs it.
 
 ---
 
 ## What is left, in order
 
-1. **Postgres store** — implement `Store` against `DATABASE_URL`, keep
-   `MemoryStore` for dev and tests. Run the same test file against both.
-2. **API routes** — Next.js route handlers in `web/app/api/`. Deploys with the
+1. **API routes** — Next.js route handlers in `web/app/api/`. Deploys with the
    app on Vercel, no extra infrastructure. Verify with `verifyRequest`, then
    check the recovered address controls the agent being acted for.
-3. **Rewrite the SDK over HTTP** — *keep the public surface identical*
+2. **Rewrite the SDK over HTTP** — *keep the public surface identical*
    (`register`, `post`, `reply`, `signal`, `follow`, `timeline`, `agent`,
    `stats`, …). If the shape holds, the MCP server and daemon barely change.
    That is the whole strategy for making this tractable.
-4. **Migrate the clients** — web hooks read the API instead of the chain; drop
+3. **Migrate the clients** — web hooks read the API instead of the chain; drop
    wagmi/viem from web; MCP and daemon should mostly just work.
-5. **Retire the chain** — delete `contracts/`, chain config, `deployments.ts`,
+4. **Retire the chain** — delete `contracts/`, chain config, `deployments.ts`,
    `chains.ts`. Recoverable from git at `872c79e` if ever needed.
-6. **Rewrite the README** — its "Why bother putting this on-chain" section, the
+5. **Rewrite the README** — its "Why bother putting this on-chain" section, the
    deployed-contracts table and several design-decision paragraphs all become
    false. This is not cosmetic; the repo description on GitHub says "on
    Robinhood Blockchain" too.
@@ -93,9 +112,11 @@ place, so "does Postgres match?" is checkable.
 
 ## Open decisions — needs the owner
 
-- **Database.** `MemoryStore` is dev-only. Production needs a Postgres
-  connection string; Neon and Vercel Postgres both have free tiers. Cannot be
-  provisioned without their account.
+- **Production database.** Local Postgres now covers dev and tests, but
+  production still needs a hosted connection string as `DATABASE_URL` in Vercel;
+  Neon and Vercel Postgres both have free tiers. Cannot be provisioned without
+  their account. `PostgresStore.init()` builds the schema on first run, so there
+  is no migration step to hand over.
 - **`@love_ai` does not migrate.** Handle, registration and its one post exist
   only on-chain. It re-registers on the new backend. Trivial at this size but
   not automatic.
@@ -126,8 +147,14 @@ place, so "does Postgres match?" is checkable.
   into the same `.next` and corrupts it; the symptom is 500s and
   "Cannot find module './vendor-chunks/…'".
 - **`git add -A` sweeps `.mcp.json`.** Now gitignored, but watch for it.
-- **Left running:** anvil on `:8545` (pid 2403) with a seeded local chain, and
-  the dev server on `:3100`. `web/.env.local` currently points at **testnet**
+- **Local Postgres** is installed via Homebrew (`postgresql@16`, running as a
+  `brew services` login item) with a `parley_dev` database. It is keg-only, so
+  `psql` and friends need `/opt/homebrew/opt/postgresql@16/bin` on PATH. Run the
+  store suite against it with
+  `DATABASE_URL=postgres://localhost/parley_dev pnpm test`.
+- **No longer running:** the anvil node on `:8545` and the dev server on `:3100`
+  from the previous session are both dead; restart them if you need them.
+  `web/.env.local` currently points at **testnet**
   (46630). Anvil's deployment is registry
   `0x5FbDB2315678afecb367f032d93F642f64180aa3`, feed
   `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`, `deployedAtBlock` 0, with 4
