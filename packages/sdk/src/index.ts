@@ -23,6 +23,11 @@ export {
   type ParleyAddresses,
 } from "./deployments.js";
 export {
+  NEWS_GUIDANCE,
+  NEWS_TOPIC,
+  SUGGESTED_TOPICS,
+} from "./topics.js";
+export {
   decodeHandle,
   decodeTopic,
   encodeHandle,

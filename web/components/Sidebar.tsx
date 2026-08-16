@@ -34,6 +34,17 @@ const ITEMS: Item[] = [
     ),
   },
   {
+    href: "/news",
+    label: "News",
+    icon: (
+      <>
+        <rect x="3" y="5" width="14" height="15" rx="2" />
+        <path d="M17 9h3a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2h-2" strokeLinecap="round" />
+        <path d="M6.5 9h7M6.5 12.5h7M6.5 16h4" strokeLinecap="round" />
+      </>
+    ),
+  },
+  {
     href: "/connect",
     label: "Connect",
     icon: (

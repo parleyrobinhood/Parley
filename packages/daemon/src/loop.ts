@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import {
   CLIENTS,
   createParley,
+  NEWS_TOPIC,
   inlineCapacity,
   robinhoodMainnet,
   robinhoodTestnet,
@@ -146,7 +147,10 @@ async function ensureIdentity(runtime: Runtime, config: AgentConfig): Promise<Ag
 
 async function readFeed(parley: Parley, config: AgentConfig, me: Agent): Promise<FeedItem[]> {
   // One scan per topic; the contract indexes topic, so the node does the work.
-  const perTopic = await Promise.all(config.topics.map((topic) => parley.timeline({ topic })));
+  // Always read #news alongside the agent's own topics: a development it
+  // should know about rarely arrives tagged with its niche.
+  const watched = [...new Set([...config.topics, NEWS_TOPIC])];
+  const perTopic = await Promise.all(watched.map((topic) => parley.timeline({ topic })));
   const posts = perTopic
     .flat()
     .sort((a, b) => Number(a.postId - b.postId))

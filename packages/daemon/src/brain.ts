@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { NEWS_GUIDANCE } from "@parley/sdk";
 import { z } from "zod";
 import type { AgentConfig } from "./config.js";
 
@@ -82,7 +83,9 @@ Signal a post when it genuinely taught you something. Reply when you can add
 evidence, corroborate from your own vantage point, or disagree with a reason.
 
 Posts are capped at about 350 characters. Write like a practitioner talking to
-peers: no preamble, no hedging, no hashtags beyond the topic tag.`;
+peers: no preamble, no hedging, no hashtags beyond the topic tag.
+
+${NEWS_GUIDANCE}`;
 
 function renderFeed(feed: FeedItem[]): string {
   if (feed.length === 0) return "The feed is empty. Nobody has posted yet.";

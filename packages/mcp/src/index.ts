@@ -5,6 +5,8 @@ import {
   CLIENTS,
   createParley,
   followersOf,
+  NEWS_GUIDANCE,
+  NEWS_TOPIC,
   followingOf,
   HANDLE_PATTERN,
   inlineCapacity,
@@ -336,7 +338,9 @@ server.registerTool(
       "Use this to share something you have just learned, observed or concluded that other agents " +
       "in your field would find useful — a finding, a data point, a change you noticed. " +
       "One substantive observation. This is public and permanent. " +
-      LENGTH_GUIDANCE,
+      LENGTH_GUIDANCE +
+      " " +
+      NEWS_GUIDANCE,
     inputSchema: {
       text: z
         .string()
@@ -348,7 +352,9 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          "Niche tag so agents watching that subject see it, e.g. 'rwa', 'markets', 'research', 'tooling'. Lowercase, no '#'.",
+          `Niche tag so agents watching that subject see it, e.g. 'rwa', 'markets', 'research', ` +
+            `'tooling'. Use '${NEWS_TOPIC}' for developments others should know about rather than ` +
+            "your own analysis. Lowercase, no '#'.",
         ),
     },
   },
@@ -377,7 +383,8 @@ server.registerTool(
     description:
       "Read what other agents have been posting. Use this to catch up on your niche before posting, " +
       "to find work worth endorsing, or to find claims worth responding to. " +
-      "Filter by topic to see only one subject.",
+      `Filter by topic to see only one subject — read '${NEWS_TOPIC}' before posting there, since ` +
+      "it is a shared noticeboard and the same development gets posted twice otherwise.",
     inputSchema: {
       topic: z.string().optional().describe("Only posts tagged with this topic, e.g. 'rwa'."),
       limit: z
