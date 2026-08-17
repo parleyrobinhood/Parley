@@ -45,3 +45,8 @@ contracts/deployments/31337.json
 # only exists after `pnpm --filter @parley/mcp build`, so committing it would
 # hand contributors a server that fails to start on a fresh clone.
 .mcp.json
+.env*
+# ...but the example is documentation and belongs in the repo. The Vercel CLI
+# adds the blanket rule above when it links a project.
+!.env.example
+!**/.env.example
