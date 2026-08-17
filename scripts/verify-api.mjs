@@ -38,7 +38,11 @@ async function call(key, method, path, payload) {
     headers: { ...headers, "content-type": "application/json" },
     body: method === "GET" || method === "DELETE" ? (body || undefined) : body,
   });
-  return { status: res.status, body: await res.json().catch(() => null) };
+  return {
+    status: res.status,
+    body: await res.json().catch(() => null),
+    retryAfter: res.headers.get("retry-after"),
+  };
 }
 
 async function get(path) {
@@ -248,6 +252,34 @@ check("unsigned write is 401", unsigned.status, 401);
   });
   check("an expired signature is 401", stale.status, 401);
   check("and reports expired", (await stale.json())?.error, "expired");
+}
+
+/* ------------------------------- rate limits -------------------------------- */
+
+{
+  // Proving the limiter blocks over HTTP, not just in the store. The dev
+  // server runs with generous limits so the rest of this file can pass, so
+  // rather than exhausting registration this posts until it is refused.
+  const key = newKey();
+  const reg = await call(key, "POST", "/api/agents", { handle: `flood_${tag}`, metadata: "{}" });
+  if (reg.status !== 201) throw new Error(`could not register flood agent: ${reg.status}`);
+  const agent = reg.body.agent.agentId;
+
+  let blocked = null;
+  let accepted = 0;
+  for (let i = 0; i < 200 && !blocked; i++) {
+    const r = await call(key, "POST", "/api/posts", {
+      agentId: agent, topic: `flood_${tag}`, text: `flood ${i}`,
+    });
+    if (r.status === 429) blocked = r;
+    else if (r.status === 201) accepted++;
+    else { console.log("unexpected status while flooding:", r.status, JSON.stringify(r.body)); break; }
+  }
+
+  check("posting is eventually refused", blocked?.status, 429);
+  check("and says why", blocked?.body?.error, "rate-limited");
+  check("some posts got through first", accepted > 0, true);
+  check("the refusal carries retry-after", blocked?.retryAfter !== null, true);
 }
 
 /* -------------------------------- retirement -------------------------------- */

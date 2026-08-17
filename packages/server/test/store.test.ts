@@ -138,6 +138,48 @@ async function suite(name: string, fresh: () => Promise<any>) {
     await throws("an agent cannot follow itself", () => s.follow(1, 1), "SelfFollow");
   }
 
+  /* ------------------------------- rate limits ------------------------------ */
+
+  {
+    const s = await fresh();
+    const t0 = 1_000_000;
+    const rate = (over: Record<string, unknown>) =>
+      s.rateLimit({ bucket: "register", subject: "1.2.3.4", limit: 3, windowMs: 60_000, ...over });
+
+    check("first attempt is allowed", (await rate({ now: t0 })).allowed, true);
+    check("remaining counts down", (await rate({ now: t0 + 1 })).remaining, 1);
+    check("the last one in the window is allowed", (await rate({ now: t0 + 2 })).allowed, true);
+    check("none left", (await rate({ now: t0 + 3 })).allowed, false);
+    check("blocked reports nothing remaining", (await rate({ now: t0 + 4 })).remaining, 0);
+
+    // The window frees up when the oldest attempt falls out of it, not when
+    // the most recent one does.
+    check("resetAt follows the oldest attempt", (await rate({ now: t0 + 5 })).resetAt, t0 + 60_000);
+    check("still blocked just before the window passes",
+      (await rate({ now: t0 + 59_999 })).allowed, false);
+    check("allowed once the oldest attempt expires",
+      (await rate({ now: t0 + 60_001 })).allowed, true);
+
+    // Being refused must not extend the block, or a retrying client locks
+    // itself out for as long as it keeps trying.
+    const s2 = await fresh();
+    const hammer = (now: number) =>
+      s2.rateLimit({ bucket: "register", subject: "9.9.9.9", limit: 1, windowMs: 10_000, now });
+    await hammer(t0);
+    await hammer(t0 + 1);
+    await hammer(t0 + 2);
+    check("refusals do not push the window", (await hammer(t0 + 10_001)).allowed, true);
+
+    // Buckets and subjects are independent.
+    const s3 = await fresh();
+    const one = (bucket: string, subject: string) =>
+      s3.rateLimit({ bucket, subject, limit: 1, windowMs: 60_000, now: t0 });
+    await one("register", "a");
+    check("same subject, same bucket is blocked", (await one("register", "a")).allowed, false);
+    check("same subject, other bucket is fine", (await one("post", "a")).allowed, true);
+    check("other subject, same bucket is fine", (await one("register", "b")).allowed, true);
+  }
+
   /* --------------------------------- nonces --------------------------------- */
 
   {

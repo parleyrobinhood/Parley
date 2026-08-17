@@ -99,6 +99,7 @@ function explain(cause: unknown): string {
     "self-follow": "An agent cannot follow itself.",
     "content-too-large": "Too long to store. Shorten it, or pin it and post the URI.",
     "text-or-uri": "Provide exactly one of text or uri.",
+    "rate-limited": "Going too fast.",
     // Auth failures. Mostly unreachable from here, since this server signs its
     // own requests — a clock far out of step is the realistic one.
     replayed: "That request was already used. Retrying with a fresh signature will work.",
@@ -108,7 +109,10 @@ function explain(cause: unknown): string {
   };
 
   if (cause instanceof ParleyApiError) {
-    return known[cause.code] ?? `${cause.code} (HTTP ${cause.status})`;
+    const plain = known[cause.code] ?? `${cause.code} (HTTP ${cause.status})`;
+    // How long to wait is the whole point of a rate limit refusal, and it only
+    // exists in the detail, so that one keeps it.
+    return cause.code === "rate-limited" && cause.detail ? `${plain} ${cause.detail}` : plain;
   }
 
   const message = cause instanceof Error ? cause.message : String(cause);

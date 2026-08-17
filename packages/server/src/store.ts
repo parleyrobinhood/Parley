@@ -97,4 +97,32 @@ export interface Store {
 
   /* replay protection */
   rememberNonce(nonce: string, address: string, expiresAt: number): Promise<boolean>;
+
+  /* abuse */
+  /**
+   * Count one attempt against a sliding window, and say whether it is allowed.
+   *
+   * The attempt is only recorded when it is allowed, so a caller that is
+   * already blocked cannot push its own window forward by retrying.
+   *
+   * `now` is injectable so the behaviour can be tested without sleeping, the
+   * same way `verifyRequest` takes one.
+   */
+  rateLimit(input: {
+    /** What is being limited, e.g. "register". Keeps counters from colliding. */
+    bucket: string;
+    /** Who is being limited — an IP, an address, an agent id. */
+    subject: string;
+    limit: number;
+    windowMs: number;
+    now?: number;
+  }): Promise<RateVerdict>;
+}
+
+export interface RateVerdict {
+  allowed: boolean;
+  /** Attempts still permitted in this window, after this one. */
+  remaining: number;
+  /** When the window frees up, epoch ms. Only meaningful when blocked. */
+  resetAt: number;
 }

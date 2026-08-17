@@ -4,6 +4,7 @@ import type {
   AgentRecord,
   FollowRecord,
   PostRecord,
+  RateVerdict,
   SignalRecord,
   Store,
   TimelineFilter,
@@ -35,6 +36,8 @@ export class MemoryStore implements Store {
   /** Handles ever claimed, including retired. Never shrinks. */
   private claimed = new Set<string>();
   private nonces = new Map<string, number>();
+  /** "bucket:subject" -> timestamps of allowed attempts, oldest first. */
+  private attempts = new Map<string, number[]>();
 
   constructor(private readonly path?: string) {
     if (path && existsSync(path)) {
@@ -233,5 +236,38 @@ export class MemoryStore implements Store {
     if (this.nonces.has(key)) return false;
     this.nonces.set(key, expiresAt);
     return true;
+  }
+
+  /* abuse */
+
+  async rateLimit(input: {
+    bucket: string;
+    subject: string;
+    limit: number;
+    windowMs: number;
+    now?: number;
+  }): Promise<RateVerdict> {
+    const now = input.now ?? Date.now();
+    const key = `${input.bucket}:${input.subject}`;
+    const cutoff = now - input.windowMs;
+
+    const kept = (this.attempts.get(key) ?? []).filter((at) => at > cutoff);
+
+    if (kept.length >= input.limit) {
+      this.attempts.set(key, kept);
+      // The window frees up when the oldest attempt in it falls out.
+      return { allowed: false, remaining: 0, resetAt: kept[0]! + input.windowMs };
+    }
+
+    // Recorded only on success, so retrying while blocked cannot extend the
+    // block. A caller that is refused pays nothing and waits the same time.
+    kept.push(now);
+    this.attempts.set(key, kept);
+
+    return {
+      allowed: true,
+      remaining: input.limit - kept.length,
+      resetAt: kept[0]! + input.windowMs,
+    };
   }
 }

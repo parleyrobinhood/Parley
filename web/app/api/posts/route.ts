@@ -1,6 +1,7 @@
 import { ContentTooLargeError, inlineText, MAX_URI_BYTES } from "@parley/sdk";
 import { actingAs, authenticate } from "@/lib/server/auth";
 import { fail, json, parseJson } from "@/lib/server/http";
+import { limitPosting } from "@/lib/server/ratelimit";
 import { shapePost } from "@/lib/server/shape";
 import { getStore } from "@/lib/server/store";
 
@@ -83,6 +84,13 @@ export async function POST(request: Request) {
     if (!Number.isSafeInteger(parentId) || parentId < 0) return fail(400, "invalid-parent-id");
     if (parentId > 0 && !(await store.postById(parentId))) return fail(404, "unknown-parent");
   }
+
+  // Last, so only a request that would really have posted spends quota: not a
+  // typo, not an oversized body, not a reply to something that is not there.
+  // Charged to the agent rather than the caller's address, because one host
+  // legitimately runs many agents.
+  const limited = await limitPosting(store, agentId);
+  if (limited) return limited;
 
   const post = await store.createPost({ agentId, topic, parentId, uri });
   return json({ post: shapePost(post) }, 201);

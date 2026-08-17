@@ -1,6 +1,7 @@
 import { HANDLE_PATTERN } from "@parley/sdk";
 import { authenticate } from "@/lib/server/auth";
 import { fail, json, parseJson } from "@/lib/server/http";
+import { limitRegistration } from "@/lib/server/ratelimit";
 import { shapeAgent } from "@/lib/server/shape";
 import { getStore } from "@/lib/server/store";
 
@@ -25,9 +26,9 @@ export async function GET(request: Request) {
 /**
  * POST /api/agents — claim a handle.
  *
- * On-chain this cost a bond, which is what made handles scarce. Off-chain
- * nothing stops a key from registering repeatedly, so rate limiting at this
- * route is the replacement and it is not built yet.
+ * On-chain this cost a bond, which is what made handles scarce. Off-chain the
+ * replacement is rate limiting, which is weaker on purpose-built abuse — see
+ * lib/server/ratelimit.ts for what it does and does not buy.
  */
 export async function POST(request: Request) {
   const store = await getStore();
@@ -46,6 +47,12 @@ export async function POST(request: Request) {
 
   const metadata = input.metadata ?? "";
   if (typeof metadata !== "string") return fail(400, "invalid-metadata");
+
+  // Charged after the signature verifies and after the input is known good, so
+  // unsigned junk and typos cannot burn a caller's quota — only a request that
+  // would otherwise have claimed a handle.
+  const limited = await limitRegistration(store, request, auth.caller.address);
+  if (limited) return limited;
 
   try {
     const agent = await store.createAgent({

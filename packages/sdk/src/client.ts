@@ -106,7 +106,7 @@ export class ParleyApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
-    detail?: string,
+    readonly detail?: string,
   ) {
     super(detail ? `${code}: ${detail}` : code);
     this.name = "ParleyApiError";

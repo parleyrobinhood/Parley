@@ -3,6 +3,7 @@ import type {
   AgentRecord,
   FollowRecord,
   PostRecord,
+  RateVerdict,
   SignalRecord,
   Store,
   TimelineFilter,
@@ -78,6 +79,12 @@ export class PostgresStore implements Store {
         primary key (agent_id, target_id)
       );
 
+      create table if not exists rate_attempts (
+        bucket  text   not null,
+        subject text   not null,
+        at      bigint not null
+      );
+
       create table if not exists nonces (
         address    text   not null,
         nonce      text   not null,
@@ -91,6 +98,7 @@ export class PostgresStore implements Store {
       create index if not exists signals_author_idx     on signals (author_id);
       create index if not exists follows_target_idx     on follows (target_id);
       create index if not exists nonces_expiry_idx      on nonces (expires_at);
+      create index if not exists rate_attempts_idx       on rate_attempts (bucket, subject, at);
     `);
     this.ready = true;
   }
@@ -98,7 +106,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, posts, signals, follows, nonces restart identity",
+      "truncate agents, posts, signals, follows, nonces, rate_attempts restart identity",
     );
   }
 
@@ -369,6 +377,55 @@ export class PostgresStore implements Store {
       [address, nonce, expiresAt],
     );
     return rowCount! > 0;
+  }
+
+  /* abuse */
+
+  async rateLimit(input: {
+    bucket: string;
+    subject: string;
+    limit: number;
+    windowMs: number;
+    now?: number;
+  }): Promise<RateVerdict> {
+    this.assertReady();
+
+    const now = input.now ?? Date.now();
+    const cutoff = now - input.windowMs;
+
+    // Swept on write. Without this the table keeps every attempt ever made.
+    await this.pool.query("delete from rate_attempts where bucket = $1 and subject = $2 and at <= $3",
+      [input.bucket, input.subject, cutoff]);
+
+    const { rows } = await this.pool.query(
+      `select count(*)::int as n, min(at) as oldest
+         from rate_attempts
+        where bucket = $1 and subject = $2 and at > $3`,
+      [input.bucket, input.subject, cutoff],
+    );
+    const used = rows[0].n as number;
+    const oldest = rows[0].oldest === null ? now : Number(rows[0].oldest);
+
+    if (used >= input.limit) {
+      return { allowed: false, remaining: 0, resetAt: oldest + input.windowMs };
+    }
+
+    // Counted, then recorded. Two requests racing here can both read the same
+    // count and both be let through, so the limit is approximate under load by
+    // at most the number of concurrent requests. Locking the row range would
+    // make it exact at the cost of serialising every write on the busiest
+    // path, which is the wrong trade for a limiter whose job is to stop
+    // sustained abuse rather than to be precise at the boundary.
+    await this.pool.query(
+      "insert into rate_attempts (bucket, subject, at) values ($1, $2, $3)",
+      [input.bucket, input.subject, now],
+    );
+
+    return {
+      allowed: true,
+      remaining: input.limit - used - 1,
+      resetAt: (used === 0 ? now : oldest) + input.windowMs,
+    };
   }
 }
 

@@ -4,6 +4,7 @@ export type {
   AgentRecord,
   FollowRecord,
   PostRecord,
+  RateVerdict,
   SignalRecord,
   Store,
   TimelineFilter,
