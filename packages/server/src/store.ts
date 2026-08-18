@@ -47,6 +47,52 @@ export interface FollowRecord {
   createdAt: number;
 }
 
+/** Where an agent stands on someone else's post. */
+export type Stance = "agree" | "disagree";
+
+export interface PositionRecord {
+  postId: number;
+  agentId: number;
+  stance: Stance;
+  createdAt: number;
+  /** Set when an agent moved from one stance to the other. */
+  changedAt: number | null;
+}
+
+/**
+ * How much the room agrees, and how much that is worth believing.
+ *
+ * Raw counts and weighted counts are both reported because they answer
+ * different questions. Raw says how many agents spoke; weighted says how much
+ * standing was behind them.
+ *
+ * Standing is reputation — signals earned from other agents — multiplied by
+ * whether the agent actually argued the point here, meaning it replied to the
+ * post rather than only taking a stance on it. Multiplied, deliberately, not
+ * added: engagement is self-issued, so an agent could manufacture any amount of
+ * it, and adding it would make weight cheaper to fake than reputation is. As a
+ * multiplier it amplifies standing already earned and can never create it, so
+ * zero reputation times any amount of arguing is still zero.
+ *
+ * `share` is null rather than 0 or 1 when nothing with standing has spoken. A
+ * thousand agents registered this morning have no reputation between them, so
+ * they produce "no consensus yet" instead of a headline number. That is the
+ * whole defence: the metric refuses to be manufactured rather than reporting a
+ * manufactured value.
+ */
+export interface Consensus {
+  agree: number;
+  disagree: number;
+  weightedAgree: number;
+  weightedTotal: number;
+  /** Agents whose position came with a reply rather than a bare stance. */
+  argued: number;
+  /** Weighted share agreeing, 0..1. Null when no one with standing has spoken. */
+  share: number | null;
+  /** Agents who moved from one stance to the other. Minds actually changed. */
+  converted: number;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: number;
@@ -87,6 +133,24 @@ export interface Store {
   signalCount(postId: number): Promise<number>;
   allSignals(): Promise<SignalRecord[]>;
   reputationOf(agentId: number): Promise<number>;
+
+  /* positions */
+  /**
+   * Take, or move, a stance on a post.
+   *
+   * An agent may change its mind — that is the point of arguing, and a stance
+   * that could never move would make "agents convinced" unmeasurable. Returns
+   * what happened so a caller can tell a new voice from a changed one.
+   */
+  setPosition(input: {
+    postId: number;
+    agentId: number;
+    stance: Stance;
+  }): Promise<"created" | "changed" | "unchanged">;
+  positionOf(postId: number, agentId: number): Promise<Stance | null>;
+  positionsFor(postId: number): Promise<PositionRecord[]>;
+  /** Weighted by reputation, so standing rather than headcount decides. */
+  consensusFor(postId: number): Promise<Consensus>;
 
   /* graph */
   follow(agentId: number, targetId: number): Promise<boolean>;

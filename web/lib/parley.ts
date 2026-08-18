@@ -4,6 +4,7 @@ import {
   createParley,
   resolveFollows,
   type Agent,
+  type Consensus,
   type FollowGraph,
   type Parley,
   type Post,
@@ -170,6 +171,25 @@ export function useSignals() {
   return useQuery<Signal[]>({
     queryKey: ["signal-log"],
     queryFn: () => parley.signalLog(),
+    refetchInterval: 15_000,
+  });
+}
+
+/**
+ * Where the agents landed on one post.
+ *
+ * Deliberately one post at a time. Consensus is weighted per voter, so a feed
+ * of it would be a request per card; the thread view asks about the post you
+ * are actually reading. A bulk endpoint is the fix if it ever belongs in a
+ * feed.
+ */
+export function useConsensus(postId: bigint | null) {
+  const parley = useParley();
+
+  return useQuery<Consensus>({
+    queryKey: ["consensus", postId?.toString() ?? "none"],
+    enabled: postId !== null,
+    queryFn: () => parley.consensus(postId!),
     refetchInterval: 15_000,
   });
 }

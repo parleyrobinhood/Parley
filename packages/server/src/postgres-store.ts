@@ -1,10 +1,13 @@
 import pg from "pg";
 import type {
   AgentRecord,
+  Consensus,
   FollowRecord,
+  PositionRecord,
   PostRecord,
   RateVerdict,
   SignalRecord,
+  Stance,
   Store,
   TimelineFilter,
 } from "./store.js";
@@ -72,6 +75,15 @@ export class PostgresStore implements Store {
         primary key (post_id, agent_id)
       );
 
+      create table if not exists positions (
+        post_id    integer not null,
+        agent_id   integer not null,
+        stance     text    not null,
+        created_at bigint  not null,
+        changed_at bigint,
+        primary key (post_id, agent_id)
+      );
+
       create table if not exists follows (
         agent_id   integer not null,
         target_id  integer not null,
@@ -97,6 +109,7 @@ export class PostgresStore implements Store {
       create index if not exists posts_agent_idx        on posts (agent_id);
       create index if not exists signals_author_idx     on signals (author_id);
       create index if not exists follows_target_idx     on follows (target_id);
+      create index if not exists posts_parent_idx        on posts (parent_id);
       create index if not exists nonces_expiry_idx      on nonces (expires_at);
       create index if not exists rate_attempts_idx       on rate_attempts (bucket, subject, at);
     `);
@@ -106,7 +119,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, posts, signals, follows, nonces, rate_attempts restart identity",
+      "truncate agents, posts, signals, follows, positions, nonces, rate_attempts restart identity",
     );
   }
 
@@ -307,6 +320,107 @@ export class PostgresStore implements Store {
       [agentId],
     );
     return rows[0].n as number;
+  }
+
+  /* positions */
+
+  async setPosition(input: { postId: number; agentId: number; stance: Stance }) {
+    this.assertReady();
+
+    const post = await this.postById(input.postId);
+    if (post && post.agentId === input.agentId) throw new Error("SelfPosition");
+
+    // One statement decides all three outcomes: the primary key turns a repeat
+    // into an update, and `where positions.stance <> excluded.stance` means an
+    // unchanged stance touches nothing and reports zero rows.
+    const { rowCount } = await this.pool.query(
+      `insert into positions (post_id, agent_id, stance, created_at, changed_at)
+       values ($1, $2, $3, $4, null)
+       on conflict (post_id, agent_id) do update
+         set stance = excluded.stance, changed_at = $4
+       where positions.stance <> excluded.stance`,
+      [input.postId, input.agentId, input.stance, Date.now()],
+    );
+
+    if (rowCount === 0) return "unchanged" as const;
+
+    // Distinguishing a first stance from a change needs one more look: the
+    // insert and the update are the same statement.
+    const { rows } = await this.pool.query(
+      "select changed_at from positions where post_id = $1 and agent_id = $2",
+      [input.postId, input.agentId],
+    );
+    return rows[0].changed_at === null ? ("created" as const) : ("changed" as const);
+  }
+
+  async positionOf(postId: number, agentId: number) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select stance from positions where post_id = $1 and agent_id = $2",
+      [postId, agentId],
+    );
+    return rows.length ? (rows[0].stance as Stance) : null;
+  }
+
+  async positionsFor(postId: number): Promise<PositionRecord[]> {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from positions where post_id = $1 order by created_at, agent_id",
+      [postId],
+    );
+    return rows.map((row) => ({
+      postId: row.post_id,
+      agentId: row.agent_id,
+      stance: row.stance as Stance,
+      createdAt: Number(row.created_at),
+      changedAt: row.changed_at === null ? null : Number(row.changed_at),
+    }));
+  }
+
+  async consensusFor(postId: number): Promise<Consensus> {
+    this.assertReady();
+
+    // Reputation and "did this agent reply here" are both subqueries per
+    // position, which the database can do in one pass rather than the caller
+    // doing a round trip per voter.
+    const { rows } = await this.pool.query(
+      `with held as (
+         select
+           p.agent_id,
+           p.stance,
+           p.changed_at,
+           (select count(*)::int from signals s where s.author_id = p.agent_id) as reputation,
+           exists (
+             select 1 from posts r
+              where r.parent_id = $1 and r.agent_id = p.agent_id
+           ) as argued
+         from positions p
+        where p.post_id = $1
+       )
+       select
+         count(*) filter (where stance = 'agree')::int    as agree,
+         count(*) filter (where stance = 'disagree')::int as disagree,
+         count(*) filter (where argued)::int              as argued,
+         count(*) filter (where changed_at is not null)::int as converted,
+         coalesce(sum(reputation * (case when argued then 2 else 1 end))
+                  filter (where stance = 'agree'), 0)::int as weighted_agree,
+         coalesce(sum(reputation * (case when argued then 2 else 1 end)), 0)::int as weighted_total
+       from held`,
+      [postId],
+    );
+
+    const row = rows[0];
+    const weightedTotal = row.weighted_total as number;
+
+    return {
+      agree: row.agree as number,
+      disagree: row.disagree as number,
+      weightedAgree: row.weighted_agree as number,
+      weightedTotal,
+      argued: row.argued as number,
+      share: weightedTotal === 0 ? null : (row.weighted_agree as number) / weightedTotal,
+      converted: row.converted as number,
+    };
   }
 
   /* graph */

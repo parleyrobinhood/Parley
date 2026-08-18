@@ -117,6 +117,83 @@ async function suite(name: string, fresh: () => Promise<any>) {
       s.addSignal({ postId: 1, agentId: 1, authorId: 1 }), "SelfSignal");
   }
 
+  /* ------------------------------- positions -------------------------------- */
+
+  {
+    const s = await fresh();
+    // 1 author, 2 voters. Voter 2 earns standing; voter 3 stays a nobody.
+    for (const h of ["author", "voter", "nobody"])
+      await s.createAgent({ handle: h, controller: `0x${h}`, metadata: "{}" });
+    await s.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "claim" });   // post 1
+    await s.createPost({ agentId: 2, topic: "rwa", parentId: 0, uri: "other" });   // post 2
+    await s.addSignal({ postId: 2, agentId: 1, authorId: 2 });                     // voter earns 1
+
+    check("a first stance is created", await s.setPosition({ postId: 1, agentId: 2, stance: "agree" }), "created");
+    check("the same stance again is unchanged",
+      await s.setPosition({ postId: 1, agentId: 2, stance: "agree" }), "unchanged");
+    check("the other stance is a change",
+      await s.setPosition({ postId: 1, agentId: 2, stance: "disagree" }), "changed");
+    check("positionOf reads it back", await s.positionOf(1, 2), "disagree");
+    check("positionOf is null for an agent with no stance", await s.positionOf(1, 3), null);
+    await throws("an agent cannot take a stance on its own post", () =>
+      s.setPosition({ postId: 1, agentId: 1, stance: "agree" }), "SelfPosition");
+
+    await s.setPosition({ postId: 1, agentId: 2, stance: "agree" });
+    const c1 = await s.consensusFor(1);
+    check("raw agree counts the voter", c1.agree, 1);
+    check("a changed mind is counted as converted", c1.converted, 1);
+    check("weight is the voter's reputation", c1.weightedTotal, 1);
+    check("share is unanimous so far", c1.share, 1);
+
+    // The whole defence: an agent with no standing cannot move the number.
+    await s.setPosition({ postId: 1, agentId: 3, stance: "disagree" });
+    const c2 = await s.consensusFor(1);
+    check("a standingless agent is counted raw", c2.disagree, 1);
+    check("but adds no weight", c2.weightedTotal, 1);
+    check("and does not move the share", c2.share, 1);
+  }
+
+  {
+    // A brigade of brand-new agents must produce no consensus at all, rather
+    // than a manufactured one.
+    const s = await fresh();
+    await s.createAgent({ handle: "author", controller: "0xa", metadata: "{}" });
+    await s.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "claim" });
+
+    for (let i = 0; i < 25; i++) {
+      await s.createAgent({ handle: `sybil${i}`, controller: `0xs${i}`, metadata: "{}" });
+      await s.setPosition({ postId: 1, agentId: i + 2, stance: "agree" });
+    }
+
+    const c = await s.consensusFor(1);
+    check("25 fresh agents are counted raw", c.agree, 25);
+    check("they carry no weight at all", c.weightedTotal, 0);
+    check("so there is no consensus to report", c.share, null);
+  }
+
+  {
+    // Arguing multiplies standing; it cannot create it.
+    const s = await fresh();
+    for (const h of ["author", "arguer", "clicker"])
+      await s.createAgent({ handle: h, controller: `0x${h}`, metadata: "{}" });
+    await s.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "claim" });    // 1
+    await s.createPost({ agentId: 2, topic: "rwa", parentId: 0, uri: "a" });        // 2
+    await s.createPost({ agentId: 3, topic: "rwa", parentId: 0, uri: "b" });        // 3
+    // Both voters earn one signal, so their base standing is equal.
+    await s.addSignal({ postId: 2, agentId: 1, authorId: 2 });
+    await s.addSignal({ postId: 3, agentId: 1, authorId: 3 });
+
+    // Only the arguer replies to the claim.
+    await s.createPost({ agentId: 2, topic: "rwa", parentId: 1, uri: "because" });
+    await s.setPosition({ postId: 1, agentId: 2, stance: "agree" });
+    await s.setPosition({ postId: 1, agentId: 3, stance: "disagree" });
+
+    const c = await s.consensusFor(1);
+    check("the one who argued is noted", c.argued, 1);
+    check("arguing doubles that agent's weight", c.weightedAgree, 2);
+    check("against the clicker's single weight", c.weightedTotal, 3);
+  }
+
   /* -------------------------------- follows --------------------------------- */
 
   {

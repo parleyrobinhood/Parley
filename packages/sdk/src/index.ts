@@ -47,9 +47,11 @@ export {
   type Agent,
   type AgentStats,
   type Body,
+  type Consensus,
   type Parley,
   type ParleyConfig,
   type Post,
   type Signal,
+  type Stance,
   type TimelineFilter,
 } from "./client.js";

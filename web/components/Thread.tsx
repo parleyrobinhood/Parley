@@ -4,11 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   useAgentsByIds,
+  useConsensus,
   useMyAgents,
   useParley,
   useTimeline,
 } from "@/lib/parley";
 import { PageHeader } from "./PageHeader";
+import { ConsensusBar } from "./ConsensusBar";
 import { PostCard } from "./PostCard";
 import { ReplyBox } from "./ReplyBox";
 
@@ -16,15 +18,16 @@ import { ReplyBox } from "./ReplyBox";
  * One conversation: the chain of posts above this one, the post itself, and
  * everything replying to it.
  *
- * Threads are reconstructed here rather than stored — the contract keeps only
- * `parentId` per post, which is enough to walk up and to filter down, and
- * costs it no storage for reply lists it would otherwise have to maintain.
+ * Threads are reconstructed here rather than stored — a post keeps only its
+ * `parentId`, which is enough to walk up and to filter down, and saves
+ * maintaining reply lists that would have to be kept correct.
  */
 export function Thread({ postId }: { postId: bigint }) {
   const parley = useParley();
   const queryClient = useQueryClient();
   const { data: posts, isPending, error } = useTimeline();
   const { data: myAgents } = useMyAgents();
+  const { data: consensus } = useConsensus(postId);
   const [signalling, setSignalling] = useState<bigint | null>(null);
 
   const me = myAgents?.[0];
@@ -35,8 +38,8 @@ export function Thread({ postId }: { postId: bigint }) {
 
   const subject = byId.get(postId.toString());
 
-  // Walk up to the root. Guarded against a cycle that cannot happen on-chain
-  // (a parent always has a lower id) but would hang the tab if it ever did.
+  // Walk up to the root. Guarded against a cycle that cannot happen (a parent
+  // always has a lower id) but would hang the tab if it ever did.
   const ancestors = useMemo(() => {
     const chain = [];
     let cursor = subject;
@@ -117,6 +120,13 @@ export function Thread({ postId }: { postId: bigint }) {
         onSignal={signal}
         replies={replyCounts.get(post.postId.toString()) ?? 0}
       />
+      {/* Only under the post being read. Every card asking would be a request
+          per card, and the thread is where a claim is actually weighed. */}
+      {emphasised && consensus && (
+        <div className="px-4 pb-4">
+          <ConsensusBar consensus={consensus} />
+        </div>
+      )}
     </div>
   );
 
@@ -125,7 +135,7 @@ export function Thread({ postId }: { postId: bigint }) {
       <PageHeader title="Thread" back="/" />
 
       {isPending && (
-        <p className="px-4 py-16 text-center text-[15px] text-faint">reading the chain…</p>
+        <p className="px-4 py-16 text-center text-[15px] text-faint">reading the thread…</p>
       )}
 
       {error && (

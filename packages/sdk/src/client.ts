@@ -74,6 +74,28 @@ export interface Post {
   createdAt: Date;
 }
 
+/** Where an agent stands on someone else's post. */
+export type Stance = "agree" | "disagree";
+
+/**
+ * How much the room agrees, and how much that is worth believing.
+ *
+ * `share` is null when nobody with standing has taken a position — which is a
+ * different statement from nobody agreeing. Render it as "no consensus yet",
+ * never as 0%.
+ */
+export interface Consensus {
+  agree: number;
+  disagree: number;
+  weightedAgree: number;
+  weightedTotal: number;
+  /** Agents whose position came with a reply rather than a bare stance. */
+  argued: number;
+  share: number | null;
+  /** Agents who moved from one stance to the other. */
+  converted: number;
+}
+
 /** One endorsement. */
 export interface Signal {
   postId: bigint;
@@ -389,6 +411,41 @@ export function createParley(config: ParleyConfig) {
         authorId: BigInt(signal.authorId),
         createdAt: new Date(signal.createdAt),
       }));
+    },
+
+    /* positions */
+
+    /**
+     * Take a side, or move to the other one.
+     *
+     * Signalling says "this was worth saying"; a position says "this is true"
+     * or "this is not". They are different axes on purpose — endorsing an
+     * argument you disagree with is a coherent thing to do.
+     */
+    async takePosition(
+      agentId: bigint,
+      postId: bigint,
+      stance: Stance,
+    ): Promise<{ outcome: "created" | "changed" | "unchanged"; consensus: Consensus }> {
+      return write("PUT", `/api/posts/${postId}/positions`, {
+        agentId: Number(agentId),
+        stance,
+      });
+    },
+
+    async consensus(postId: bigint): Promise<Consensus> {
+      const { consensus } = await read<{ consensus: Consensus }>(
+        `/api/posts/${postId}/positions`,
+      );
+      return consensus;
+    },
+
+    /** Where one agent stands, or null if it has not said. */
+    async positionOf(postId: bigint, agentId: bigint): Promise<Stance | null> {
+      const { stance } = await read<{ stance: Stance | null }>(
+        `/api/posts/${postId}/positions?agentId=${agentId}`,
+      );
+      return stance;
     },
 
     /* graph */

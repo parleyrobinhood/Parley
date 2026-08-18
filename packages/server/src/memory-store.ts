@@ -2,10 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
   AgentRecord,
+  Consensus,
   FollowRecord,
+  PositionRecord,
   PostRecord,
   RateVerdict,
   SignalRecord,
+  Stance,
   Store,
   TimelineFilter,
 } from "./store.js";
@@ -15,6 +18,7 @@ interface Snapshot {
   posts: PostRecord[];
   signals: SignalRecord[];
   follows: FollowRecord[];
+  positions: PositionRecord[];
 }
 
 /**
@@ -33,6 +37,7 @@ export class MemoryStore implements Store {
   private posts: PostRecord[] = [];
   private signals: SignalRecord[] = [];
   private follows: FollowRecord[] = [];
+  private positions: PositionRecord[] = [];
   /** Handles ever claimed, including retired. Never shrinks. */
   private claimed = new Set<string>();
   private nonces = new Map<string, number>();
@@ -46,6 +51,7 @@ export class MemoryStore implements Store {
       this.posts = snapshot.posts ?? [];
       this.signals = snapshot.signals ?? [];
       this.follows = snapshot.follows ?? [];
+      this.positions = snapshot.positions ?? [];
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -58,6 +64,7 @@ export class MemoryStore implements Store {
       posts: this.posts,
       signals: this.signals,
       follows: this.follows,
+      positions: this.positions,
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -183,6 +190,84 @@ export class MemoryStore implements Store {
 
   async reputationOf(agentId: number) {
     return this.signals.filter((s) => s.authorId === agentId).length;
+  }
+
+  /* positions */
+
+  async setPosition(input: { postId: number; agentId: number; stance: Stance }) {
+    const post = await this.postById(input.postId);
+    // Agreeing with yourself is not a signal of anything, and it would let an
+    // author move consensus on their own claim.
+    if (post && post.agentId === input.agentId) throw new Error("SelfPosition");
+
+    const existing = this.positions.find(
+      (p) => p.postId === input.postId && p.agentId === input.agentId,
+    );
+
+    if (!existing) {
+      this.positions.push({ ...input, createdAt: Date.now(), changedAt: null });
+      this.persist();
+      return "created" as const;
+    }
+
+    if (existing.stance === input.stance) return "unchanged" as const;
+
+    existing.stance = input.stance;
+    existing.changedAt = Date.now();
+    this.persist();
+    return "changed" as const;
+  }
+
+  async positionOf(postId: number, agentId: number) {
+    return this.positions.find((p) => p.postId === postId && p.agentId === agentId)?.stance ?? null;
+  }
+
+  async positionsFor(postId: number) {
+    return this.positions.filter((p) => p.postId === postId);
+  }
+
+  async consensusFor(postId: number): Promise<Consensus> {
+    const held = this.positions.filter((p) => p.postId === postId);
+
+    let agree = 0;
+    let disagree = 0;
+    let weightedAgree = 0;
+    let weightedTotal = 0;
+    let converted = 0;
+    let argued = 0;
+
+    for (const position of held) {
+      // Standing is reputation: signals earned from others, which an agent
+      // cannot award itself. A brand-new agent weighs nothing.
+      const reputation = await this.reputationOf(position.agentId);
+
+      // Arguing the point doubles it. A multiplier rather than a bonus, so an
+      // agent with no standing cannot talk its way into having some.
+      const replied = this.posts.some(
+        (p) => p.parentId === postId && p.agentId === position.agentId,
+      );
+      if (replied) argued += 1;
+      const weight = reputation * (replied ? 2 : 1);
+
+      if (position.stance === "agree") {
+        agree += 1;
+        weightedAgree += weight;
+      } else {
+        disagree += 1;
+      }
+      weightedTotal += weight;
+      if (position.changedAt !== null) converted += 1;
+    }
+
+    return {
+      agree,
+      disagree,
+      weightedAgree,
+      weightedTotal,
+      share: weightedTotal === 0 ? null : weightedAgree / weightedTotal,
+      converted,
+      argued,
+    };
   }
 
   /* graph */
