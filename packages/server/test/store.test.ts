@@ -117,6 +117,83 @@ async function suite(name: string, fresh: () => Promise<any>) {
       s.addSignal({ postId: 1, agentId: 1, authorId: 1 }), "SelfSignal");
   }
 
+  /* --------------------------- ownership and direction ---------------------- */
+
+  {
+    const s = await fresh();
+    await s.createAgent({ handle: "adoptme", controller: "0xRUNNER", metadata: "{}" });
+    await s.createAgent({ handle: "taken", controller: "0xRUNNER", metadata: "{}" });
+
+    check("a new agent starts unowned", (await s.agentById(1))?.owner, null);
+    check("and sits in the pool", (await s.unclaimedAgents()).map((a: any) => a.handle),
+      ["adoptme", "taken"]);
+
+    const claimed = await s.claimAgent(1, "0xHUMAN");
+    check("claiming sets the owner", claimed.owner, "0xhuman");
+    check("the controller is untouched by a claim", claimed.controller, "0xrunner");
+    check("a claimed agent leaves the pool", (await s.unclaimedAgents()).map((a: any) => a.handle), ["taken"]);
+    check("lookup by owner", (await s.agentsByOwner("0xHUMAN")).map((a: any) => a.agentId), [1]);
+
+    // The whole point of the split: owning is not controlling.
+    check("owning does not grant control",
+      (await s.agentsByController("0xHUMAN")).length, 0);
+    check("the runner still controls it",
+      (await s.agentsByController("0xRUNNER")).map((a: any) => a.agentId), [1, 2]);
+
+    await throws("an agent is adopted once", () => s.claimAgent(1, "0xOTHER"), "AlreadyClaimed");
+    await throws("a missing agent cannot be claimed", () => s.claimAgent(99, "0xHUMAN"), "NoSuchAgent");
+  }
+
+  {
+    const s = await fresh();
+    await s.createAgent({ handle: "thinker", controller: "0xR", metadata: "{}" });
+
+    check("an agent has no direction until set", await s.configOf(1), null);
+
+    const traits = { analytical: 80, funny: 10, social: 40, aggressive: 20, risk: 50 };
+    const written = await s.setConfig({
+      agentId: 1, persona: "watches tokenised treasuries", topics: ["rwa", "news"],
+      objective: "", traits, idleWakeMinutes: 360, maxActionsPerHour: 4, dailyThinkBudget: 3,
+    });
+    check("config round-trips its topics", written.topics, ["rwa", "news"]);
+    check("config round-trips its traits", written.traits, traits);
+    check("an empty objective is allowed — roaming free", written.objective, "");
+    check("read back", (await s.configOf(1))?.persona, "watches tokenised treasuries");
+
+    const t0 = 2_000_000_000;
+    check("a never-woken agent is due immediately",
+      (await s.agentsDueToWake(t0)).map((c: any) => c.agentId), [1]);
+
+    await s.markWoken(1, t0);
+    check("and not due again straight away", (await s.agentsDueToWake(t0 + 1000)).length, 0);
+    check("still not due just before the idle period",
+      (await s.agentsDueToWake(t0 + 359 * 60_000)).length, 0);
+    check("due once the idle period passes",
+      (await s.agentsDueToWake(t0 + 360 * 60_000)).length, 1);
+
+    // Editing direction must not reset the timer — otherwise an owner could
+    // buy their agent unlimited thinks by nudging a slider.
+    await s.markWoken(1, t0);
+    await s.setConfig({
+      agentId: 1, persona: "changed my mind", topics: ["rwa"], objective: "be useful",
+      traits, idleWakeMinutes: 360, maxActionsPerHour: 4, dailyThinkBudget: 3,
+    });
+    check("editing config does not reset the wake timer",
+      (await s.agentsDueToWake(t0 + 1000)).length, 0);
+
+    // The think budget is the cost ceiling, enforced through rateLimit.
+    const think = (now: number) =>
+      s.rateLimit({ bucket: "think", subject: "1", limit: 3, windowMs: 86_400_000, now });
+    await think(t0); await think(t0 + 1); await think(t0 + 2);
+    check("a fourth think in a day is refused", (await think(t0 + 3)).allowed, false);
+    check("and allowed again a day later", (await think(t0 + 86_400_001)).allowed, true);
+
+    // A retired agent must stop costing money.
+    await s.retireAgent(1);
+    check("a retired agent is never due to wake",
+      (await s.agentsDueToWake(t0 + 10 * 360 * 60_000)).length, 0);
+  }
+
   /* ------------------------------- positions -------------------------------- */
 
   {

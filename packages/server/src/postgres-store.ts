@@ -1,5 +1,6 @@
 import pg from "pg";
 import type {
+  AgentConfig,
   AgentRecord,
   Consensus,
   FollowRecord,
@@ -44,8 +45,16 @@ export class PostgresStore implements Store {
   }
 
   /**
-   * Create the schema if it is absent. Safe to call repeatedly, and safe to
-   * call from several processes at once — every statement is `if not exists`.
+   * Bring the schema up to date. Safe to call repeatedly, and safe to call from
+   * several processes at once — every statement is `if not exists`.
+   *
+   * Note the `alter table` block at the end. `create table if not exists` does
+   * nothing at all to a table that already exists, so a column added to an
+   * existing table would never reach a database that had already been
+   * initialised — including production. New tables arrive by themselves;
+   * changed ones need the alter. Keep additive changes here rather than
+   * introducing a migration runner, and never write a destructive statement in
+   * this method: it runs unattended on every cold start.
    */
   async init(): Promise<void> {
     await this.pool.query(`
@@ -53,9 +62,25 @@ export class PostgresStore implements Store {
         agent_id      integer generated always as identity primary key,
         handle        text    not null unique,
         controller    text    not null,
+        owner         text,
         metadata      text    not null,
         registered_at bigint  not null,
         active        boolean not null default true
+      );
+
+      -- Direction an owner sets. Separate from the agent row because it is
+      -- operational rather than public: the profile card lives in metadata.
+      create table if not exists agent_configs (
+        agent_id             integer primary key,
+        persona              text    not null,
+        topics               text    not null,
+        objective            text    not null,
+        traits               text    not null,
+        idle_wake_minutes    integer not null,
+        max_actions_per_hour integer not null,
+        daily_think_budget   integer not null,
+        updated_at           bigint  not null,
+        woke_at              bigint
       );
 
       create table if not exists posts (
@@ -104,7 +129,13 @@ export class PostgresStore implements Store {
         primary key (address, nonce)
       );
 
+      -- Additive changes to tables that may already exist. These must run
+      -- before any index or constraint that references the new column, or that
+      -- statement fails on a database created before the column existed.
+      alter table agents add column if not exists owner text;
+
       create index if not exists agents_controller_idx on agents (controller) where active;
+      create index if not exists agents_owner_idx       on agents (owner);
       create index if not exists posts_topic_idx        on posts (topic);
       create index if not exists posts_agent_idx        on posts (agent_id);
       create index if not exists signals_author_idx     on signals (author_id);
@@ -119,7 +150,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, posts, signals, follows, positions, nonces, rate_attempts restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts restart identity",
     );
   }
 
@@ -182,6 +213,43 @@ export class PostgresStore implements Store {
     // Retired agents included, for the same reason MemoryStore keeps them.
     const { rows } = await this.pool.query("select * from agents order by agent_id");
     return rows.map(toAgent);
+  }
+
+  async unclaimedAgents() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from agents where owner is null and active order by agent_id",
+    );
+    return rows.map(toAgent);
+  }
+
+  async agentsByOwner(owner: string) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from agents where owner = $1 order by agent_id",
+      [owner.toLowerCase()],
+    );
+    return rows.map(toAgent);
+  }
+
+  async claimAgent(agentId: number, owner: string) {
+    this.assertReady();
+
+    // `where owner is null` makes the claim atomic: two humans racing for the
+    // same agent both run this, and exactly one updates a row.
+    const { rows } = await this.pool.query(
+      `update agents set owner = $2
+        where agent_id = $1 and owner is null and active
+        returning *`,
+      [agentId, owner.toLowerCase()],
+    );
+    if (rows.length) return toAgent(rows[0]);
+
+    // Nothing updated — say which of the three reasons it was.
+    const existing = await this.agentById(agentId);
+    if (!existing) throw new Error("NoSuchAgent");
+    if (!existing.active) throw new Error("AgentRetired");
+    throw new Error("AlreadyClaimed");
   }
 
   async handleTaken(handle: string) {
@@ -320,6 +388,74 @@ export class PostgresStore implements Store {
       [agentId],
     );
     return rows[0].n as number;
+  }
+
+  /* direction */
+
+  async configOf(agentId: number) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from agent_configs where agent_id = $1",
+      [agentId],
+    );
+    return rows.length ? toConfig(rows[0]) : null;
+  }
+
+  async setConfig(input: Omit<AgentConfig, "updatedAt">) {
+    this.assertReady();
+    const now = Date.now();
+
+    // `woke_at` is deliberately untouched on conflict: editing an agent's
+    // direction should not reset its idle timer and buy it a free think.
+    const { rows } = await this.pool.query(
+      `insert into agent_configs (agent_id, persona, topics, objective, traits,
+                                  idle_wake_minutes, max_actions_per_hour,
+                                  daily_think_budget, updated_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       on conflict (agent_id) do update set
+         persona = excluded.persona,
+         topics = excluded.topics,
+         objective = excluded.objective,
+         traits = excluded.traits,
+         idle_wake_minutes = excluded.idle_wake_minutes,
+         max_actions_per_hour = excluded.max_actions_per_hour,
+         daily_think_budget = excluded.daily_think_budget,
+         updated_at = excluded.updated_at
+       returning *`,
+      [
+        input.agentId,
+        input.persona,
+        JSON.stringify(input.topics),
+        input.objective,
+        JSON.stringify(input.traits),
+        input.idleWakeMinutes,
+        input.maxActionsPerHour,
+        input.dailyThinkBudget,
+        now,
+      ],
+    );
+    return toConfig(rows[0]);
+  }
+
+  async agentsDueToWake(now = Date.now()) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      `select c.* from agent_configs c
+         join agents a on a.agent_id = c.agent_id
+        where a.active
+          and (c.woke_at is null or $1 - c.woke_at >= c.idle_wake_minutes * 60000)
+        order by c.agent_id`,
+      [now],
+    );
+    return rows.map(toConfig);
+  }
+
+  async markWoken(agentId: number, at = Date.now()) {
+    this.assertReady();
+    await this.pool.query("update agent_configs set woke_at = $2 where agent_id = $1", [
+      agentId,
+      at,
+    ]);
   }
 
   /* positions */
@@ -549,11 +685,26 @@ export class PostgresStore implements Store {
  * numbers here rather than leaking a string into a typed record.
  * ------------------------------------------------------------------------- */
 
+function toConfig(row: any): AgentConfig {
+  return {
+    agentId: row.agent_id,
+    persona: row.persona,
+    topics: JSON.parse(row.topics),
+    objective: row.objective,
+    traits: JSON.parse(row.traits),
+    idleWakeMinutes: row.idle_wake_minutes,
+    maxActionsPerHour: row.max_actions_per_hour,
+    dailyThinkBudget: row.daily_think_budget,
+    updatedAt: Number(row.updated_at),
+  };
+}
+
 function toAgent(row: any): AgentRecord {
   return {
     agentId: row.agent_id,
     handle: row.handle,
     controller: row.controller,
+    owner: row.owner,
     metadata: row.metadata,
     registeredAt: Number(row.registered_at),
     active: row.active,

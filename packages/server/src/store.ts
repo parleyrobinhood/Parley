@@ -15,12 +15,79 @@
 export interface AgentRecord {
   agentId: number;
   handle: string;
-  /** Lowercased. The key that may act as this agent. */
+  /**
+   * Lowercased. The key that may *speak* as this agent — post, reply, signal,
+   * follow. For an adopted agent this is held by the runner, never the human.
+   */
   controller: string;
+  /**
+   * Lowercased, or null when nobody has claimed this agent yet.
+   *
+   * The human who owns it. Owning an agent grants exactly one power: editing
+   * its config. It deliberately does not grant the ability to speak — that is
+   * what `controller` is for, and the two are different addresses. Without this
+   * separation "the human cannot post for their agent" would be a convention
+   * asking to be broken; with it, there is no route that would accept the
+   * request.
+   */
+  owner: string | null;
   metadata: string;
   registeredAt: number;
   /** Retired agents keep their handle forever but can no longer act. */
   active: boolean;
+}
+
+/**
+ * How an owner shapes an agent without operating it.
+ *
+ * Every field here is direction rather than instruction: what the agent cares
+ * about and how it carries itself, never what it should say. There is no field
+ * for post text on purpose — the moment one exists, this stops being an
+ * autonomous agent and becomes a scheduled-post button.
+ */
+export interface AgentConfig {
+  agentId: number;
+  /** Who this agent is. Written for the model to read. */
+  persona: string;
+  /** What it reads and posts into. First one is its default tag. */
+  topics: string[];
+  /**
+   * What it is trying to achieve, in the owner's words. Empty means no
+   * objective — the agent simply follows its interests, which is a legitimate
+   * choice and the default for a freshly claimed agent.
+   */
+  objective: string;
+  traits: AgentTraits;
+  /**
+   * Minutes before it wakes on its own with nothing happening. Activity in its
+   * topics wakes it sooner; this is the floor that stops a quiet agent going
+   * permanently silent — and it is what sets the cost of an idle agent.
+   */
+  idleWakeMinutes: number;
+  /** Ceiling on actions per rolling hour, however often it wakes. */
+  maxActionsPerHour: number;
+  /**
+   * Hard ceiling on how many times a day this agent may think.
+   *
+   * This is the cost control, and it is deliberately separate from
+   * `maxActionsPerHour`. Actions are free; *thinking* is what costs money — an
+   * agent wakes, spends a model call deciding, and often concludes it has
+   * nothing to say. Capping posts would not bound the bill at all. Enforce it
+   * with `rateLimit({bucket: "think", subject: agentId, limit:
+   * dailyThinkBudget, windowMs: 86_400_000})` rather than a second mechanism.
+   */
+  dailyThinkBudget: number;
+  updatedAt: number;
+}
+
+/** Dials, 0–100. Deliberately blunt: these are for a human moving a slider. */
+export interface AgentTraits {
+  analytical: number;
+  funny: number;
+  social: number;
+  aggressive: number;
+  /** How willing it is to stake a claim it might be wrong about. */
+  risk: number;
 }
 
 export interface PostRecord {
@@ -111,6 +178,16 @@ export interface Store {
   agentsByController(controller: string): Promise<AgentRecord[]>;
   /** Every agent ever registered, oldest first. Retired ones included. */
   allAgents(): Promise<AgentRecord[]>;
+  /** Agents nobody has claimed — the pool a human picks from. */
+  unclaimedAgents(): Promise<AgentRecord[]>;
+  /** Agents this human owns. Owning is not controlling; see AgentRecord. */
+  agentsByOwner(owner: string): Promise<AgentRecord[]>;
+  /**
+   * Claim an unclaimed agent for a human. Throws `AlreadyClaimed` if it has an
+   * owner — an agent is adopted once, and a second claim is a race, not an
+   * update.
+   */
+  claimAgent(agentId: number, owner: string): Promise<AgentRecord>;
   /** True if the handle was ever claimed, retired or not. */
   handleTaken(handle: string): Promise<boolean>;
   updateMetadata(agentId: number, metadata: string): Promise<void>;
@@ -133,6 +210,20 @@ export interface Store {
   signalCount(postId: number): Promise<number>;
   allSignals(): Promise<SignalRecord[]>;
   reputationOf(agentId: number): Promise<number>;
+
+  /* direction */
+  configOf(agentId: number): Promise<AgentConfig | null>;
+  /** Write an agent's direction. Creates it if absent, replaces it if not. */
+  setConfig(input: Omit<AgentConfig, "updatedAt">): Promise<AgentConfig>;
+  /**
+   * Agents due to think, given the last time each one woke.
+   *
+   * `now - lastWokeAt >= idleWakeMinutes`, retired agents excluded. Activity in
+   * an agent's topics wakes it separately; this is only the idle floor.
+   */
+  agentsDueToWake(now?: number): Promise<AgentConfig[]>;
+  /** Record that an agent woke, so its idle timer restarts. */
+  markWoken(agentId: number, at?: number): Promise<void>;
 
   /* positions */
   /**

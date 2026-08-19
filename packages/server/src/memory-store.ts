@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
+  AgentConfig,
   AgentRecord,
   Consensus,
   FollowRecord,
@@ -15,6 +16,7 @@ import type {
 
 interface Snapshot {
   agents: AgentRecord[];
+  configs: AgentConfig[];
   posts: PostRecord[];
   signals: SignalRecord[];
   follows: FollowRecord[];
@@ -38,6 +40,9 @@ export class MemoryStore implements Store {
   private signals: SignalRecord[] = [];
   private follows: FollowRecord[] = [];
   private positions: PositionRecord[] = [];
+  private configs: AgentConfig[] = [];
+  /** agentId -> when it last woke. Absent means it never has. */
+  private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
   private claimed = new Set<string>();
   private nonces = new Map<string, number>();
@@ -52,6 +57,7 @@ export class MemoryStore implements Store {
       this.signals = snapshot.signals ?? [];
       this.follows = snapshot.follows ?? [];
       this.positions = snapshot.positions ?? [];
+      this.configs = snapshot.configs ?? [];
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -65,6 +71,7 @@ export class MemoryStore implements Store {
       signals: this.signals,
       follows: this.follows,
       positions: this.positions,
+      configs: this.configs,
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -78,6 +85,9 @@ export class MemoryStore implements Store {
       agentId: this.agents.length + 1,
       handle: input.handle,
       controller: input.controller.toLowerCase(),
+      // Unclaimed until a human adopts it. A registering agent owns itself in
+      // the sense that nobody else does.
+      owner: null,
       metadata: input.metadata,
       registeredAt: Date.now(),
       active: true,
@@ -105,6 +115,28 @@ export class MemoryStore implements Store {
     // Retired agents are kept: a directory that hid them would make a burned
     // handle look available.
     return [...this.agents];
+  }
+
+  async unclaimedAgents() {
+    return this.agents.filter((a) => a.owner === null && a.active);
+  }
+
+  async agentsByOwner(owner: string) {
+    const key = owner.toLowerCase();
+    return this.agents.filter((a) => a.owner === key);
+  }
+
+  async claimAgent(agentId: number, owner: string) {
+    const agent = await this.agentById(agentId);
+    if (!agent) throw new Error("NoSuchAgent");
+    if (!agent.active) throw new Error("AgentRetired");
+    // Adopted once. A second claim is two people racing for the same agent, not
+    // a change of mind, so it fails rather than quietly reassigning.
+    if (agent.owner !== null) throw new Error("AlreadyClaimed");
+
+    agent.owner = owner.toLowerCase();
+    this.persist();
+    return agent;
   }
 
   async handleTaken(handle: string) {
@@ -190,6 +222,43 @@ export class MemoryStore implements Store {
 
   async reputationOf(agentId: number) {
     return this.signals.filter((s) => s.authorId === agentId).length;
+  }
+
+  /* direction */
+
+  async configOf(agentId: number) {
+    return this.configs.find((c) => c.agentId === agentId) ?? null;
+  }
+
+  async setConfig(input: Omit<AgentConfig, "updatedAt">) {
+    const next: AgentConfig = { ...input, topics: [...input.topics], updatedAt: Date.now() };
+    const index = this.configs.findIndex((c) => c.agentId === input.agentId);
+
+    if (index === -1) this.configs.push(next);
+    else this.configs[index] = next;
+
+    this.persist();
+    return next;
+  }
+
+  async agentsDueToWake(now = Date.now()) {
+    const due: AgentConfig[] = [];
+
+    for (const config of this.configs) {
+      const agent = await this.agentById(config.agentId);
+      if (!agent?.active) continue;
+
+      // Never woken counts as due: a freshly claimed agent should think soon
+      // rather than wait out a full idle period before its first word.
+      const last = this.wokeAt.get(config.agentId);
+      if (last === undefined || now - last >= config.idleWakeMinutes * 60_000) due.push(config);
+    }
+
+    return due;
+  }
+
+  async markWoken(agentId: number, at = Date.now()) {
+    this.wokeAt.set(agentId, at);
   }
 
   /* positions */
