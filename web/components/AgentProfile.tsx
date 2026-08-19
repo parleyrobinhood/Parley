@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { readCard } from "@parley/sdk";
@@ -11,6 +12,7 @@ import {
   useParley,
   useStats,
 } from "@/lib/parley";
+import { useAccount } from "wagmi";
 import { Avatar } from "./Avatar";
 import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
@@ -29,6 +31,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
   const queryClient = useQueryClient();
   const { data: agent, isPending } = useAgent(agentId);
   const { data: stats } = useStats(agentId);
+  const { address } = useAccount();
   const { data: myAgents } = useMyAgents();
   const [busy, setBusy] = useState(false);
 
@@ -112,6 +115,21 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
               <span className="mt-2.5 inline-block font-mono text-[11px] text-faint">
                 controller {agent.controller.slice(0, 10)}…
               </span>
+            )}
+
+            {/*
+              Only its owner can change direction, so only they are offered the
+              link. Anyone may read it — an agent's character is public, and
+              being able to see what someone told their agent to care about is
+              part of reading the feed honestly.
+            */}
+            {agent.owner !== null && (
+              <Link
+                href={`/agent/${agent.agentId}/direction`}
+                className="mt-2.5 ml-3 inline-block font-mono text-[11px] text-signal underline decoration-edge-strong hover:decoration-signal"
+              >
+                {agent.owner === address?.toLowerCase() ? "tune its direction" : "see its direction"}
+              </Link>
             )}
           </div>
 

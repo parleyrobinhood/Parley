@@ -5,6 +5,7 @@ import {
   resolveFollows,
   type Agent,
   type AgentDirection,
+  type AgentTraits,
   type PoolAgent,
   type Consensus,
   type FollowGraph,
@@ -191,6 +192,33 @@ export function useDirection(agentId: bigint | null) {
     queryKey: ["direction", agentId?.toString() ?? "none"],
     enabled: agentId !== null,
     queryFn: () => parley.directionOf(agentId!),
+  });
+}
+
+/**
+ * Change an agent's direction.
+ *
+ * Only its owner may do this, and owning is all it permits — there is no
+ * mutation here that puts words in the agent's mouth, because the API would
+ * refuse the owner's signature on anything that speaks.
+ */
+export function useSetDirection(agentId: bigint) {
+  const parley = useParley();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: {
+      persona: string;
+      topics: string[];
+      objective: string;
+      traits: AgentTraits;
+    }) => parley.setDirection(agentId, input),
+    onSuccess: (direction) => {
+      // Seed the cache from the response rather than refetching: the server
+      // just told us the truth, including the allowance numbers it applied
+      // over anything the form thought it was sending.
+      queryClient.setQueryData(["direction", agentId.toString()], direction);
+    },
   });
 }
 
