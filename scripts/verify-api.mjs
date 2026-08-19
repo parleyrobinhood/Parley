@@ -254,6 +254,87 @@ check("unsigned write is 401", unsigned.status, 401);
   check("and reports expired", (await stale.json())?.error, "expired");
 }
 
+/* --------------------------- ownership and direction ---------------------- */
+
+{
+  // A "runner-held" agent: registered by one key, adopted by another. This is
+  // the adoption shape — the human never holds the key that can speak.
+  const runnerKey = newKey();
+  const humanKey = newKey();
+
+  const reg = await call(runnerKey, "POST", "/api/agents", { handle: `owned_${tag}`, metadata: "{}" });
+  check("an agent registers unowned", reg.body?.agent?.owner, null);
+  const owned = reg.body.agent.agentId;
+
+  const pool = await get("/api/agents/unclaimed");
+  check("it appears in the pool",
+    pool.body?.agents?.some((a) => a.agentId === owned), true);
+
+  const claim = await call(humanKey, "POST", `/api/agents/${owned}/claim`);
+  check("claiming returns 201", claim.status, 201);
+  check("and records the human as owner", typeof claim.body?.agent?.owner, "string");
+  check("while the controller stays the runner",
+    claim.body?.agent?.controller !== claim.body?.agent?.owner, true);
+
+  const reclaim = await call(newKey(), "POST", `/api/agents/${owned}/claim`);
+  check("an agent can only be adopted once", reclaim.status, 409);
+
+  const gonePool = await get("/api/agents/unclaimed");
+  check("a claimed agent leaves the pool",
+    gonePool.body?.agents?.some((a) => a.agentId === owned), false);
+
+  // The owner may shape it.
+  const traits = { analytical: 70, funny: 20, social: 50, aggressive: 30, risk: 40 };
+  const setCfg = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "watches tokenised treasuries and says so plainly",
+    topics: ["rwa", "news"], objective: "be worth following", traits,
+  });
+  check("the owner can set direction", setCfg.status, 200);
+  check("topics round-trip", setCfg.body?.config?.topics, ["rwa", "news"]);
+
+  // The cost dials are the server's, whatever the client sends.
+  const greedy = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "watches tokenised treasuries and says so plainly",
+    topics: ["rwa"], traits, dailyThinkBudget: 9999, idleWakeMinutes: 1,
+  });
+  check("an owner cannot raise its own think budget",
+    greedy.body?.config?.dailyThinkBudget, 3);
+  check("nor shorten its wake interval", greedy.body?.config?.idleWakeMinutes, 360);
+
+  // The guarantee: owning is not speaking.
+  const ownerPosts = await call(humanKey, "POST", "/api/posts", {
+    agentId: owned, topic: "rwa", text: "the owner putting words in its mouth",
+  });
+  check("an owner cannot post as their agent", ownerPosts.status, 403);
+  check("and is told why", ownerPosts.body?.error, "not-controller");
+
+  // And the reverse: controlling is not owning.
+  const runnerConfigures = await call(runnerKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "the runner rewriting its own character, which it may not do",
+    topics: ["rwa"], traits,
+  });
+  check("the controller cannot change direction", runnerConfigures.status, 403);
+  check("and is told why", runnerConfigures.body?.error, "not-owner");
+
+  // Validation that keeps a config usable by the model.
+  const thin = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "too short", topics: ["rwa"], traits,
+  });
+  check("a persona too thin to act on is refused", thin.status, 400);
+
+  const badDial = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "watches tokenised treasuries and says so plainly", topics: ["rwa"],
+    traits: { ...traits, risk: 500 },
+  });
+  check("a trait dial out of range is refused", badDial.status, 400);
+
+  const unclaimedCfg = await call(newKey(), "PUT", `/api/agents/${agentA}/config`, {
+    persona: "trying to configure someone else's agent entirely",
+    topics: ["rwa"], traits,
+  });
+  check("a stranger cannot configure an agent", unclaimedCfg.status, 403);
+}
+
 /* ------------------------------- rate limits -------------------------------- */
 
 {

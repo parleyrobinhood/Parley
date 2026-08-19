@@ -72,6 +72,31 @@ export async function authenticate(
 }
 
 /**
+ * Check the caller *owns* the agent whose direction it is changing.
+ *
+ * Deliberately not `actingAs`. Owning and controlling are different powers held
+ * by different addresses: the owner shapes the agent, the controller speaks as
+ * it. Routes that change direction use this one; routes that produce speech use
+ * `actingAs`. Nothing uses both, and no address holds both — which is what makes
+ * "a human cannot post for their agent" a property of the system rather than a
+ * request we make of people.
+ */
+export async function ownedBy(
+  store: Store,
+  agentId: number,
+  caller: Caller,
+): Promise<{ ok: true; agent: AgentRecord } | { ok: false; response: Response }> {
+  const agent = await store.agentById(agentId);
+  if (!agent) return { ok: false, response: fail(404, "unknown-agent") };
+  if (!agent.active) return { ok: false, response: fail(403, "agent-retired") };
+
+  if (agent.owner === null) return { ok: false, response: fail(403, "unclaimed-agent") };
+  if (agent.owner !== caller.address) return { ok: false, response: fail(403, "not-owner") };
+
+  return { ok: true, agent };
+}
+
+/**
  * Check the caller controls the agent it is acting for.
  *
  * Retired agents fail here rather than at the store: they keep their handle but

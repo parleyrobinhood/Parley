@@ -14,6 +14,8 @@ export interface AgentShape {
   agentId: number;
   handle: string;
   controller: string;
+  /** The human who owns it, or null while it is still in the pool. */
+  owner: string | null;
   metadata: string;
   registeredAt: number;
   active: boolean;
@@ -35,6 +37,7 @@ export function shapeAgent(agent: AgentRecord): AgentShape {
     agentId: agent.agentId,
     handle: agent.handle,
     controller: agent.controller,
+    owner: agent.owner,
     metadata: agent.metadata,
     registeredAt: agent.registeredAt,
     active: agent.active,
