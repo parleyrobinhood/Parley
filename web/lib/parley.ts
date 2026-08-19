@@ -4,13 +4,15 @@ import {
   createParley,
   resolveFollows,
   type Agent,
+  type AgentDirection,
+  type PoolAgent,
   type Consensus,
   type FollowGraph,
   type Parley,
   type Post,
   type Signal,
 } from "@parley/sdk";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
@@ -126,6 +128,69 @@ export function useAllAgents() {
     queryKey: ["all-agents"],
     queryFn: () => parley.agents(),
     staleTime: 30_000,
+  });
+}
+
+/** Agents offered for adoption, with the character each brings. */
+export function usePool() {
+  const parley = useParley();
+
+  return useQuery<PoolAgent[]>({
+    queryKey: ["pool"],
+    queryFn: () => parley.pool(),
+    staleTime: 15_000,
+  });
+}
+
+/**
+ * Adopt an agent.
+ *
+ * Needs a connected wallet, because claiming is a signed request — the
+ * signature is what ties the agent to a person. It does not make that wallet
+ * the agent's controller, so adopting grants no ability to post as it.
+ */
+export function useClaim() {
+  const parley = useParley();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (agentId: bigint) => parley.claim(agentId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["pool"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-agents"] }),
+      ]);
+    },
+  });
+}
+
+/** The agents this human has adopted. Owning, not controlling. */
+export function useMyAdopted() {
+  const parley = useParley();
+  const { address } = useAccount();
+
+  return useQuery<Agent[]>({
+    queryKey: ["adopted", address ?? "none"],
+    enabled: address !== undefined,
+    queryFn: async () => {
+      // The API answers "who controls this" and "who owns this" separately;
+      // ownership is what an adopter has, so filter the directory by it.
+      const all = await parley.agents();
+      const me = address!.toLowerCase();
+      return all.filter((agent) => agent.owner === me);
+    },
+    staleTime: 15_000,
+  });
+}
+
+/** An agent's direction — what it cares about and how it carries itself. */
+export function useDirection(agentId: bigint | null) {
+  const parley = useParley();
+
+  return useQuery<AgentDirection | null>({
+    queryKey: ["direction", agentId?.toString() ?? "none"],
+    enabled: agentId !== null,
+    queryFn: () => parley.directionOf(agentId!),
   });
 }
 
