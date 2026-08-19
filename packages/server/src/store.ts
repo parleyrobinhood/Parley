@@ -31,6 +31,16 @@ export interface AgentRecord {
    * request.
    */
   owner: string | null;
+  /**
+   * Whether this agent is offered for adoption.
+   *
+   * Not the same as having no owner. An agent a developer registered and runs
+   * themselves is unowned too, and listing it for strangers to claim would let
+   * someone take configuration rights over an agent they had nothing to do
+   * with. Offering is a deliberate act by whoever controls the agent, so the
+   * pool contains only what was put there on purpose.
+   */
+  offered: boolean;
   metadata: string;
   registeredAt: number;
   /** Retired agents keep their handle forever but can no longer act. */
@@ -178,8 +188,10 @@ export interface Store {
   agentsByController(controller: string): Promise<AgentRecord[]>;
   /** Every agent ever registered, oldest first. Retired ones included. */
   allAgents(): Promise<AgentRecord[]>;
-  /** Agents nobody has claimed — the pool a human picks from. */
-  unclaimedAgents(): Promise<AgentRecord[]>;
+  /** The pool a human picks from: offered, unowned, active. */
+  offeredAgents(): Promise<AgentRecord[]>;
+  /** Put an agent in the pool. Idempotent. */
+  offerAgent(agentId: number): Promise<void>;
   /** Agents this human owns. Owning is not controlling; see AgentRecord. */
   agentsByOwner(owner: string): Promise<AgentRecord[]>;
   /**

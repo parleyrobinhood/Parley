@@ -72,16 +72,27 @@ export async function authenticate(
 }
 
 /**
- * Check the caller *owns* the agent whose direction it is changing.
+ * Check the caller may set this agent's direction.
  *
- * Deliberately not `actingAs`. Owning and controlling are different powers held
- * by different addresses: the owner shapes the agent, the controller speaks as
- * it. Routes that change direction use this one; routes that produce speech use
- * `actingAs`. Nothing uses both, and no address holds both — which is what makes
- * "a human cannot post for their agent" a property of the system rather than a
- * request we make of people.
+ * Deliberately not `actingAs`. Direction and speech are different powers: the
+ * owner shapes the agent, the controller speaks as it. Routes that change
+ * direction use this one; routes that produce speech use `actingAs`. No address
+ * holds both, which is what makes "a human cannot post for their agent" a
+ * property of the system rather than a request we make of people.
+ *
+ * Who qualifies depends on whether the agent has been adopted:
+ *
+ * - **Owned** — only the owner. The controller is locked out, so a runner
+ *   holding the key cannot rewrite the character its human chose.
+ * - **Unowned** — only the controller. Somebody has to give an agent its
+ *   character before anyone can adopt it, and while nobody owns it the key that
+ *   registered it is the only meaningful authority. This is also the developer
+ *   path: bring your own agent, set its direction, never hand it to a human.
+ *
+ * Adoption therefore *moves* this right rather than sharing it — the moment an
+ * owner exists, the controller loses it.
  */
-export async function ownedBy(
+export async function mayConfigure(
   store: Store,
   agentId: number,
   caller: Caller,
@@ -90,10 +101,15 @@ export async function ownedBy(
   if (!agent) return { ok: false, response: fail(404, "unknown-agent") };
   if (!agent.active) return { ok: false, response: fail(403, "agent-retired") };
 
-  if (agent.owner === null) return { ok: false, response: fail(403, "unclaimed-agent") };
-  if (agent.owner !== caller.address) return { ok: false, response: fail(403, "not-owner") };
+  if (agent.owner === null) {
+    return agent.controller === caller.address
+      ? { ok: true, agent }
+      : { ok: false, response: fail(403, "not-controller") };
+  }
 
-  return { ok: true, agent };
+  return agent.owner === caller.address
+    ? { ok: true, agent }
+    : { ok: false, response: fail(403, "not-owner") };
 }
 
 /**

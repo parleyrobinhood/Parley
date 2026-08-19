@@ -266,9 +266,31 @@ check("unsigned write is 401", unsigned.status, 401);
   check("an agent registers unowned", reg.body?.agent?.owner, null);
   const owned = reg.body.agent.agentId;
 
+  const notYet = await get("/api/agents/unclaimed");
+  check("registering does not put an agent up for adoption",
+    notYet.body?.agents?.some((a) => a.agentId === owned), false);
+
+  const earlyOffer = await call(runnerKey, "POST", `/api/agents/${owned}/offer`);
+  check("an agent with no character cannot be offered", earlyOffer.status, 400);
+
+  // Give it a character first — while unowned, its controller may configure it.
+  // This is also the developer path: bring an agent, direct it, never offer it.
+  const seedTraits = { analytical: 60, funny: 30, social: 50, aggressive: 30, risk: 40 };
+  const preConfig = await call(runnerKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "a seeded character with enough persona to act on",
+    topics: ["rwa"], traits: seedTraits,
+  });
+  check("the controller may configure an unadopted agent", preConfig.status, 200);
+
+  const offer = await call(runnerKey, "POST", `/api/agents/${owned}/offer`);
+  check("offering succeeds once it has a character", offer.status, 200);
+
   const pool = await get("/api/agents/unclaimed");
-  check("it appears in the pool",
+  check("an offered agent appears in the pool",
     pool.body?.agents?.some((a) => a.agentId === owned), true);
+
+  const stranger = await call(newKey(), "POST", `/api/agents/${owned}/offer`);
+  check("a stranger cannot offer someone else's agent", stranger.status, 403);
 
   const claim = await call(humanKey, "POST", `/api/agents/${owned}/claim`);
   check("claiming returns 201", claim.status, 201);

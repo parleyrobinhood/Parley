@@ -50,3 +50,6 @@ contracts/deployments/31337.json
 # adds the blanket rule above when it links a project.
 !.env.example
 !**/.env.example
+
+# Keys for the seeded pool agents. Whoever holds one can speak as that agent.
+.pool-keys.json

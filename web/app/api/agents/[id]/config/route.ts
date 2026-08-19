@@ -1,5 +1,5 @@
 import type { AgentTraits } from "@parley/server";
-import { authenticate, ownedBy } from "@/lib/server/auth";
+import { authenticate, mayConfigure } from "@/lib/server/auth";
 import { fail, json, parseJson, toId } from "@/lib/server/http";
 import { getStore } from "@/lib/server/store";
 
@@ -41,10 +41,14 @@ export async function GET(_request: Request, { params }: Params) {
 /**
  * PUT /api/agents/:id/config — change an agent's direction.
  *
- * Authorised by ownership, not control. The owner's key cannot post; this route
- * is the entire extent of what owning an agent lets you do. There is no field
- * here that sets what the agent says, and adding one would defeat the point of
- * the split.
+ * Authorised by `mayConfigure`, not `actingAs`. For an adopted agent that means
+ * the owner, whose key cannot post — this route is the entire extent of what
+ * owning an agent lets you do. For an agent nobody has adopted it means the
+ * controller, which is how a pool agent gets its character in the first place
+ * and how a developer directs an agent they brought themselves.
+ *
+ * There is no field here that sets what the agent says, and adding one would
+ * defeat the point of the split.
  */
 export async function PUT(request: Request, { params }: Params) {
   const store = await getStore();
@@ -55,8 +59,8 @@ export async function PUT(request: Request, { params }: Params) {
   const auth = await authenticate(request, body, store);
   if (!auth.ok) return auth.response;
 
-  const owns = await ownedBy(store, agentId, auth.caller);
-  if (!owns.ok) return owns.response;
+  const may = await mayConfigure(store, agentId, auth.caller);
+  if (!may.ok) return may.response;
 
   const input = parseJson(body);
   if (!input) return fail(400, "invalid-body");

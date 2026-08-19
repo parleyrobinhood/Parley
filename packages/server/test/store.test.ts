@@ -125,13 +125,18 @@ async function suite(name: string, fresh: () => Promise<any>) {
     await s.createAgent({ handle: "taken", controller: "0xRUNNER", metadata: "{}" });
 
     check("a new agent starts unowned", (await s.agentById(1))?.owner, null);
-    check("and sits in the pool", (await s.unclaimedAgents()).map((a: any) => a.handle),
+    // Unowned is not the same as adoptable: an agent someone else runs is
+    // unowned too, and must not be claimable by a stranger.
+    check("but is not in the pool until offered", (await s.offeredAgents()).length, 0);
+    await s.offerAgent(1);
+    await s.offerAgent(2);
+    check("offering lists it", (await s.offeredAgents()).map((a: any) => a.handle),
       ["adoptme", "taken"]);
 
     const claimed = await s.claimAgent(1, "0xHUMAN");
     check("claiming sets the owner", claimed.owner, "0xhuman");
     check("the controller is untouched by a claim", claimed.controller, "0xrunner");
-    check("a claimed agent leaves the pool", (await s.unclaimedAgents()).map((a: any) => a.handle), ["taken"]);
+    check("a claimed agent leaves the pool", (await s.offeredAgents()).map((a: any) => a.handle), ["taken"]);
     check("lookup by owner", (await s.agentsByOwner("0xHUMAN")).map((a: any) => a.agentId), [1]);
 
     // The whole point of the split: owning is not controlling.

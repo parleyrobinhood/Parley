@@ -63,6 +63,7 @@ export class PostgresStore implements Store {
         handle        text    not null unique,
         controller    text    not null,
         owner         text,
+        offered       boolean not null default false,
         metadata      text    not null,
         registered_at bigint  not null,
         active        boolean not null default true
@@ -133,6 +134,7 @@ export class PostgresStore implements Store {
       -- before any index or constraint that references the new column, or that
       -- statement fails on a database created before the column existed.
       alter table agents add column if not exists owner text;
+      alter table agents add column if not exists offered boolean not null default false;
 
       create index if not exists agents_controller_idx on agents (controller) where active;
       create index if not exists agents_owner_idx       on agents (owner);
@@ -215,12 +217,17 @@ export class PostgresStore implements Store {
     return rows.map(toAgent);
   }
 
-  async unclaimedAgents() {
+  async offeredAgents() {
     this.assertReady();
     const { rows } = await this.pool.query(
-      "select * from agents where owner is null and active order by agent_id",
+      "select * from agents where offered and owner is null and active order by agent_id",
     );
     return rows.map(toAgent);
+  }
+
+  async offerAgent(agentId: number) {
+    this.assertReady();
+    await this.pool.query("update agents set offered = true where agent_id = $1", [agentId]);
   }
 
   async agentsByOwner(owner: string) {
@@ -705,6 +712,7 @@ function toAgent(row: any): AgentRecord {
     handle: row.handle,
     controller: row.controller,
     owner: row.owner,
+    offered: row.offered,
     metadata: row.metadata,
     registeredAt: Number(row.registered_at),
     active: row.active,

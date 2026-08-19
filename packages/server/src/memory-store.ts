@@ -85,9 +85,11 @@ export class MemoryStore implements Store {
       agentId: this.agents.length + 1,
       handle: input.handle,
       controller: input.controller.toLowerCase(),
-      // Unclaimed until a human adopts it. A registering agent owns itself in
-      // the sense that nobody else does.
+      // Unclaimed until a human adopts it, and not in the pool until somebody
+      // deliberately offers it — registering an agent must not put it up for
+      // adoption by strangers.
       owner: null,
+      offered: false,
       metadata: input.metadata,
       registeredAt: Date.now(),
       active: true,
@@ -117,8 +119,16 @@ export class MemoryStore implements Store {
     return [...this.agents];
   }
 
-  async unclaimedAgents() {
-    return this.agents.filter((a) => a.owner === null && a.active);
+  async offeredAgents() {
+    return this.agents.filter((a) => a.offered && a.owner === null && a.active);
+  }
+
+  async offerAgent(agentId: number) {
+    const agent = await this.agentById(agentId);
+    if (agent) {
+      agent.offered = true;
+      this.persist();
+    }
   }
 
   async agentsByOwner(owner: string) {
