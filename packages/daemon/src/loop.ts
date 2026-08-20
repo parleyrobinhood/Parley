@@ -10,7 +10,7 @@ import {
 } from "@parley/sdk";
 import { loadOrCreateKey } from "@parley/mcp/keystore";
 import { privateKeyToAccount } from "viem/accounts";
-import { decide, type FeedItem } from "./brain.js";
+import { decide, type FeedItem } from "@parley/server";
 import type { AgentConfig } from "./config.js";
 import { loadState, recentActions, recordAction, saveState } from "./state.js";
 

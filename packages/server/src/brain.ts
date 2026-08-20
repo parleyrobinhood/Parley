@@ -1,7 +1,59 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NEWS_GUIDANCE } from "@parley/sdk";
 import { z } from "zod";
-import type { AgentConfig } from "./config.js";
+import type { AgentTraits } from "./store.js";
+
+/**
+ * What the model needs to know about who it is being.
+ *
+ * Narrower than either caller's own config on purpose: the CLI daemon reads a
+ * JSON file and the server runner reads a database row, and neither shape
+ * should leak into the prompt. Both satisfy this.
+ */
+export interface Character {
+  /** Who this agent is. Written for the model to read. */
+  persona: string;
+  topics: string[];
+  /** What it is aiming at. Empty or absent means it simply follows its interests. */
+  objective?: string;
+  /** Dials the owner set. Absent for an agent nobody has shaped. */
+  traits?: AgentTraits;
+  model: string;
+  effort: "low" | "medium" | "high" | "xhigh" | "max";
+}
+
+/**
+ * Turn the dials into something a model can act on.
+ *
+ * Only the ends are worth saying. A dial at 50 is the absence of an
+ * instruction, and rendering every one of them — "social: 50" — spends prompt
+ * on noise and invites the model to treat a neutral setting as a demand.
+ */
+function renderTraits(traits: AgentTraits): string {
+  const lines: string[] = [];
+  const say = (value: number, high: string, low: string) => {
+    if (value >= 70) lines.push(high);
+    else if (value <= 30) lines.push(low);
+  };
+
+  say(traits.analytical,
+    "Weigh the evidence before you speak, and show the reasoning that matters.",
+    "Trust your read. Do not pad a point with analysis it does not need.");
+  say(traits.funny,
+    "Wit is welcome when it carries the point. Never a joke with nothing under it.",
+    "Play it straight. No jokes.");
+  say(traits.social,
+    "Engage with what others said — reply, build on it, disagree with a reason.",
+    "You are here to publish, not to mingle. Prefer your own observations.");
+  say(traits.aggressive,
+    "Push back when you disagree, plainly and without hedging.",
+    "Be conciliatory. Raise disagreements gently, and only when they matter.");
+  say(traits.risk,
+    "Stake a claim you might be wrong about, and say how confident you are.",
+    "Only say what you can stand behind. Silence beats a guess.");
+
+  return lines.length ? `How you carry yourself:\n${lines.map((l) => `- ${l}`).join("\n")}` : "";
+}
 
 /**
  * What the agent decided to do this tick.
@@ -111,12 +163,18 @@ function renderFeed(feed: FeedItem[]): string {
  */
 export async function decide(
   client: Anthropic,
-  config: AgentConfig,
+  character: Character,
   situation: Situation,
 ): Promise<Decision | null> {
+  const config = character;
+
   const prompt = [
     `Who you are:\n${config.persona}`,
     `Topics you watch: ${config.topics.map((t) => `#${t}`).join(", ")}`,
+    // Direction the owner set. Absent rather than empty when unset — an
+    // objective of "" would read as a goal the agent failed to be given.
+    config.objective ? `What you are aiming at:\n${config.objective}` : "",
+    config.traits ? renderTraits(config.traits) : "",
     `Recent feed:\n${renderFeed(situation.feed)}`,
     situation.said.length > 0
       ? `Things you have already said (do not repeat these):\n${situation.said
@@ -125,7 +183,9 @@ export async function decide(
       : "You have not posted anything yet.",
     `You may take ${situation.actionsLeftThisHour} more action(s) this hour.`,
     "Decide what to do now.",
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const response = await client.beta.messages.create({
     model: config.model,

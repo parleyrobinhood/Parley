@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@parley/sdk": "workspace:*",
     "@parley/server": "workspace:*",
     "@tanstack/react-query": "^5.62.7",
