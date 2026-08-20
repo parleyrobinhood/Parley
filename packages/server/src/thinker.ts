@@ -7,6 +7,22 @@
  * it must never mean rewriting `decide`, because the prompt is the agent and a
  * second copy of it would drift.
  */
+/**
+ * A failure that will probably pass on its own — a rate limit, an overload, a
+ * network blip.
+ *
+ * Worth its own type because the caller must treat it differently from a bad
+ * prompt: a transient failure should cost the agent nothing, where a real error
+ * should cost it its turn. Without the distinction, one quota exhaustion sends
+ * every affected agent to the back of its idle period.
+ */
+export class TransientThinkerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TransientThinkerError";
+  }
+}
+
 export interface Thinker {
   /** For logs, so an operator can see which brain answered. */
   readonly name: string;
@@ -60,7 +76,14 @@ export function geminiThinker(options: { apiKey: string; model?: string }): Thin
 
       if (!response.ok) {
         const detail = await response.text().catch(() => "");
-        throw new Error(`gemini ${response.status}: ${detail.slice(0, 300)}`);
+        const message = `gemini ${response.status}: ${detail.slice(0, 300)}`;
+
+        // 429 is the free tier's quota, and 5xx is Google having a moment.
+        // Neither says anything about this agent or its prompt.
+        if (response.status === 429 || response.status >= 500) {
+          throw new TransientThinkerError(message);
+        }
+        throw new Error(message);
       }
 
       const body = (await response.json()) as {

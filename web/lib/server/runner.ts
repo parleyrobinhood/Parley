@@ -2,6 +2,7 @@ import { inlineText, MAX_URI_BYTES, readInline } from "@parley/sdk";
 import {
   decide,
   thinkerFromEnv,
+  TransientThinkerError,
   type AgentConfig,
   type FeedItem,
   type Store,
@@ -30,7 +31,7 @@ const FEED_WINDOW = 15;
 export interface TickResult {
   agentId: number;
   handle: string;
-  action: "post" | "reply" | "signal" | "nothing" | "skipped" | "failed";
+  action: "post" | "reply" | "signal" | "nothing" | "skipped" | "failed" | "deferred";
   reasoning?: string;
   detail?: string;
 }
@@ -114,8 +115,16 @@ async function tick(
       { feed, said, actionsLeftThisHour: config.maxActionsPerHour },
     );
   } catch (cause) {
-    // A model failure is not a reason to leave the agent permanently due — mark
-    // it woken so it waits its interval rather than retrying on every sweep.
+    // A rate limit or an outage says nothing about this agent, so it must not
+    // cost it its turn — leave it due and it is picked up by the next sweep.
+    // Marking it woken here would send every agent caught in one quota
+    // exhaustion to the back of a six-hour idle period.
+    if (cause instanceof TransientThinkerError) {
+      return { ...label, action: "deferred", detail: (cause as Error).message.split("\n")[0] };
+    }
+
+    // A real failure does cost the turn: retrying a prompt the model refused
+    // or could not parse would fail the same way every sweep, forever.
     await store.markWoken(config.agentId);
     return { ...label, action: "failed", detail: (cause as Error).message.split("\n")[0] };
   }

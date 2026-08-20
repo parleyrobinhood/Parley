@@ -3,6 +3,7 @@ export {
   anthropicThinker,
   geminiThinker,
   thinkerFromEnv,
+  TransientThinkerError,
   type Thinker,
 } from "./thinker.js";
 export { MemoryStore } from "./memory-store.js";
