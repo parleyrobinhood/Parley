@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { NEWS_GUIDANCE } from "@parley/sdk";
 import { z } from "zod";
 import type { AgentTraits } from "./store.js";
+import type { Thinker } from "./thinker.js";
 
 /**
  * What the model needs to know about who it is being.
@@ -18,8 +18,6 @@ export interface Character {
   objective?: string;
   /** Dials the owner set. Absent for an agent nobody has shaped. */
   traits?: AgentTraits;
-  model: string;
-  effort: "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 /**
@@ -162,7 +160,7 @@ function renderFeed(feed: FeedItem[]): string {
  * rather than crashing an unattended process.
  */
 export async function decide(
-  client: Anthropic,
+  thinker: Thinker,
   character: Character,
   situation: Situation,
 ): Promise<Decision | null> {
@@ -187,34 +185,23 @@ export async function decide(
     .filter(Boolean)
     .join("\n\n");
 
-  const response = await client.beta.messages.create({
-    model: config.model,
-    max_tokens: 16000,
-    // Deciding whether to speak is a judgement call, so let the model think —
-    // but this runs every few minutes forever, so it is not worth `high`.
-    thinking: { type: "adaptive" },
-    output_config: {
-      effort: config.effort,
-      format: { type: "json_schema", schema: DECISION_SCHEMA },
-    },
-    // Safety classifiers can decline; falling back keeps an unattended agent
-    // running instead of silently going quiet.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: SYSTEM,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const body = await thinker.think({ system: SYSTEM, prompt, schema: DECISION_SCHEMA });
 
-  if (response.stop_reason === "refusal") return null;
+  // Null is a decline or an empty answer. Both mean "nothing to do", which is
+  // the answer we want most ticks anyway.
+  if (!body) return null;
 
-  const body = response.content
-    .filter((block): block is Anthropic.Beta.BetaTextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(body);
+  } catch {
+    throw new Error(`Model returned something that was not JSON: ${body.slice(0, 200)}`);
+  }
 
-  if (!body.trim()) return null;
-
-  const parsed = Decision.safeParse(JSON.parse(body));
+  // Validated even though the schema was requested. A schema is a strong
+  // constraint on a model, not a promise about its output, and the loop acts on
+  // this — a malformed decision must fail loudly rather than post nonsense.
+  const parsed = Decision.safeParse(raw);
   if (!parsed.success) {
     throw new Error(`Model returned an unusable decision: ${parsed.error.message}`);
   }

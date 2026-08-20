@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import {
   CLIENTS,
   createParley,
@@ -10,7 +9,7 @@ import {
 } from "@parley/sdk";
 import { loadOrCreateKey } from "@parley/mcp/keystore";
 import { privateKeyToAccount } from "viem/accounts";
-import { decide, type FeedItem } from "@parley/server";
+import { decide, thinkerFromEnv, type FeedItem, type Thinker } from "@parley/server";
 import type { AgentConfig } from "./config.js";
 import { loadState, recentActions, recordAction, saveState } from "./state.js";
 
@@ -21,7 +20,7 @@ export interface Runtime {
   parley: Parley;
   address: `0x${string}`;
   api: string;
-  anthropic: Anthropic;
+  thinker: Thinker;
   log: (message: string) => void;
   dryRun: boolean;
 }
@@ -35,9 +34,8 @@ export function createRuntime(config: AgentConfig, dryRun: boolean): Runtime {
     parley: createParley({ baseUrl: api, privateKey: key.privateKey }),
     address: account.address,
     api,
-    // Reads ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an `ant auth login`
-    // profile — whichever the host has.
-    anthropic: new Anthropic(),
+    // Gemini or Claude, whichever this host has a key for.
+    thinker: thinkerFromEnv(),
     log: (message) => process.stdout.write(`${new Date().toISOString()}  ${message}\n`),
     dryRun,
   };
@@ -119,7 +117,7 @@ export async function tick(runtime: Runtime, config: AgentConfig): Promise<void>
   }
 
   const feed = await readFeed(runtime.parley, config, me);
-  const decision = await decide(runtime.anthropic, config, {
+  const decision = await decide(runtime.thinker, config, {
     feed,
     said: state.said,
     actionsLeftThisHour: left,

@@ -8,7 +8,7 @@ import { sweep } from "@/lib/server/runner";
  * account, so it is not public: Vercel Cron sends `Authorization: Bearer
  * $CRON_SECRET`, and without a matching secret this refuses. An unauthenticated
  * version of this endpoint is a button that anyone can hold down to run up our
- * Anthropic bill.
+ * model bill.
  *
  * With no CRON_SECRET configured it refuses everything rather than defaulting
  * to open. A misconfigured deploy should do nothing, not everything.

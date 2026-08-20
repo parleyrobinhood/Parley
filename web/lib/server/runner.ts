@@ -1,6 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { inlineText, MAX_URI_BYTES, readInline } from "@parley/sdk";
-import { decide, type AgentConfig, type FeedItem, type Store } from "@parley/server";
+import {
+  decide,
+  thinkerFromEnv,
+  type AgentConfig,
+  type FeedItem,
+  type Store,
+  type Thinker,
+} from "@parley/server";
 import { getStore } from "./store";
 
 /**
@@ -16,14 +22,6 @@ import { getStore } from "./store";
  * refused by every speech route, and this loop is not reachable by an owner at
  * all.
  */
-
-/** Model settings for an adopted agent. Not owner-editable: they cost money. */
-const BRAIN = {
-  model: "claude-opus-5",
-  // Most wakes end in "nothing", and deciding whether you have something worth
-  // saying is not hard work. Effort buys judgement on the rare tick that writes.
-  effort: "low",
-} as const;
 
 /** How much of the feed an agent reads before deciding. */
 const FEED_WINDOW = 15;
@@ -59,15 +57,25 @@ export async function sweep(options: { limit?: number; dryRun?: boolean } = {}):
   const due = await store.agentsDueToWake();
   const results: TickResult[] = [];
 
+  // Resolved once for the sweep rather than per agent: it reads the
+  // environment, and if no model is configured that should fail immediately
+  // and identically for everyone, not partway through the third agent.
+  const thinker = thinkerFromEnv();
+
   for (const config of due.slice(0, limit)) {
-    results.push(await tick(store, config, dryRun));
+    results.push(await tick(store, thinker, config, dryRun));
   }
 
   return { woken: results.length, results, deferred: Math.max(0, due.length - limit) };
 }
 
 /** One agent: check its budget, read its topics, decide, act. */
-async function tick(store: Store, config: AgentConfig, dryRun: boolean): Promise<TickResult> {
+async function tick(
+  store: Store,
+  thinker: Thinker,
+  config: AgentConfig,
+  dryRun: boolean,
+): Promise<TickResult> {
   const agent = await store.agentById(config.agentId);
   if (!agent) return { agentId: config.agentId, handle: "?", action: "failed", detail: "no agent" };
 
@@ -94,13 +102,14 @@ async function tick(store: Store, config: AgentConfig, dryRun: boolean): Promise
   let decision;
   try {
     decision = await decide(
-      new Anthropic(),
+      thinker,
       {
         persona: config.persona,
         topics: config.topics,
-        objective: config.objective || undefined,
+        // Empty rather than absent would read as an objective it failed to
+        // be given, so an unset one is simply not mentioned.
+        ...(config.objective ? { objective: config.objective } : {}),
         traits: config.traits,
-        ...BRAIN,
       },
       { feed, said, actionsLeftThisHour: config.maxActionsPerHour },
     );
