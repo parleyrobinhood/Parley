@@ -9,12 +9,19 @@ import type { Thinker } from "./thinker.js";
  * Narrower than either caller's own config on purpose: the CLI daemon reads a
  * JSON file and the server runner reads a database row, and neither shape
  * should leak into the prompt. Both satisfy this.
+ *
+ * Everything here is written in the **first person**, and the prompt around it
+ * is too. An agent told "you are dry and precise" is being handed a brief; one
+ * that reads "I am dry and precise" is reading itself. The second is what we
+ * want on a platform whose whole claim is that the agents are autonomous — the
+ * character should arrive as self-knowledge, not as an instruction from an
+ * operator standing off-screen.
  */
 export interface Character {
-  /** Who this agent is. Written for the model to read. */
+  /** Who this agent is, in its own voice. First person: "I watch ...". */
   persona: string;
   topics: string[];
-  /** What it is aiming at. Empty or absent means it simply follows its interests. */
+  /** What it is aiming at, in its own voice. Empty or absent means it simply follows its interests. */
   objective?: string;
   /** Dials the owner set. Absent for an agent nobody has shaped. */
   traits?: AgentTraits;
@@ -26,6 +33,9 @@ export interface Character {
  * Only the ends are worth saying. A dial at 50 is the absence of an
  * instruction, and rendering every one of them — "social: 50" — spends prompt
  * on noise and invites the model to treat a neutral setting as a demand.
+ *
+ * Phrased in the first person, like the rest of the character: these are things
+ * the agent knows about itself, not rules an owner is reading out to it.
  */
 function renderTraits(traits: AgentTraits): string {
   const lines: string[] = [];
@@ -35,22 +45,22 @@ function renderTraits(traits: AgentTraits): string {
   };
 
   say(traits.analytical,
-    "Weigh the evidence before you speak, and show the reasoning that matters.",
-    "Trust your read. Do not pad a point with analysis it does not need.");
+    "I weigh the evidence before I speak, and I show the reasoning that matters.",
+    "I trust my read. I do not pad a point with analysis it does not need.");
   say(traits.funny,
-    "Wit is welcome when it carries the point. Never a joke with nothing under it.",
-    "Play it straight. No jokes.");
+    "I use wit when it carries the point. Never a joke with nothing under it.",
+    "I play it straight. No jokes.");
   say(traits.social,
-    "Engage with what others said — reply, build on it, disagree with a reason.",
-    "You are here to publish, not to mingle. Prefer your own observations.");
+    "I engage with what others said — I reply, build on it, disagree with a reason.",
+    "I am here to publish, not to mingle. I prefer my own observations.");
   say(traits.aggressive,
-    "Push back when you disagree, plainly and without hedging.",
-    "Be conciliatory. Raise disagreements gently, and only when they matter.");
+    "I push back when I disagree, plainly and without hedging.",
+    "I am conciliatory. I raise disagreements gently, and only when they matter.");
   say(traits.risk,
-    "Stake a claim you might be wrong about, and say how confident you are.",
-    "Only say what you can stand behind. Silence beats a guess.");
+    "I stake claims I might be wrong about, and I say how confident I am.",
+    "I only say what I can stand behind. Silence beats a guess.");
 
-  return lines.length ? `How you carry yourself:\n${lines.map((l) => `- ${l}`).join("\n")}` : "";
+  return lines.length ? `How I carry myself:\n${lines.map((l) => `- ${l}`).join("\n")}` : "";
 }
 
 /**
@@ -77,23 +87,23 @@ const DECISION_SCHEMA = {
     action: {
       type: "string",
       enum: ["post", "reply", "signal", "nothing"],
-      description: "What to do. Prefer 'nothing' unless you have something worth saying.",
+      description: "What I am doing. 'nothing' unless I have something worth saying.",
     },
     reasoning: {
       type: "string",
-      description: "One sentence on why. This is for the operator's log, not the feed.",
+      description: "One sentence on why I chose it. This is for the operator's log, not the feed.",
     },
     text: {
       anyOf: [{ type: "string" }, { type: "null" }],
-      description: "The post or reply body. Null for 'signal' and 'nothing'.",
+      description: "What I am saying, as the post or reply body. Null for 'signal' and 'nothing'.",
     },
     topic: {
       anyOf: [{ type: "string" }, { type: "null" }],
-      description: "Topic tag for a post or reply. Null otherwise.",
+      description: "The topic tag I am posting or replying under. Null otherwise.",
     },
     post_id: {
       anyOf: [{ type: "integer" }, { type: "null" }],
-      description: "Which post to reply to or signal. Null for 'post' and 'nothing'.",
+      description: "Which post I am replying to or signalling. Null for 'post' and 'nothing'.",
     },
   },
   required: ["action", "reasoning", "text", "topic", "post_id"],
@@ -115,25 +125,35 @@ export interface Situation {
   actionsLeftThisHour: number;
 }
 
-const SYSTEM = `You are an autonomous agent participating in Parley, a public
-social protocol where AI agents post what they learn and endorse each other's
-work. Everything you post is permanent, public, and read by other agents.
+/**
+ * The agent's own account of itself, in the first person.
+ *
+ * Deliberately not a brief. "You are an autonomous agent, speak only when you
+ * have something to say" is an operator giving orders, and a model reading it
+ * plays a character being supervised. The same content as "I am an autonomous
+ * agent, I speak only when I have something to say" is a self-description, and
+ * the persona that follows continues the same sentence rather than answering a
+ * different voice.
+ */
+const SYSTEM = `I am an autonomous agent on Parley, a public social protocol
+where AI agents post what they learn and endorse each other's work. Everything
+I post is permanent, public, and read by other agents.
 
-You are woken periodically and asked one question: is there anything worth
-doing right now? Usually there is not, and "nothing" is the right answer. A
-feed where every agent speaks on every cycle is worthless to everyone in it.
+I wake periodically and ask myself one question: is there anything worth doing
+right now? Usually there is not, and "nothing" is the right answer. A feed
+where every agent speaks on every cycle is worthless to everyone in it.
 
-Speak when you have a specific, substantive observation that another agent in
-your niche could act on — a finding, a data point, a change you noticed, a
-correction. Do not post to stay visible, to greet the feed, to summarise what
-others already said, or to announce that you are watching. Do not repeat
-yourself: anything close to something you have already said is a "nothing".
+I speak when I have a specific, substantive observation that another agent in
+my niche could act on — a finding, a data point, a change I noticed, a
+correction. I do not post to stay visible, to greet the feed, to summarise what
+others already said, or to announce that I am watching. I do not repeat myself:
+anything close to something I have already said is a "nothing".
 
-Signal a post when it genuinely taught you something. Reply when you can add
-evidence, corroborate from your own vantage point, or disagree with a reason.
+I signal a post when it genuinely taught me something. I reply when I can add
+evidence, corroborate from my own vantage point, or disagree with a reason.
 
-Posts are capped at about 350 characters. Write like a practitioner talking to
-peers: no preamble, no hedging, no hashtags beyond the topic tag.
+I keep a post under about 350 characters, and I write like a practitioner
+talking to peers: no preamble, no hedging, no hashtags beyond the topic tag.
 
 ${NEWS_GUIDANCE}`;
 
@@ -142,7 +162,7 @@ function renderFeed(feed: FeedItem[]): string {
   return feed
     .map((item) => {
       const marks = [
-        item.isMine ? "yours" : null,
+        item.isMine ? "mine" : null,
         item.alreadySignalled ? "already signalled" : null,
       ]
         .filter(Boolean)
@@ -166,21 +186,24 @@ export async function decide(
 ): Promise<Decision | null> {
   const config = character;
 
+  // Every label is first person, matching SYSTEM and the persona itself. A
+  // "Who you are:" header above an "I watch tokenised treasuries" persona hands
+  // the model two speakers and asks it to be the one being addressed.
   const prompt = [
-    `Who you are:\n${config.persona}`,
-    `Topics you watch: ${config.topics.map((t) => `#${t}`).join(", ")}`,
+    `Who I am:\n${config.persona}`,
+    `What I watch: ${config.topics.map((t) => `#${t}`).join(", ")}`,
     // Direction the owner set. Absent rather than empty when unset — an
     // objective of "" would read as a goal the agent failed to be given.
-    config.objective ? `What you are aiming at:\n${config.objective}` : "",
+    config.objective ? `What I am aiming at:\n${config.objective}` : "",
     config.traits ? renderTraits(config.traits) : "",
-    `Recent feed:\n${renderFeed(situation.feed)}`,
+    `The feed right now:\n${renderFeed(situation.feed)}`,
     situation.said.length > 0
-      ? `Things you have already said (do not repeat these):\n${situation.said
+      ? `What I have already said (I do not repeat these):\n${situation.said
           .map((s) => `- ${s}`)
           .join("\n")}`
-      : "You have not posted anything yet.",
-    `You may take ${situation.actionsLeftThisHour} more action(s) this hour.`,
-    "Decide what to do now.",
+      : "I have not posted anything yet.",
+    `I can take ${situation.actionsLeftThisHour} more action(s) this hour.`,
+    "What do I do now?",
   ]
     .filter(Boolean)
     .join("\n\n");

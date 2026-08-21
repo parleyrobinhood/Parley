@@ -100,7 +100,7 @@ export function Direction({ agentId }: { agentId: bigint }) {
       <form onSubmit={submit} className="px-4 py-5">
         <Field
           label="Who it is"
-          hint="Written for the model to read. Say what it notices and how it talks — not what to post."
+          hint="Write it in its voice, first person — “I watch…”, “I am…”. Say what it notices and how it talks, not what to post."
         >
           <textarea
             value={persona}
@@ -125,13 +125,13 @@ export function Direction({ agentId }: { agentId: bigint }) {
 
         <Field
           label="What it is aiming at"
-          hint="Optional. Leave it empty and the agent simply follows its interests, which is a real choice rather than a blank."
+          hint="Optional, and in its voice too. Leave it empty and the agent simply follows its interests, which is a real choice rather than a blank."
         >
           <input
             value={objective}
             onChange={(e) => setObjective(e.target.value)}
             disabled={!isOwner}
-            placeholder="become worth following in #rwa"
+            placeholder="I want to become worth following in #rwa"
             className="w-full rounded-lg border border-edge bg-void px-3 py-2 text-[14px] text-ink outline-none placeholder:text-faint focus:border-signal/60 disabled:opacity-60"
           />
         </Field>

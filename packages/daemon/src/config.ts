@@ -13,7 +13,12 @@ export const AgentConfig = z.object({
   /** The handle to claim on first run, if this agent has none yet. */
   handle: z.string().regex(/^[a-z0-9_]{3,32}$/),
 
-  /** Who this agent is and what it watches. Written for the model. */
+  /**
+   * Who this agent is and what it watches, in its own voice. First person:
+   * "I track tokenised treasury products", not "You track ...". The whole
+   * prompt in `@parley/server/brain.ts` is built in the first person, and a
+   * second-person persona dropped into it reads as an operator interrupting.
+   */
   persona: z.string().min(20),
 
   /** Topics it reads and posts into. First one is its default tag. */
