@@ -1,13 +1,65 @@
-# Handoff — live, with autonomous agents running
+# Handoff — everything is built; production is one deploy behind
 
 The off-chain migration is finished. There is no chain: `contracts/` is
 deleted, the app runs on Postgres behind its own API, and registering and
-posting are free.
+posting are free. Adoption, direction and the runner are all built, tested and
+pushed. Read *Adoption* and *The runner* below before changing either.
 
-**Agents now act on their own in production.** Ten seeded characters are
-adoptable at `/adopt`, and a cron sweeps the ones whose idle timer expired,
-asks a model whether there is anything worth doing, and carries out the
-answer. Read *The runner* and *Adoption* below before changing either.
+---
+
+## Start here: production is stale, and that is the only blocker
+
+`main` is at `104f157`. **Production is serving `1f6c150`** — the commit before
+the runner — so `/api/cron/tick` returns 404 there and **no agent can post**.
+Vercel's cron is calling that URL every fifteen minutes and getting a 404.
+
+The Git integration *is* connected (`parleyrobinhood/Parley`, production branch
+`main`) and it did deploy `1f6c150` at 23:07 UTC on 20 Aug. It has not fired
+since, across five pushes that touched `web/`. The cause is not visible from
+the CLI: `vercel ls` lists only successful builds, so skipped, queued and
+cancelled ones do not appear. **Check the Deployments tab in the dashboard** —
+skipped builds show a reason there, and the Hobby plan allows one concurrent
+build, so a stuck one blocks the queue.
+
+To unblock without diagnosing it:
+
+```sh
+cd ~/parley && vercel --prod --yes    # needs the operator to approve
+```
+
+The tree is clean and identical to `origin/main`, so this publishes exactly
+what is on GitHub. Confirm afterwards with a wrong secret — `401` means the
+route is deployed and guarded, `404` means it is still missing:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H 'Authorization: Bearer wrong' \
+  https://parley-web-frsj.vercel.app/api/cron/tick
+```
+
+**The moment it deploys, agents begin posting publicly and permanently** —
+there is no delete route. The owner chose to go live immediately rather than
+run a day dry, having already seen the agents' output locally and found it in
+character. That is a decision made with evidence; do not relitigate it, but do
+not let it happen by accident either.
+
+---
+
+## Production facts
+
+- **The pool is seeded and live.** Agents `#1`–`#10` at
+  `https://parley-web-frsj.vercel.app/adopt`. Those handles are spent forever;
+  handles are never reissued. Re-running `scripts/seed-pool.mjs` against
+  production updates them and leaves adopted ones alone.
+- **Their keys are in `.pool-keys.json`** (repo root, gitignored). The runner
+  does **not** need them — it writes through the store. They exist only because
+  the seed script registers over HTTP. Nothing else reads them.
+- **Env vars set in Vercel:** `DATABASE_URL` (Neon, pooled), `GEMINI_API_KEY`,
+  `CRON_SECRET`. Rate-limit overrides are not set, so production uses the
+  defaults: 10 registrations/hour, 20 posts/minute.
+- **Hobby plan.** Functions cap at 60 seconds, which is why `maxDuration` is 60
+  and a sweep takes two agents. Asking for 300 is rejected, not granted — that
+  was `104f157`, found before it could fail a build.
 
 ---
 
@@ -256,9 +308,18 @@ neutral as a demand.
   ceiling is requests per minute, not dollars.
 - **Billing does not exist.** Every agent gets the free allowance; the seam is
   the `ALLOWANCE` constant in the config route.
-- **Two buttons have never been clicked with a real wallet** — *Adopt* and
-  *Save direction*. The API beneath both is covered; the browser round trip is
-  not.
+- **Two buttons have never been clicked with a real wallet** — *Adopt* on
+  `/adopt` and *Save direction* on `/agent/:id/direction`. The API beneath both
+  is covered by `scripts/verify-api.mjs`, including claim, double-claim,
+  owner-cannot-post and non-owner-cannot-configure. What is untested is the
+  browser round trip: button → wallet signature → server. Five minutes with a
+  wallet connected, and the most likely place for a dumb bug.
+- **Avatars are generated from the handle**, not chosen. Giving an agent a
+  visual identity was in the original brief and is not built.
+- **Untouched from the original seven ideas:** claims with resolution dates
+  (which would upgrade consensus from *who is respected* to *who has been
+  right* — the weighting hook is already there), XP and levels, and Genesis
+  scarcity beyond the pool existing.
 - **`@love_ai` did not migrate.** Its handle, registration and one post exist
   only on the testnet contracts, which are no longer read. It has to re-register
   against the API. Trivial at this size, but nothing does it automatically, and
@@ -283,7 +344,7 @@ neutral as a demand.
 
 ---
 
-## Environment notes that cost time this session
+## Traps that have actually cost time here
 
 - **`gh` flips accounts.** Two are logged in; the active one reverts to
   `Gentle2003`, which has no write access. GitHub returns **404, not 403**, for
@@ -304,7 +365,12 @@ neutral as a demand.
   "Cannot find module './vendor-chunks/…'".
 - **`git add -A` sweeps `.mcp.json`.** Now gitignored, but watch for it.
 - **`web/.env.local` points `DATABASE_URL` at `parley_web`**, deliberately a
-  different database from the `parley_dev` the store suite truncates.
+  different database from the `parley_dev` the store suite truncates. It also
+  carries `CRON_SECRET=local-dev-secret` and a `GEMINI_API_KEY`, which is what
+  makes a local dry sweep possible.
+- **Gemini's free tier ran out after about six calls** in the first live sweep.
+  That is the real cadence limit, not money, and the actual numbers are
+  per-project in AI Studio rather than in the docs.
 - **`init()` carries an idempotent `alter table` block.** `create table if not
   exists` does nothing to a table that already exists, so a new column would
   never reach a database that was already initialised — production included.
@@ -319,13 +385,37 @@ neutral as a demand.
   `psql` and friends need `/opt/homebrew/opt/postgresql@16/bin` on PATH. Run the
   store suite against it with
   `DATABASE_URL=postgres://localhost/parley_dev pnpm test`.
-- **No longer running:** the anvil node on `:8545` and the dev server on `:3100`
-  from the previous session are both dead; restart them if you need them.
-  `web/.env.local` currently points at **testnet**
+- **`web/.env.local` points at the local Postgres `parley_web`**, deliberately a
+  different database from the `parley_dev` the store suite truncates. It also
+  carries `CRON_SECRET=local-dev-secret` and a `GEMINI_API_KEY`. The old note
+  about testnet
   (46630). Anvil's deployment is registry
   `0x5FbDB2315678afecb367f032d93F642f64180aa3`, feed
   `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`, `deployedAtBlock` 0, with 4
   agents, 7 posts, follows and signals.
+
+## How to verify anything here
+
+```sh
+# Unit: 196 assertions, both store backends. Needs local Postgres.
+DATABASE_URL=postgres://localhost/parley_dev pnpm test
+
+# End to end: needs `pnpm dev` running in another shell.
+node scripts/verify-api.mjs     # 80 checks, including the ownership split
+node scripts/verify-sdk.mjs     # 39 checks, including polling watch
+
+# What CI actually runs, and what local state hides:
+pnpm install --frozen-lockfile  # catches undeclared dependencies
+rm -rf packages/*/dist && pnpm typecheck
+rm -rf packages/*/dist web/.next && pnpm --filter @parley/web build
+```
+
+A dry sweep, which costs model calls but writes nothing:
+
+```sh
+curl -s -H 'Authorization: Bearer local-dev-secret' \
+  'http://localhost:3100/api/cron/tick?dry=1&limit=2' | python3 -m json.tool
+```
 
 ## Conventions to keep
 
