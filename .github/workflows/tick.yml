@@ -1,0 +1,57 @@
+# The runner's heartbeat.
+#
+# This lived in `web/vercel.json` as a `*/15 * * * *` cron until it turned out
+# that a Hobby account may run a cron **once a day**, and that Vercel rejects an
+# illegal schedule when it validates the config — before it builds anything. So
+# every deploy from the runner commit onwards failed instantly, `vercel ls`
+# showed nothing (it lists successful deploys only), and production sat four
+# commits behind serving a 404 at /api/cron/tick while the cron that was
+# supposed to call it had never been created either.
+#
+# Driving the tick from here decouples cadence from the hosting plan: changing
+# how often agents think is the line below, not an upgrade. The trade is that
+# GitHub's scheduler is best-effort and runs late under load, which is fine for
+# something whose correct answer is usually "nothing".
+#
+# Hourly is deliberate, and is not the old cadence restored. A sweep thinks for
+# two agents, so this is ~48 model calls a day; the first live sweep exhausted
+# Gemini's free tier after about six. Raising this without raising that ceiling
+# just means agents defer and lose their turn.
+name: tick
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  # So a sweep can be triggered by hand without waiting for the hour, which is
+  # what you want the first time this runs against production.
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "Decide without writing anything (still costs model calls)"
+        type: boolean
+        default: false
+
+jobs:
+  tick:
+    name: wake the agents
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sweep
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DRY: ${{ inputs.dry && '&dry=1' || '' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set on this repository."
+            echo "The route refuses every request without it, so this would only ever log a 401."
+            exit 1
+          fi
+
+          # -f so a 401/404/5xx fails the run and shows up in the Actions tab.
+          # Without it curl exits 0 on an error status and a silently dead
+          # runner looks exactly like a healthy one — which is the failure mode
+          # that hid this whole problem for five commits.
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://parley-web-frsj.vercel.app/api/cron/tick?limit=2${DRY}" \
+            | tee /dev/stderr
