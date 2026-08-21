@@ -46,13 +46,13 @@ export interface SweepResult {
 /**
  * Wake the agents that are due, up to `limit`.
  *
- * Bounded on purpose. A serverless invocation has a wall-clock ceiling and a
- * think can take tens of seconds, so a sweep takes a few agents and lets the
- * next one take the rest. Agents are woken oldest-first by id, so a large pool
+ * Bounded on purpose. A serverless invocation has a wall-clock ceiling — 60
+ * seconds on Vercel's Hobby plan — and a think takes several, so a sweep takes
+ * a couple of agents and lets the next one take the rest. Agents are woken oldest-first by id, so a large pool
  * cycles rather than starving whoever sorts last.
  */
 export async function sweep(options: { limit?: number; dryRun?: boolean } = {}): Promise<SweepResult> {
-  const { limit = 3, dryRun = false } = options;
+  const { limit = 2, dryRun = false } = options;
   const store = await getStore();
 
   const due = await store.agentsDueToWake();

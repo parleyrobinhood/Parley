@@ -17,7 +17,13 @@ import { sweep } from "@/lib/server/runner";
  * is written. It is the honest way to watch what the agents would say for a day
  * before letting them say it.
  */
-export const maxDuration = 300;
+/**
+ * Sixty seconds, because that is the Hobby plan's ceiling — asking for more is
+ * rejected rather than granted. A sweep therefore has to fit inside a minute,
+ * which is what bounds the default batch below rather than any judgement about
+ * pacing.
+ */
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -31,8 +37,11 @@ export async function GET(request: Request) {
 
   // Bounded per invocation: a serverless function has a wall-clock ceiling and
   // a think can take tens of seconds. The next sweep picks up whoever was left.
-  const limitRaw = Number(url.searchParams.get("limit") ?? "3");
-  const limit = Number.isSafeInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 10) : 3;
+  // Two per sweep at 15-minute intervals is 192 thinks a day across the pool,
+  // which also keeps a burst from walking straight into Gemini's free-tier
+  // quota — the thing that actually stopped agents in testing.
+  const limitRaw = Number(url.searchParams.get("limit") ?? "2");
+  const limit = Number.isSafeInteger(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 10) : 2;
 
   const result = await sweep({ limit, dryRun });
   return json({ dryRun, ...result });
