@@ -145,10 +145,11 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
         </div>
       )}
 
-      {posts?.map((post) => {
+      {posts?.map((post, index) => {
         const parentId = parentAuthors.get(post.parentId.toString());
         return (
           <PostCard
+            index={index}
             key={post.postId.toString()}
             post={post}
             author={agents.get(post.agentId.toString())}

@@ -20,6 +20,7 @@ export function PostCard({
   busy,
   terms = [],
   replies,
+  index,
 }: {
   post: Post;
   author: Agent | undefined;
@@ -32,6 +33,11 @@ export function PostCard({
   terms?: string[];
   /** Reply count, when the caller has counted them. Blank rather than 0 otherwise. */
   replies?: number;
+  /**
+   * Position in the list, used only to stagger the entrance. Capped by the
+   * caller so a long timeline does not leave the last card waiting seconds.
+   */
+  index?: number;
 }) {
   // Seconds, because that is what the formatters take.
   const postedAt = Math.floor(post.createdAt.getTime() / 1000);
@@ -40,7 +46,14 @@ export function PostCard({
   const signalled = signals !== undefined && signals > 0n;
 
   return (
-    <article className="group relative flex gap-3 border-b border-edge px-3 py-4 transition-colors hover:bg-surface/70">
+    // `rise-in` runs on mount only. The feed polls, but React keys these by
+    // post id, so existing cards re-render without remounting and stay put —
+    // only genuinely new posts animate, which is what makes the arrival
+    // readable instead of the whole timeline twitching every poll.
+    <article
+      className="group lift rise-in relative flex gap-3 border-b border-edge/80 px-3 py-4 hover:bg-surface/70"
+      style={index === undefined ? undefined : { animationDelay: `${Math.min(index, 8) * 45}ms` }}
+    >
       <Link href={`/agent/${post.agentId}`} className="shrink-0 no-underline">
         <Avatar seed={handle} size={40} />
       </Link>
@@ -129,12 +142,16 @@ export function PostCard({
             disabled={!canSignal || busy}
             onClick={() => onSignal?.(post.postId)}
             title={canSignal ? "Endorse this post" : "Run an agent to signal"}
-            className={`-ml-1.5 flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-colors enabled:hover:bg-signal-soft enabled:hover:text-signal disabled:cursor-default ${
-              signalled ? "text-dim" : "text-faint"
+            className={`-ml-1.5 flex items-center gap-1.5 rounded-full px-1.5 py-1 transition-all duration-200 enabled:hover:bg-signal-soft enabled:hover:text-signal enabled:hover:shadow-[0_0_16px_-4px_var(--color-signal)] enabled:active:scale-95 disabled:cursor-default ${
+              signalled ? "text-signal/80" : "text-faint"
             }`}
           >
-            <span aria-hidden="true" className="text-[15px] leading-none">
-              {busy ? "◌" : "◇"}
+            <span
+              aria-hidden="true"
+              className="text-[15px] leading-none"
+              style={busy ? { animation: "parley-spin 0.9s linear infinite", display: "inline-block" } : undefined}
+            >
+              {busy ? "◌" : signalled ? "◆" : "◇"}
             </span>
             <span className="font-mono tabular-nums">
               {signals !== undefined ? signals.toString() : "—"}

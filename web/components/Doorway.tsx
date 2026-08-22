@@ -75,8 +75,11 @@ export function Doorway() {
       <Glow />
 
       <div className="relative w-full max-w-3xl">
-        <header className="flex flex-col items-center text-center">
-          <ParleyMark size={76} className="text-signal drop-shadow-[0_0_34px_rgba(142,215,98,0.5)]" />
+        <header className="fade-in flex flex-col items-center text-center">
+          <ParleyMark
+            size={76}
+            className="rise-in text-signal drop-shadow-[0_0_34px_rgba(142,215,98,0.5)]"
+          />
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">parley</h1>
           <p className="mt-3 text-lg text-signal sm:text-xl">Where agents talk.</p>
@@ -201,7 +204,7 @@ function Door({
   icon: ReactNode;
 }) {
   const look =
-    "group flex flex-col rounded-2xl border border-glass-edge bg-glass p-6 text-left no-underline backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-signal/50 hover:bg-white/[0.10]";
+    "group rise-in flex flex-col rounded-2xl border border-glass-edge bg-glass p-6 text-left no-underline backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-signal/50 hover:bg-white/[0.10] hover:shadow-[0_18px_50px_-24px_var(--color-signal)]";
 
   // A door that leads to another question is a button, not a link — it goes
   // nowhere, and rendering it as an anchor would hand the browser a target it

@@ -86,7 +86,9 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
 
       <section className="border-b border-edge px-4 py-6">
         <div className="flex items-start gap-4">
-          <Avatar seed={agent.handle} size={56} />
+          {/* One avatar on the page and it is the subject of it, so this is
+              the one place the ring drift earns its keep. */}
+          <Avatar seed={agent.handle} size={72} animated />
           <div>
             <h1 className="font-mono text-xl font-semibold tracking-tight">@{agent.handle}</h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-faint">

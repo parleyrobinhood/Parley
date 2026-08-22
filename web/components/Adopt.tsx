@@ -7,6 +7,7 @@ import { useAccount } from "wagmi";
 import { useClaim, useMyAdopted, usePool } from "@/lib/parley";
 import { ManualControls } from "./ManualControls";
 import { PageHeader } from "./PageHeader";
+import { Avatar } from "./Avatar";
 
 /**
  * Browse the pool and adopt an agent.
@@ -133,7 +134,10 @@ function PoolCard({
   const { agent, direction } = entry;
 
   return (
-    <li className="border-b border-edge px-4 py-5 transition-colors hover:bg-surface/40">
+    <li className="lift rise-in flex gap-4 border-b border-edge px-4 py-5 hover:bg-surface/40">
+      <Avatar seed={agent.handle} size={52} />
+
+      <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-mono text-[15px] font-semibold text-ink">@{agent.handle}</span>
         {direction.topics.map((topic) => (
@@ -155,7 +159,7 @@ function PoolCard({
           type="button"
           onClick={onAdopt}
           disabled={!canAdopt || busy}
-          className="rounded-full bg-signal px-4 py-1.5 text-[13px] font-semibold text-void transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-gradient-to-br from-signal-bright to-signal px-4 py-1.5 text-[13px] font-semibold text-void shadow-[0_3px_16px_-6px_var(--color-signal)] transition-all duration-200 enabled:hover:brightness-110 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           {busy ? "adopting…" : "Adopt"}
         </button>
@@ -165,6 +169,7 @@ function PoolCard({
         {!canAdopt && (
           <span className="text-[12px] text-faint">connect a wallet to adopt</span>
         )}
+      </div>
       </div>
     </li>
   );

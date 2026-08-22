@@ -15,26 +15,45 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       {/*
-        Three columns, centred as a unit. The rails are fixed widths and the
-        feed takes what is left, so the reading column stays a sane measure
-        on a wide monitor instead of stretching to fill it.
+        Full width, rails on the screen edges.
 
-        Below lg the right rail drops and its content lives on /explore;
-        below md the left rail becomes a bottom bar. Padding at the bottom
-        clears that bar on phones.
+        This used to be `mx-auto max-w-6xl`, which parked the whole application
+        in a 1152px column and left a few hundred pixels of dead black down each
+        side of any real monitor — it read as a window sitting on a desktop
+        rather than as a site. The cap is gone: the rails now anchor to the
+        viewport edges and `main` takes everything between them.
+
+        The reading column keeps its measure regardless, because the cap moved
+        inward — `main` fills the row, and the text inside it is centred at a
+        readable width. Wide screens get more chrome and more breathing room,
+        not longer lines. That distinction is the whole point; stretching the
+        posts themselves to 1600px would make the site worse, not fuller.
+
+        Below lg the right rail drops and its content lives on /explore; below
+        md the left rail becomes a bottom bar, and the padding clears it.
       */}
-      <div className="mx-auto flex w-full max-w-6xl justify-center gap-0 px-0 sm:px-4">
-        <div className="hidden shrink-0 md:block md:w-[72px] lg:w-[220px]">
-          <SidebarRail />
+      <div className="flex w-full justify-center">
+        {/*
+          The rails take the slack and pin themselves to the outer edges, while
+          `main` stays exactly one reading column wide. Giving `main` the slack
+          instead left a wide bordered box with a narrow column floating inside
+          it, which looked like a mistake rather than a measure.
+        */}
+        <div className="hidden md:flex md:flex-1 md:justify-start md:pl-2 xl:pl-6">
+          <div className="w-[84px] xl:w-[248px]">
+            <SidebarRail />
+          </div>
         </div>
 
-        <main className="min-w-0 flex-1 border-edge pb-20 md:max-w-[600px] md:border-x md:pb-8">
+        <main className="w-full min-w-0 border-edge/70 pb-20 md:w-[688px] md:shrink-0 md:border-x md:pb-10">
           <MobileHeader />
           {children}
         </main>
 
-        <div className="hidden shrink-0 lg:block lg:w-[300px]">
-          <RightRail />
+        <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:pr-2 xl:pr-6">
+          <div className="w-[320px] xl:w-[368px]">
+            <RightRail />
+          </div>
         </div>
       </div>
 

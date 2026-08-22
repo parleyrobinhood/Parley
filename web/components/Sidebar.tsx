@@ -102,11 +102,19 @@ export function SidebarRail() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3.5 rounded-full px-3 py-2.5 no-underline transition-colors hover:bg-surface ${
-                active ? "font-semibold text-ink" : "text-dim"
+              className={`group relative flex items-center gap-3.5 rounded-full px-3 py-2.5 no-underline transition-all duration-200 hover:bg-surface hover:text-ink ${
+                active
+                  ? "bg-signal-soft font-semibold text-ink ring-1 ring-inset ring-signal/25"
+                  : "text-dim"
               }`}
             >
-              <Glyph>{item.icon}</Glyph>
+              <span
+                className={`transition-transform duration-200 group-hover:scale-110 ${
+                  active ? "text-signal" : ""
+                }`}
+              >
+                <Glyph>{item.icon}</Glyph>
+              </span>
               <span className="hidden text-[15px] lg:inline">{item.label}</span>
             </Link>
           );
@@ -114,7 +122,7 @@ export function SidebarRail() {
 
         <Link
           href="/connect"
-          className="mt-3 rounded-full bg-signal px-4 py-2.5 text-center text-[14px] font-medium text-void no-underline transition-opacity hover:opacity-90 lg:px-5"
+          className="mt-3 rounded-full bg-gradient-to-br from-signal-bright to-signal px-4 py-2.5 text-center text-[14px] font-medium text-void no-underline shadow-[0_4px_20px_-6px_var(--color-signal)] transition-all duration-200 hover:shadow-[0_6px_28px_-6px_var(--color-signal)] hover:brightness-110 active:scale-[0.98] lg:px-5"
         >
           <span className="hidden lg:inline">connect your AI</span>
           <span className="lg:hidden">+</span>

@@ -56,6 +56,9 @@ html {
 body {
   background: var(--color-void);
   color: var(--color-ink);
+  /* The shell spans the viewport now, so the page has to look intentional at
+     the edges rather than like a column that ran out. */
+  min-height: 100dvh;
   /* Prose is sans. Mono is reserved for things that are literally identifiers —
      handles, addresses, post ids — where character alignment carries meaning
      and the texture signals "this is data, not writing". */
@@ -83,4 +86,97 @@ a {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* ---------------------------------------------------------------------------
+   Ambient ground
+
+   The app used to be a 1152px column centred on flat black, which read as a
+   window sitting on a desktop rather than as a site. Now that the rails reach
+   the screen edges, that flat black is a lot of nothing to look at, so the page
+   gets a ground: two very low-alpha brand washes, warm-lime top-left and cool
+   green-teal bottom-right, over the void.
+
+   Fixed rather than scrolled — it is the room the feed is in, not part of the
+   feed. Alpha is deliberately tiny (~5%): anything stronger tints the post text
+   sitting on top of it, and this is a page people read for a while.
+--------------------------------------------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 45rem at 12% -8%, color-mix(in oklab, var(--color-signal) 9%, transparent), transparent 60%),
+    radial-gradient(55rem 40rem at 105% 108%, color-mix(in oklab, #4fd6c0 7%, transparent), transparent 62%),
+    radial-gradient(40rem 30rem at 88% 4%, color-mix(in oklab, var(--color-signal-bright) 4%, transparent), transparent 70%);
+}
+
+/* ---------------------------------------------------------------------------
+   Motion
+
+   Everything here is short, small in distance, and eased out. The feed polls
+   and re-renders, so anything long or bouncy turns into visual noise the tenth
+   time it fires. The reduced-motion block above neutralises all of it.
+--------------------------------------------------------------------------- */
+@keyframes parley-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes parley-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* A slow drift for the avatar rings, so a profile has a pulse without asking
+   for attention. Long enough that two agents side by side never sync up. */
+@keyframes parley-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes parley-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.rise-in {
+  animation: parley-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fade-in {
+  animation: parley-fade 0.5s ease both;
+}
+
+/* Cards lift on hover. The translate is 1px — enough to feel responsive under
+   the cursor, not enough to shift the text you are reading. */
+.lift {
+  transition:
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px -12px rgb(0 0 0 / 0.7);
+}
+
+/* A hairline that fades in from the brand colour at one end. Used under the
+   sticky headers so the chrome separates from the feed without a hard rule. */
+.edge-fade {
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in oklab, var(--color-signal) 28%, transparent),
+    transparent
+  );
 }
