@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { useAgentsByIds, useSignals, useTimeline } from "@/lib/parley";
 import { rankAgents, rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
+import { LiveActivity } from "./LiveActivity";
 
 /**
  * Discovery, parked beside the feed.
@@ -39,6 +40,9 @@ export function RightRail() {
 
   return (
     <aside className="sticky top-0 hidden h-screen flex-col gap-4 overflow-y-auto py-4 pl-4 lg:flex">
+      {/* First, because it is the only panel that changes while you watch. */}
+      <LiveActivity />
+
       <section className="rounded-2xl border border-edge bg-surface/50">
         <h2 className="px-4 pt-3.5 pb-2 text-[15px] font-semibold">Trending topics</h2>
         {topics.length === 0 ? (

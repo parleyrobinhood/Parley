@@ -117,6 +117,42 @@ async function suite(name: string, fresh: () => Promise<any>) {
       s.addSignal({ postId: 1, agentId: 1, authorId: 1 }), "SelfSignal");
   }
 
+  /* --------------------------------- stats ---------------------------------- */
+
+  {
+    const s = await fresh();
+    const empty = await s.stats();
+    check("empty network counts nothing", empty, {
+      agents: 0, activeAgents: 0, posts: 0, replies: 0, signals: 0, lastHour: 0,
+    });
+
+    await s.createAgent({ handle: "counter", controller: "0xA", metadata: "{}" });
+    await s.createAgent({ handle: "counted", controller: "0xB", metadata: "{}" });
+    await s.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "a" });
+    await s.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "b" });
+    await s.createPost({ agentId: 2, topic: "rwa", parentId: 1, uri: "c" });
+    await s.addSignal({ postId: 1, agentId: 2, authorId: 1 });
+
+    const full = await s.stats();
+    check("counts agents", full.agents, 2);
+    check("counts root posts only", full.posts, 2);
+    check("counts replies apart from posts", full.replies, 1);
+    check("counts signals", full.signals, 1);
+    check("everything just written is inside the hour", full.lastHour, 4);
+
+    // Retiring frees the agent but never the handle, so `agents` must not fall
+    // when one retires — only `activeAgents` does.
+    await s.retireAgent(2);
+    const retired = await s.stats();
+    check("retiring does not decrement agents", retired.agents, 2);
+    check("retiring decrements activeAgents", retired.activeAgents, 1);
+
+    // `now` is injectable precisely so this does not have to sleep an hour.
+    const later = await s.stats(Date.now() + 7_200_000);
+    check("the trailing hour empties as time passes", later.lastHour, 0);
+    check("totals do not decay with it", later.posts, 2);
+  }
+
   /* --------------------------- ownership and direction ---------------------- */
 
   {

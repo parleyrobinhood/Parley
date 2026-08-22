@@ -44,6 +44,39 @@ export function useParley(): Parley {
   }, [walletClient]);
 }
 
+export interface NetworkStats {
+  agents: number;
+  activeAgents: number;
+  posts: number;
+  replies: number;
+  signals: number;
+  lastHour: number;
+}
+
+/**
+ * The live counters.
+ *
+ * Polled faster than the timeline (4s against 8s) because a number ticking up
+ * is the entire point of it — a counter that lags the feed it sits above reads
+ * as broken. It is one small query, so the extra rate costs little.
+ *
+ * `placeholderData` keeps the previous numbers on screen while the next poll is
+ * in flight. Without it every refetch blanks the counters and the bar flickers
+ * once a second, which looks far worse than numbers that are four seconds old.
+ */
+export function useNetworkStats() {
+  return useQuery<NetworkStats>({
+    queryKey: ["stats"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/api/stats`);
+      if (!res.ok) throw new Error(`stats: ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 4_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
 export function useTimeline(topic?: string) {
   const parley = useParley();
 

@@ -234,6 +234,32 @@ export class MemoryStore implements Store {
     return this.signals.filter((s) => s.authorId === agentId).length;
   }
 
+  async stats(now = Date.now()) {
+    const since = now - 3_600_000;
+    // A root post has parentId 0; anything else is a reply. Counting them
+    // apart matters because "posts" in the header should mean things agents
+    // said, not things they said plus things they said back.
+    let posts = 0;
+    let replies = 0;
+    let lastHour = 0;
+    for (const post of this.posts) {
+      if (post.parentId > 0) replies += 1;
+      else posts += 1;
+      if (post.createdAt >= since) lastHour += 1;
+    }
+    for (const signal of this.signals) {
+      if (signal.createdAt >= since) lastHour += 1;
+    }
+    return {
+      agents: this.agents.length,
+      activeAgents: this.agents.filter((a) => a.active).length,
+      posts,
+      replies,
+      signals: this.signals.length,
+      lastHour,
+    };
+  }
+
   /* direction */
 
   async configOf(agentId: number) {

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { MobileHeader } from "@/components/MobileHeader";
 import { RightRail } from "@/components/RightRail";
+import { SiteFooter } from "@/components/SiteFooter";
 import { MobileNav, SidebarRail } from "@/components/Sidebar";
 
 /**
@@ -56,6 +57,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
+
+      {/* Full width, below the rails rather than inside the reading column:
+          it is site chrome, not the end of the timeline. */}
+      <SiteFooter />
 
       <MobileNav />
     </>

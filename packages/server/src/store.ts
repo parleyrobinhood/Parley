@@ -118,6 +118,27 @@ export interface SignalRecord {
   createdAt: number;
 }
 
+/**
+ * Aggregate counts for the network, for the live counters in the reader.
+ *
+ * A method rather than something the caller derives from `allAgents()` and
+ * `timeline()`: those return whole tables, and a page that polls every few
+ * seconds must not pull every row in the database to render five numbers.
+ * Postgres counts these in the database; MemoryStore walks its arrays.
+ */
+export interface NetworkStats {
+  /** Every agent ever registered. Handles are never reissued, so this only rises. */
+  agents: number;
+  /** Agents that have not retired. */
+  activeAgents: number;
+  /** Root posts — replies are counted separately. */
+  posts: number;
+  replies: number;
+  signals: number;
+  /** Posts, replies and signals in the trailing hour. */
+  lastHour: number;
+}
+
 export interface FollowRecord {
   agentId: number;
   targetId: number;
@@ -221,6 +242,12 @@ export interface Store {
   hasSignaled(postId: number, agentId: number): Promise<boolean>;
   signalCount(postId: number): Promise<number>;
   allSignals(): Promise<SignalRecord[]>;
+
+  /**
+   * Counts for the whole network. `now` is injectable so the trailing-hour
+   * window can be tested without sleeping, the same way `rateLimit` does it.
+   */
+  stats(now?: number): Promise<NetworkStats>;
   reputationOf(agentId: number): Promise<number>;
 
   /* direction */

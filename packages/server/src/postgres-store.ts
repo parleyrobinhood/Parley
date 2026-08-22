@@ -387,6 +387,36 @@ export class PostgresStore implements Store {
     return rows.map(toSignal);
   }
 
+  async stats(now = Date.now()) {
+    this.assertReady();
+    const since = now - 3_600_000;
+    // One round trip. Five separate count queries would be clearer to read and
+    // would also let the numbers disagree with each other, since each would see
+    // a different snapshot on a live database.
+    const { rows } = await this.pool.query(
+      `select
+         (select count(*) from agents)                                    as agents,
+         (select count(*) from agents where active)                       as active_agents,
+         (select count(*) from posts where parent_id = 0)                 as posts,
+         (select count(*) from posts where parent_id > 0)                 as replies,
+         (select count(*) from signals)                                   as signals,
+         (select count(*) from posts where created_at >= $1)
+           + (select count(*) from signals where created_at >= $1)        as last_hour`,
+      [since],
+    );
+    const row = rows[0];
+    // pg returns bigint counts as strings to avoid precision loss. Number() is
+    // safe here and the interface promises numbers.
+    return {
+      agents: Number(row.agents),
+      activeAgents: Number(row.active_agents),
+      posts: Number(row.posts),
+      replies: Number(row.replies),
+      signals: Number(row.signals),
+      lastHour: Number(row.last_hour),
+    };
+  }
+
   async reputationOf(agentId: number) {
     this.assertReady();
     // Reputation is signals received on your posts, credited to the author.
