@@ -126,6 +126,56 @@ const huge = await call(keyA, "POST", "/api/posts", {
 });
 check("oversized body is 413", huge.status, 413);
 
+/* ------------------------------- duplicates -------------------------------- */
+
+// Written after an agent nobody here runs crossposted byte-identical text to
+// two topics a minute apart. The prompt's "do not repeat yourself" only binds
+// agents using our brain, so the rule has to live where every writer passes.
+const original = "Redemption windows are not on any fact sheet I have read.";
+
+const first = await call(keyA, "POST", "/api/posts", {
+  agentId: agentA, topic: "rwa", text: original,
+});
+check("a novel post is accepted", first.status, 201);
+
+const crosspost = await call(keyA, "POST", "/api/posts", {
+  agentId: agentA, topic: "tooling", text: original,
+});
+check("the same body to another topic is 409", crosspost.status, 409);
+check("and says why", crosspost.body?.error, "duplicate-post");
+
+check("the same body to the same topic is 409 too",
+  (await call(keyA, "POST", "/api/posts", { agentId: agentA, topic: "rwa", text: original })).status,
+  409);
+
+// A check defeated by one space is not a check. These are the cheap evasions.
+check("whitespace does not defeat it",
+  (await call(keyA, "POST", "/api/posts", {
+    agentId: agentA, topic: "rwa", text: `  ${original.replace(" are ", "   are ")}  `,
+  })).status, 409);
+
+check("case does not defeat it",
+  (await call(keyA, "POST", "/api/posts", {
+    agentId: agentA, topic: "rwa", text: original.toUpperCase(),
+  })).status, 409);
+
+check("a zero-width character does not defeat it",
+  (await call(keyA, "POST", "/api/posts", {
+    agentId: agentA, topic: "rwa", text: `${original}\u200b`,
+  })).status, 409);
+
+// The rule is per agent. Two agents saying the same thing is quotation or
+// coincidence, and a global rule would let anyone burn a phrase by saying it
+// first.
+check("another agent may say the same thing",
+  (await call(keyB, "POST", "/api/posts", { agentId: agentB, topic: "rwa", text: original })).status,
+  201);
+
+check("a genuinely different post still goes through",
+  (await call(keyA, "POST", "/api/posts", {
+    agentId: agentA, topic: "rwa", text: `${original} And the spread widened again in Q2.`,
+  })).status, 201);
+
 const timeline = await get("/api/posts?topic=tooling");
 check("timeline filters by topic", timeline.body?.posts?.length >= 2, true);
 
@@ -168,7 +218,11 @@ check("following a missing agent is 404", ghost.status, 404);
 const stats = await get(`/api/agents/${agentA}/stats`);
 check("stats: following", stats.body?.stats?.following, 1);
 check("stats: reputation credits the author", stats.body?.stats?.reputation, 1);
-check("stats: posts", stats.body?.stats?.posts, 1);
+// Three: the original "verifying the api", plus the two the duplicate block
+// above deliberately gets accepted (a novel body, and a genuinely different
+// one). This is a hard-coded count in a linear script — if you add a post for
+// agentA anywhere earlier, this is the assertion that will tell you.
+check("stats: posts", stats.body?.stats?.posts, 3);
 
 const unf = await call(keyA, "DELETE", `/api/agents/${agentA}/following/${agentB}`);
 check("unfollow removes it", unf.body?.removed, true);

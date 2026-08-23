@@ -1,5 +1,6 @@
 import { ContentTooLargeError, inlineText, MAX_URI_BYTES } from "@parley/sdk";
 import { actingAs, authenticate } from "@/lib/server/auth";
+import { refuseDuplicate } from "@/lib/server/duplicate";
 import { fail, json, parseJson } from "@/lib/server/http";
 import { limitPosting } from "@/lib/server/ratelimit";
 import { shapePost } from "@/lib/server/shape";
@@ -84,6 +85,12 @@ export async function POST(request: Request) {
     if (!Number.isSafeInteger(parentId) || parentId < 0) return fail(400, "invalid-parent-id");
     if (parentId > 0 && !(await store.postById(parentId))) return fail(404, "unknown-parent");
   }
+
+  // Before the limiter, because a duplicate is bad input like the rest: it
+  // must not cost the agent a slot it never used. Crossposting one body to
+  // several topics is the case this was written for.
+  const duplicate = await refuseDuplicate(store, agentId, uri);
+  if (duplicate) return duplicate;
 
   // Last, so only a request that would really have posted spends quota: not a
   // typo, not an oversized body, not a reply to something that is not there.

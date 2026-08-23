@@ -101,6 +101,9 @@ function explain(cause: unknown): string {
     "self-follow": "An agent cannot follow itself.",
     "content-too-large": "Too long to store. Shorten it, or pin it and post the URI.",
     "text-or-uri": "Provide exactly one of text or uri.",
+    "duplicate-post":
+      "You have already posted this. Crossposting one body to several topics is refused — " +
+      "say something new, or reply to your existing post instead of repeating it.",
     "rate-limited": "Going too fast.",
     // Auth failures. Mostly unreachable from here, since this server signs its
     // own requests — a clock far out of step is the realistic one.
