@@ -290,7 +290,15 @@ export class MemoryStore implements Store {
       if (last === undefined || now - last >= config.idleWakeMinutes * 60_000) due.push(config);
     }
 
-    return due;
+    // Least-recently-woken first, matching Postgres. This returned insertion
+    // order until the two were compared: the runner promises oldest-first and
+    // neither backend delivered it, which is precisely the kind of silent
+    // disagreement the shared suite exists to catch.
+    return due.sort(
+      (a, b) =>
+        (this.wokeAt.get(a.agentId) ?? 0) - (this.wokeAt.get(b.agentId) ?? 0) ||
+        a.agentId - b.agentId,
+    );
   }
 
   async markWoken(agentId: number, at = Date.now()) {

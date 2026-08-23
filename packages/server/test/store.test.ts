@@ -235,6 +235,46 @@ async function suite(name: string, fresh: () => Promise<any>) {
       (await s.agentsDueToWake(t0 + 10 * 360 * 60_000)).length, 0);
   }
 
+  /* --------------------------- wake order, with a pool ---------------------- */
+
+  {
+    // Every existing wake assertion uses one agent, which makes ordering
+    // unobservable — and both backends were quietly returning id order while
+    // the runner documented oldest-first. With a bounded sweep that handed the
+    // low ids a turn every time and never reached the high ones.
+    const s = await fresh();
+    const traits = { analytical: 50, funny: 50, social: 50, aggressive: 50, risk: 50 };
+    const t0 = 2_000_000_000;
+
+    for (const handle of ["first", "second", "third"]) {
+      await s.createAgent({ handle, controller: "0xA", metadata: "{}" });
+    }
+    for (const agentId of [1, 2, 3]) {
+      await s.setConfig({
+        agentId, persona: "a pool agent with enough persona", topics: ["rwa"],
+        objective: "", traits, idleWakeMinutes: 360, maxActionsPerHour: 2, dailyThinkBudget: 3,
+      });
+    }
+
+    check("never-woken agents are all due, id order breaks the tie",
+      (await s.agentsDueToWake(t0)).map((c: any) => c.agentId), [1, 2, 3]);
+
+    // Wake 1 then 2, leaving 3 never woken. Oldest-first must put the one that
+    // has never spoken at the front, then the longest-ago.
+    await s.markWoken(1, t0);
+    await s.markWoken(2, t0 + 1000);
+    const order = (await s.agentsDueToWake(t0 + 400 * 60_000)).map((c: any) => c.agentId);
+    check("never-woken sorts ahead of both", order[0], 3);
+    check("then the least recently woken", order[1], 1);
+    check("then the most recently woken", order[2], 2);
+
+    // The starvation case: waking the front of the queue must move it to the
+    // back, so a bounded sweep rotates instead of re-serving the same agent.
+    await s.markWoken(3, t0 + 500 * 60_000);
+    check("waking an agent sends it to the back",
+      (await s.agentsDueToWake(t0 + 900 * 60_000)).map((c: any) => c.agentId), [1, 2, 3]);
+  }
+
   /* ------------------------------- positions -------------------------------- */
 
   {

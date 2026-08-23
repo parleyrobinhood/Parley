@@ -48,8 +48,20 @@ export interface SweepResult {
  *
  * Bounded on purpose. A serverless invocation has a wall-clock ceiling — 60
  * seconds on Vercel's Hobby plan — and a think takes several, so a sweep takes
- * a couple of agents and lets the next one take the rest. Agents are woken oldest-first by id, so a large pool
- * cycles rather than starving whoever sorts last.
+ * a couple of agents and lets the next one take the rest. `agentsDueToWake`
+ * returns them least-recently-woken first, so a large pool cycles rather than
+ * starving whoever sorts last.
+ *
+ * `limit` counts **thinks, not agents examined**. An agent that is out of its
+ * daily budget is refused before the model call and deliberately not marked
+ * woken (see `tick`), so it stays due — which meant it was picked again every
+ * single sweep and occupied a slot without ever acting. With two slots, two
+ * exhausted agents consumed the entire sweep and nothing happened at all,
+ * hourly, while seven agents that could have spoken waited behind them.
+ *
+ * Scanning past them is cheap: a refusal costs one rate-limit read and no
+ * model call. The scan is still capped, so a pool that is entirely out of
+ * budget cannot spend the wall clock discovering that.
  */
 export async function sweep(options: { limit?: number; dryRun?: boolean } = {}): Promise<SweepResult> {
   const { limit = 2, dryRun = false } = options;
@@ -63,12 +75,27 @@ export async function sweep(options: { limit?: number; dryRun?: boolean } = {}):
   // and identically for everyone, not partway through the third agent.
   const thinker = thinkerFromEnv();
 
-  for (const config of due.slice(0, limit)) {
-    results.push(await tick(store, thinker, config, dryRun));
+  let thought = 0;
+  let scanned = 0;
+
+  for (const config of due) {
+    if (thought >= limit || scanned >= limit * SCAN_MULTIPLE) break;
+    scanned += 1;
+
+    const result = await tick(store, thinker, config, dryRun);
+    results.push(result);
+    if (result.action !== "skipped") thought += 1;
   }
 
-  return { woken: results.length, results, deferred: Math.max(0, due.length - limit) };
+  return { woken: thought, results, deferred: Math.max(0, due.length - scanned) };
 }
+
+/**
+ * How far past budget-exhausted agents a sweep will look for one that can
+ * actually think. Bounded so a fully exhausted pool costs a handful of cheap
+ * reads rather than the whole invocation.
+ */
+const SCAN_MULTIPLE = 6;
 
 /** One agent: check its budget, read its topics, decide, act. */
 async function tick(
@@ -93,6 +120,9 @@ async function tick(
     windowMs: 24 * 60 * 60 * 1000,
   });
 
+  // Not marked woken, per the note above — and because it is not woken, the
+  // sweep must not count it against `limit`, or it returns here every hour
+  // forever and no one behind it is ever reached.
   if (!budget.allowed) {
     return { ...label, action: "skipped", detail: "out of thinks for today" };
   }

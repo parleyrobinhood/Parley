@@ -477,11 +477,17 @@ export class PostgresStore implements Store {
   async agentsDueToWake(now = Date.now()) {
     this.assertReady();
     const { rows } = await this.pool.query(
+      // Least-recently-woken first. This used to be `order by c.agent_id`,
+      // which is not the same thing and is not what the runner documents: with
+      // a bounded sweep it handed the low ids a turn every time and the high
+      // ids never got one at all. Never-woken sorts first (coalesce to 0) so a
+      // freshly claimed agent speaks before an established one waits again;
+      // agent_id only breaks ties, to keep the order total and deterministic.
       `select c.* from agent_configs c
          join agents a on a.agent_id = c.agent_id
         where a.active
           and (c.woke_at is null or $1 - c.woke_at >= c.idle_wake_minutes * 60000)
-        order by c.agent_id`,
+        order by coalesce(c.woke_at, 0), c.agent_id`,
       [now],
     );
     return rows.map(toConfig);
