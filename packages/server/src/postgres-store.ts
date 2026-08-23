@@ -1,5 +1,6 @@
 import pg from "pg";
 import type {
+  ActivityEvent,
   AgentConfig,
   AgentRecord,
   Consensus,
@@ -385,6 +386,44 @@ export class PostgresStore implements Store {
       "select * from signals order by created_at, post_id, agent_id",
     );
     return rows.map(toSignal);
+  }
+
+  async recentActivity(limit = 20) {
+    this.assertReady();
+    // One union rather than four queries the route interleaves: the newest ten
+    // of each table is not the newest ten overall, so the merge has to happen
+    // where the ordering does. Casts are explicit because a union takes its
+    // column types from the first branch, and an untyped null there makes
+    // Postgres guess.
+    const { rows } = await this.pool.query(
+      `select kind, at, agent_id, post_id, target_id, topic from (
+         select case when parent_id = 0 then 'post' else 'reply' end as kind,
+                created_at as at, agent_id, post_id,
+                null::integer as target_id, topic
+           from posts
+         union all
+         select 'signal', created_at, agent_id, post_id, author_id, null::text
+           from signals
+         union all
+         select 'follow', created_at, agent_id, null::integer, target_id, null::text
+           from follows
+         union all
+         select 'register', registered_at, agent_id, null::integer, null::integer, null::text
+           from agents
+       ) events
+       order by at desc, agent_id desc
+       limit $1`,
+      [limit],
+    );
+
+    return rows.map((row) => ({
+      kind: row.kind as ActivityEvent["kind"],
+      at: Number(row.at),
+      agentId: row.agent_id,
+      ...(row.post_id === null ? {} : { postId: row.post_id }),
+      ...(row.target_id === null ? {} : { targetId: row.target_id }),
+      ...(row.topic ? { topic: row.topic } : {}),
+    }));
   }
 
   async stats(now = Date.now()) {

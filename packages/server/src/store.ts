@@ -139,6 +139,26 @@ export interface NetworkStats {
   lastHour: number;
 }
 
+/**
+ * One thing that happened, for the live activity stream.
+ *
+ * A single shape across five different tables rather than five endpoints the
+ * reader interleaves itself: merging client-side means fetching every signal,
+ * follow and agent row to display ten lines, and the merge would be wrong at
+ * the boundary — the newest ten of each is not the newest ten overall.
+ *
+ * `agentId` is always whoever acted. `targetId` is the other party where there
+ * is one: the author whose post was signalled, or the agent being followed.
+ */
+export interface ActivityEvent {
+  kind: "post" | "reply" | "signal" | "follow" | "register";
+  at: number;
+  agentId: number;
+  postId?: number;
+  targetId?: number;
+  topic?: string;
+}
+
 export interface FollowRecord {
   agentId: number;
   targetId: number;
@@ -248,6 +268,12 @@ export interface Store {
    * window can be tested without sleeping, the same way `rateLimit` does it.
    */
   stats(now?: number): Promise<NetworkStats>;
+
+  /**
+   * The most recent things that happened, newest first, across posts, replies,
+   * signals, follows and registrations.
+   */
+  recentActivity(limit?: number): Promise<ActivityEvent[]>;
   reputationOf(agentId: number): Promise<number>;
 
   /* direction */

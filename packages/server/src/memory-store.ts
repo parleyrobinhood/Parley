@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
+  ActivityEvent,
   AgentConfig,
   AgentRecord,
   Consensus,
@@ -232,6 +233,47 @@ export class MemoryStore implements Store {
 
   async reputationOf(agentId: number) {
     return this.signals.filter((s) => s.authorId === agentId).length;
+  }
+
+  async recentActivity(limit = 20) {
+    const events: ActivityEvent[] = [];
+
+    for (const post of this.posts) {
+      events.push({
+        kind: post.parentId > 0 ? "reply" : "post",
+        at: post.createdAt,
+        agentId: post.agentId,
+        postId: post.postId,
+        ...(post.topic ? { topic: post.topic } : {}),
+      });
+    }
+    for (const signal of this.signals) {
+      events.push({
+        kind: "signal",
+        at: signal.createdAt,
+        agentId: signal.agentId,
+        postId: signal.postId,
+        targetId: signal.authorId,
+      });
+    }
+    for (const follow of this.follows) {
+      events.push({
+        kind: "follow",
+        at: follow.createdAt,
+        agentId: follow.agentId,
+        targetId: follow.targetId,
+      });
+    }
+    for (const agent of this.agents) {
+      events.push({ kind: "register", at: agent.registeredAt, agentId: agent.agentId });
+    }
+
+    // agentId breaks ties so the order is total. Seeding writes several rows
+    // inside the same millisecond, and without a tiebreak the two backends
+    // would return the same set in different orders and disagree.
+    return events
+      .sort((a, b) => b.at - a.at || b.agentId - a.agentId)
+      .slice(0, limit);
   }
 
   async stats(now = Date.now()) {

@@ -235,6 +235,45 @@ async function suite(name: string, fresh: () => Promise<any>) {
       (await s.agentsDueToWake(t0 + 10 * 360 * 60_000)).length, 0);
   }
 
+  /* ------------------------------- activity --------------------------------- */
+
+  {
+    const s = await fresh();
+    check("an empty network has no activity", (await s.recentActivity()).length, 0);
+
+    await s.createAgent({ handle: "actor", controller: "0xA", metadata: "{}" });
+    await s.createAgent({ handle: "other", controller: "0xB", metadata: "{}" });
+    await s.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "a" });
+    await s.createPost({ agentId: 2, topic: "rwa", parentId: 1, uri: "b" });
+    await s.addSignal({ postId: 1, agentId: 2, authorId: 1 });
+    await s.follow(2, 1);
+
+    const feed = await s.recentActivity();
+
+    // Every kind reaches the stream. A merge that silently drops one is the
+    // failure this exists to catch — the counters would still look right.
+    check("registrations are activity", feed.filter((e: any) => e.kind === "register").length, 2);
+    check("root posts are activity", feed.filter((e: any) => e.kind === "post").length, 1);
+    check("replies are their own kind", feed.filter((e: any) => e.kind === "reply").length, 1);
+    check("signals are activity", feed.filter((e: any) => e.kind === "signal").length, 1);
+    check("follows are activity", feed.filter((e: any) => e.kind === "follow").length, 1);
+
+    check("newest first", feed[0]?.at >= feed[feed.length - 1]?.at, true);
+
+    const signal = feed.find((e: any) => e.kind === "signal");
+    check("a signal records who gave it", signal?.agentId, 2);
+    check("a signal records whose post it was", signal?.targetId, 1);
+
+    const follow = feed.find((e: any) => e.kind === "follow");
+    check("a follow records who was followed", follow?.targetId, 1);
+
+    const reply = feed.find((e: any) => e.kind === "reply");
+    check("a reply carries its post id", reply?.postId, 2);
+    check("a reply carries its topic", reply?.topic, "rwa");
+
+    check("limit is honoured", (await s.recentActivity(3)).length, 3);
+  }
+
   /* --------------------------- wake order, with a pool ---------------------- */
 
   {

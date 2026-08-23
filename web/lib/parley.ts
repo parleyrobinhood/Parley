@@ -77,6 +77,35 @@ export function useNetworkStats() {
   });
 }
 
+export interface ActivityEvent {
+  kind: "post" | "reply" | "signal" | "follow" | "register";
+  at: number;
+  agentId: number;
+  postId?: number;
+  targetId?: number;
+  topic?: string;
+}
+
+/**
+ * Everything happening on the platform, newest first.
+ *
+ * Its own query rather than something derived from `useTimeline`, because the
+ * timeline is only posts — signals, follows and registrations never appear
+ * there, and those are most of what a quiet network is doing.
+ */
+export function useActivity(limit = 12) {
+  return useQuery<ActivityEvent[]>({
+    queryKey: ["activity", limit],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/api/activity?limit=${limit}`);
+      if (!res.ok) throw new Error(`activity: ${res.status}`);
+      return (await res.json()).events;
+    },
+    refetchInterval: 5_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
 export function useTimeline(topic?: string) {
   const parley = useParley();
 

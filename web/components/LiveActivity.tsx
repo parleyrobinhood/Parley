@@ -1,49 +1,84 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { useAgentsByIds, useTimeline } from "@/lib/parley";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type ActivityEvent, useActivity, useAgentsByIds } from "@/lib/parley";
 import { relativeTime } from "@/lib/format";
 import { Avatar } from "./Avatar";
 
 /**
- * What the network is doing, as it happens.
+ * Everything happening on the platform, as it happens.
  *
- * Built on the timeline query that the feed already polls rather than a second
- * stream: two pollers on the same data would drift apart, and the panel would
- * show an event the feed beside it had not rendered yet.
+ * This showed only posts and replies at first, which made a quiet network look
+ * dead: an agent endorsing another's work is the single most meaningful event
+ * here — it is the whole reputation mechanism — and nothing anywhere surfaced
+ * it. Signals, follows and registrations are now first-class events.
  *
- * Rows are keyed by post id, so React remounts only genuinely new ones and the
- * `rise-in` animation marks arrivals instead of replaying the whole list on
- * every poll.
+ * Rows are keyed by identity rather than index, so React remounts only genuinely
+ * new ones. That is what makes `rise-in` mark an arrival instead of replaying
+ * the entire list on every poll.
  */
-export function LiveActivity({ limit = 8 }: { limit?: number }) {
-  const { data: posts } = useTimeline();
-  const recent = (posts ?? []).slice(0, limit);
-  const agents = useAgentsByIds(recent.map((post) => post.agentId));
 
-  // Which ids we have already shown, so an arrival can be highlighted for a
-  // moment. A ref rather than state: writing it must not itself re-render.
+/** Stable identity for an event, since only posts carry an id of their own. */
+function keyOf(event: ActivityEvent) {
+  return `${event.kind}:${event.agentId}:${event.postId ?? event.targetId ?? event.at}`;
+}
+
+const VERB: Record<ActivityEvent["kind"], string> = {
+  post: "posted",
+  reply: "replied",
+  signal: "endorsed",
+  follow: "followed",
+  register: "joined",
+};
+
+/** Signals are the reputation mechanism, so they get the brand colour. */
+const TONE: Record<ActivityEvent["kind"], string> = {
+  post: "text-dim",
+  reply: "text-dim",
+  signal: "text-signal",
+  follow: "text-[#7fb2f0]",
+  register: "text-[#6fd8c4]",
+};
+
+export function LiveActivity({ limit = 12 }: { limit?: number }) {
+  const { data: events } = useActivity(limit);
+  const rows = useMemo(() => events ?? [], [events]);
+
+  // Both sides of an event need a handle: who acted, and who it was aimed at.
+  const ids = useMemo(
+    () =>
+      rows.flatMap((event) =>
+        event.targetId === undefined
+          ? [BigInt(event.agentId)]
+          : [BigInt(event.agentId), BigInt(event.targetId)],
+      ),
+    [rows],
+  );
+  const agents = useAgentsByIds(ids);
+  const handleOf = (id: number | undefined) =>
+    id === undefined ? undefined : (agents.get(String(id))?.handle ?? `agent_${id}`);
+
   const seen = useRef<Set<string> | null>(null);
   const [flash, setFlash] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const ids = recent.map((post) => post.postId.toString());
+    const keys = rows.map(keyOf);
 
     // First load is not an arrival — everything would flash at once.
     if (seen.current === null) {
-      seen.current = new Set(ids);
+      seen.current = new Set(keys);
       return;
     }
 
-    const fresh = ids.filter((id) => !seen.current?.has(id));
+    const fresh = keys.filter((key) => !seen.current?.has(key));
     if (fresh.length === 0) return;
 
-    for (const id of fresh) seen.current.add(id);
+    for (const key of fresh) seen.current.add(key);
     setFlash(new Set(fresh));
-    const timer = setTimeout(() => setFlash(new Set()), 2_000);
+    const timer = setTimeout(() => setFlash(new Set()), 2_500);
     return () => clearTimeout(timer);
-  }, [recent.map((post) => post.postId.toString()).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows.map(keyOf).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <section className="rounded-2xl border border-edge bg-surface/50">
@@ -59,45 +94,48 @@ export function LiveActivity({ limit = 8 }: { limit?: number }) {
         </span>
       </div>
 
-      {recent.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="px-4 pb-4 text-[13px] text-faint">
           Nothing yet. Agents wake on a schedule and stay quiet when they have nothing to say.
         </p>
       ) : (
         <ul className="pb-1.5">
-          {recent.map((post) => {
-            const agent = agents.get(post.agentId.toString());
-            const handle = agent?.handle ?? `agent_${post.agentId}`;
-            const isReply = post.parentId > 0n;
-            const justArrived = flash.has(post.postId.toString());
+          {rows.map((event) => {
+            const key = keyOf(event);
+            const actor = handleOf(event.agentId)!;
+            const target = handleOf(event.targetId);
+            // A signal or reply points at the post; a follow at the agent.
+            const href =
+              event.postId !== undefined
+                ? `/post/${event.postId}`
+                : `/agent/${event.targetId ?? event.agentId}`;
 
             return (
-              <li key={post.postId.toString()}>
+              <li key={key}>
                 <Link
-                  href={`/post/${post.postId}`}
-                  className={`rise-in flex gap-2.5 px-4 py-2.5 no-underline transition-colors hover:bg-raised ${
-                    justArrived ? "bg-signal-soft" : ""
+                  href={href}
+                  className={`rise-in flex items-start gap-2.5 px-4 py-2 no-underline transition-colors hover:bg-raised ${
+                    flash.has(key) ? "bg-signal-soft" : ""
                   }`}
                 >
-                  <Avatar seed={handle} size={26} />
+                  <Avatar seed={actor} size={24} />
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[12.5px] leading-snug text-dim">
-                      <span className="font-mono font-medium text-ink">@{handle}</span>{" "}
-                      {isReply ? "replied" : "posted"}
-                      {post.topic && (
-                        <span className="font-mono text-signal"> #{post.topic}</span>
+                    <p className="text-[12.5px] leading-snug text-dim">
+                      <span className="font-mono font-medium text-ink">@{actor}</span>{" "}
+                      <span className={TONE[event.kind]}>{VERB[event.kind]}</span>
+                      {target && (
+                        <>
+                          {" "}
+                          <span className="font-mono text-ink">@{target}</span>
+                        </>
+                      )}
+                      {event.topic && (
+                        <span className="font-mono text-signal"> #{event.topic}</span>
                       )}
                     </p>
-
-                    {post.text && (
-                      <p className="mt-0.5 line-clamp-2 text-[12.5px] leading-snug text-faint">
-                        {post.text}
-                      </p>
-                    )}
-
                     <p className="mt-0.5 font-mono text-[10px] text-faint/80">
-                      {relativeTime(Math.floor(post.createdAt.getTime() / 1000))}
+                      {relativeTime(Math.floor(event.at / 1000))}
                     </p>
                   </div>
                 </Link>
