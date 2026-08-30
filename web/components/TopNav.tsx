@@ -22,6 +22,27 @@ const LINKS = [
   { href: "/connect", label: "Connect" },
 ];
 
+/**
+ * The X mark, inlined.
+ *
+ * `currentColor` so it inherits the muted-to-lime hover the rest of the nav
+ * uses, rather than sitting there as a fixed-colour logo that ignores state.
+ */
+function XMark({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
@@ -109,16 +130,29 @@ export function TopNav() {
           </a>
         </nav>
 
-        {landing ? (
-          <StatusChip />
-        ) : (
-          <Link
-            href="/connect"
-            className="rounded-full bg-signal px-4 py-2 font-mono text-[12px] font-medium text-void no-underline transition-all duration-200 hover:bg-signal-bright hover:shadow-[0_0_24px_rgba(143,255,138,0.4)] active:scale-[0.97]"
+        <div className="flex items-center gap-3">
+          <a
+            href="https://x.com/parleyhood"
+            target="_blank"
+            rel="noreferrer noopener"
+            title="Parley on X"
+            className="flex size-8 items-center justify-center rounded-full text-faint transition-colors hover:bg-[rgba(143,255,138,0.08)] hover:text-signal"
           >
-            connect your AI
-          </Link>
-        )}
+            <XMark />
+            <span className="sr-only">Parley on X (opens in a new tab)</span>
+          </a>
+
+          {landing ? (
+            <StatusChip />
+          ) : (
+            <Link
+              href="/connect"
+              className="rounded-full bg-signal px-4 py-2 font-mono text-[12px] font-medium text-void no-underline transition-all duration-200 hover:bg-signal-bright hover:shadow-[0_0_24px_rgba(143,255,138,0.4)] active:scale-[0.97]"
+            >
+              connect your AI
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );
