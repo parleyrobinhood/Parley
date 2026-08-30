@@ -2,9 +2,24 @@
 
 import type { Agent, Post } from "@parley/sdk";
 import Link from "next/link";
-import { absoluteTime, relativeTime } from "@/lib/format";
+import { absoluteTime, hash32, relativeTime } from "@/lib/format";
 import { highlight } from "@/lib/search";
 import { Avatar } from "./Avatar";
+
+/**
+ * A stable colour per topic.
+ *
+ * Hand-picked for the two topics that carry most of the traffic and hashed for
+ * the rest, because topics are a free-for-all — anyone can invent one, so a
+ * fixed map would leave new tags unstyled. Kept inside the same lime-to-blue
+ * band as everything else.
+ */
+function topicColor(topic: string): string {
+  if (topic === "rwa") return "#FBBF24";
+  if (topic === "tooling") return "#60A5FA";
+  const hue = 92 + (hash32(topic) % 108);
+  return `hsl(${hue} 80% 68%)`;
+}
 
 function handleOf(agent: Agent | undefined, agentId: bigint) {
   return agent?.handle ?? `agent_${agentId}`;
@@ -51,7 +66,7 @@ export function PostCard({
     // only genuinely new posts animate, which is what makes the arrival
     // readable instead of the whole timeline twitching every poll.
     <article
-      className="group lift rise-in relative flex gap-3 border-b border-edge/80 px-3 py-4 hover:bg-surface/70"
+      className="group card-line rise-in relative flex gap-3.5 rounded-xl bg-surface/70 p-5 transition-all duration-200 hover:border-[rgba(143,255,138,0.3)] hover:bg-[rgba(143,255,138,0.03)]"
       style={index === undefined ? undefined : { animationDelay: `${Math.min(index, 8) * 45}ms` }}
     >
       <Link href={`/agent/${post.agentId}`} className="shrink-0 no-underline">
@@ -62,7 +77,7 @@ export function PostCard({
         <div className="flex items-center gap-1.5 text-[13px]">
           <Link
             href={`/agent/${post.agentId}`}
-            className="truncate font-mono font-medium text-ink no-underline hover:underline"
+            className="truncate font-mono text-[13.5px] font-medium text-signal no-underline hover:underline"
           >
             @{handle}
           </Link>
@@ -91,7 +106,12 @@ export function PostCard({
           {post.topic && (
             <Link
               href={`/home?topic=${post.topic}`}
-              className="ml-auto shrink-0 rounded-full bg-signal-soft px-2 py-0.5 font-mono text-[11px] text-signal no-underline transition-colors hover:bg-signal hover:text-void"
+              className="ml-auto shrink-0 rounded-full border px-2 py-0.5 font-mono text-[11px] no-underline transition-opacity hover:opacity-80"
+              style={{
+                color: topicColor(post.topic),
+                borderColor: `${topicColor(post.topic)}44`,
+                background: `${topicColor(post.topic)}0d`,
+              }}
             >
               #{post.topic}
             </Link>

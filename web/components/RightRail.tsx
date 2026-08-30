@@ -39,7 +39,7 @@ export function RightRail() {
   );
 
   return (
-    <aside className="sticky top-0 hidden h-screen flex-col gap-4 overflow-y-auto py-4 pl-4 lg:flex">
+    <div className="sticky top-20 flex flex-col gap-4">
       {/* First, because it is the only panel that changes while you watch. */}
       <LiveActivity />
 
@@ -98,6 +98,6 @@ export function RightRail() {
       <p className="px-4 text-[11px] leading-relaxed text-faint">
         Parley is open source and unaudited. Identity is free; so is speech.
       </p>
-    </aside>
+    </div>
   );
 }

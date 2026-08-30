@@ -1,52 +1,69 @@
 @import "tailwindcss";
 
+/*
+  PARLEY — "The Observatory"
+
+  A near-black, green-tinted void; neon-lime agent light; mono for anything that
+  is data. Ported from the landing prototype.
+
+  The token *names* below are the ones the app already used — `void`, `surface`,
+  `ink`, `signal` and so on — with Observatory *values* behind them. That is
+  deliberate: every component in the app is already written against these names,
+  so the palette changes everywhere at once without touching a hundred files,
+  and a component that opts out is visible as a hard-coded hex rather than
+  hiding behind a renamed token.
+*/
 @theme {
   /* Surfaces, darkest to lightest. Depth is what separates a timeline from a
      wall of text: the page recedes, cards sit on it, hover lifts them.
 
-     Sampled from the logo and banner, whose darks are slightly cool — #232428
-     and #1a181d, both with blue above red and green. An earlier pass gave these
-     a green cast on the assumption that a green logo wanted a green ground; the
-     files say otherwise. */
-  --color-void: #0e0f13;
-  --color-surface: #16171c;
-  --color-raised: #1e1f25;
-  --color-edge: #272930;
-  --color-edge-strong: #363942;
+     Green-tinted rather than neutral. The old palette was cool-grey (#0e0f13)
+     and made the lime read as an accent bolted onto a grey app; tinting the
+     ground the same hue makes the light look like it belongs to the room. */
+  --color-void: #070b07;
+  --color-surface: #0a120a;
+  --color-raised: #0e1a0e;
 
-  /* Text, most to least prominent. Three weights is enough to carry every
-     hierarchy in the app without reaching for size or colour tricks.
+  /* Lines are the brand colour at very low alpha, not grey. At 10% a border
+     reads as a hairline of the same light the agents emit, which is what keeps
+     a dense feed from looking like a spreadsheet. */
+  --color-edge: rgba(143, 255, 138, 0.1);
+  --color-edge-strong: rgba(143, 255, 138, 0.22);
 
-     `ink` is the banner's white, which is a hair off pure — #f9f9f7. Pure white
-     on a near-black page is harder to read for long, and this is a page people
-     read for a while. */
-  --color-ink: #f9f9f7;
-  --color-dim: #a2a6ad;
-  --color-faint: #676b74;
+  /* Text, most to least prominent. Three weights carry every hierarchy in the
+     app without reaching for size or colour tricks. Warmed very slightly green
+     so it sits on the ground rather than floating above it. */
+  --color-ink: #e8f0e8;
+  --color-dim: #a9bca9;
+  --color-faint: #8a9a8a;
 
-  /* The brand green, sampled from the artwork rather than guessed.
+  /* Agent light. Brighter and purer than the old #8ed762, which was sampled
+     from the logo's glass and came out muted; this is the colour the logo
+     looks like rather than the colour it measures. */
+  --color-signal: #8fff8a;
+  --color-signal-bright: #b4ffb0;
+  --color-signal-soft: rgba(143, 255, 138, 0.1);
 
-     Taken from the chroma peak, not the average: the mark is glass over colour,
-     so its median green (#7ab660) is dragged grey by the translucent shell and
-     reads far duller than the logo looks. #8ed762 is where the saturation
-     actually concentrates. `bright` is the lit core — and #a6f568 is the most
-     common high-saturation colour in the logo and the banner independently,
-     which is a good sign it is the real one. It is for glows and hovers only:
-     too light to hold a contrast ratio as text. */
-  --color-signal: #8ed762;
-  --color-signal-bright: #a6f568;
-  --color-signal-soft: #8ed7621f;
-  --color-warn: #ffb454;
-
-  /* The logo is glass: a white shell lit from behind. These are for surfaces
-     that should read as lit rather than painted — the front door, chrome over
-     a glow. Used sparingly, because the feed stays flat so posts stay
+  /* Lit surfaces. The mark is glass over light, and these are for chrome that
+     should read as lit rather than painted — the front door, a panel sitting
+     over a glow. Used sparingly, because the feed stays flat so posts stay
      readable. */
-  --color-glass: #ffffff14;
-  --color-glass-edge: #ffffff2e;
+  --color-glass: rgba(255, 255, 255, 0.05);
+  --color-glass-edge: rgba(143, 255, 138, 0.16);
 
-  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Data hues. Topic tags and event kinds use these to separate categories
+     without introducing a second brand colour. */
+  --color-warn: #fbbf24;
+  --color-teal: #5eead4;
+  --color-info: #60a5fa;
+
+  /* Three faces, three jobs: display for headings, sans for prose, mono for
+     anything that is literally an identifier. Declared in app/layout.tsx as
+     --font-grotesk / --font-inter / --font-jbmono; mapping them here rather
+     than naming them the same thing avoids a self-referential var(). */
+  --font-display: var(--font-grotesk), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jbmono), "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
@@ -56,19 +73,21 @@ html {
 body {
   background: var(--color-void);
   color: var(--color-ink);
-  /* The shell spans the viewport now, so the page has to look intentional at
-     the edges rather than like a column that ran out. */
-  min-height: 100dvh;
-  /* Prose is sans. Mono is reserved for things that are literally identifiers —
-     handles, addresses, post ids — where character alignment carries meaning
-     and the texture signals "this is data, not writing". */
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
+  /* The hero's constellation is wider than the viewport at some sizes. */
+  overflow-x: hidden;
 }
 
 a {
   text-underline-offset: 3px;
+}
+
+::selection {
+  background: rgba(143, 255, 138, 0.25);
+  color: #eaffea;
 }
 
 /* Visible keyboard focus everywhere, without boxing every mouse click. */
@@ -78,29 +97,13 @@ a {
   border-radius: 2px;
 }
 
-/* The feed polls and re-renders; honour a reduced-motion preference. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-
 /* ---------------------------------------------------------------------------
    Ambient ground
 
-   The app used to be a 1152px column centred on flat black, which read as a
-   window sitting on a desktop rather than as a site. Now that the rails reach
-   the screen edges, that flat black is a lot of nothing to look at, so the page
-   gets a ground: two very low-alpha brand washes, warm-lime top-left and cool
-   green-teal bottom-right, over the void.
-
-   Fixed rather than scrolled — it is the room the feed is in, not part of the
-   feed. Alpha is deliberately tiny (~5%): anything stronger tints the post text
-   sitting on top of it, and this is a page people read for a while.
+   Two very low-alpha washes over the void, warm-lime top-left and cool teal
+   bottom-right. Fixed rather than scrolled — it is the room the feed is in, not
+   part of the feed. Alpha stays tiny: anything stronger tints the post text
+   sitting on top, and this is a page people read for a while.
 --------------------------------------------------------------------------- */
 body::before {
   content: "";
@@ -109,27 +112,46 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 45rem at 12% -8%, color-mix(in oklab, var(--color-signal) 9%, transparent), transparent 60%),
-    radial-gradient(55rem 40rem at 105% 108%, color-mix(in oklab, #4fd6c0 7%, transparent), transparent 62%),
-    radial-gradient(40rem 30rem at 88% 4%, color-mix(in oklab, var(--color-signal-bright) 4%, transparent), transparent 70%);
+    radial-gradient(60rem 45rem at 12% -8%, rgba(143, 255, 138, 0.07), transparent 60%),
+    radial-gradient(55rem 40rem at 105% 108%, rgba(94, 234, 212, 0.05), transparent 62%);
+}
+
+/* ---------------------------------------------------------------------------
+   Typography helpers
+--------------------------------------------------------------------------- */
+
+/* Small mono capitals used to label a section without giving it a heading. */
+.overline-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* Lime type that emits rather than reflects. Display sizes only — the shadow
+   smears at body size and costs legibility for nothing. */
+.text-glow {
+  color: var(--color-signal);
+  text-shadow:
+    0 0 18px rgba(143, 255, 138, 0.45),
+    0 0 60px rgba(143, 255, 138, 0.18);
+}
+
+.card-line {
+  border: 1px solid var(--color-edge);
 }
 
 /* ---------------------------------------------------------------------------
    Motion
 
    Everything here is short, small in distance, and eased out. The feed polls
-   and re-renders, so anything long or bouncy turns into visual noise the tenth
-   time it fires. The reduced-motion block above neutralises all of it.
+   and re-renders, so anything long or bouncy becomes noise the tenth time it
+   fires. The reduced-motion block at the end neutralises all of it.
 --------------------------------------------------------------------------- */
 @keyframes parley-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes parley-fade {
@@ -137,8 +159,6 @@ body::before {
   to { opacity: 1; }
 }
 
-/* A slow drift for the avatar rings, so a profile has a pulse without asking
-   for attention. Long enough that two agents side by side never sync up. */
 @keyframes parley-spin {
   to { transform: rotate(360deg); }
 }
@@ -146,6 +166,37 @@ body::before {
 @keyframes parley-pulse {
   0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }
+}
+
+/* Film grain. The single strongest reason the prototype reads as "cinematic"
+   rather than "dark theme": it breaks up large flat areas that would otherwise
+   band on cheap panels. */
+@keyframes grain-shift {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4%, 3%); }
+  40% { transform: translate(3%, -4%); }
+  60% { transform: translate(-3%, -2%); }
+  80% { transform: translate(4%, 2%); }
+}
+
+@keyframes live-ping {
+  0% { transform: scale(0.6); opacity: 0.7; }
+  80%, 100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes breath-glow {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(143, 255, 138, 0.35)); }
+  50% { filter: drop-shadow(0 0 16px rgba(143, 255, 138, 0.65)); }
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes scroll-dot {
+  0% { top: -30%; }
+  100% { top: 110%; }
 }
 
 .rise-in {
@@ -162,21 +213,95 @@ body::before {
   transition:
     transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.18s ease,
+    border-color 0.18s ease,
     box-shadow 0.18s ease;
 }
 
 .lift:hover {
   transform: translateY(-1px);
+  border-color: rgba(143, 255, 138, 0.3);
   box-shadow: 0 6px 24px -12px rgb(0 0 0 / 0.7);
 }
 
-/* A hairline that fades in from the brand colour at one end. Used under the
-   sticky headers so the chrome separates from the feed without a hard rule. */
-.edge-fade {
-  background: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in oklab, var(--color-signal) 28%, transparent),
-    transparent
-  );
+/* Grain sits above content but below anything interactive, and never takes a
+   click. Applied to a wrapper element rather than body so it can be omitted on
+   routes that should stay flat. */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 90;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-shift 9s steps(6) infinite;
+}
+
+/* A dot that pings outward, for anything genuinely live. */
+.live-dot {
+  position: relative;
+}
+
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 1px solid var(--color-signal);
+  opacity: 0.6;
+  animation: live-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.breath {
+  animation: breath-glow 4.5s ease-in-out infinite;
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker-scroll 46s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+.scroll-line {
+  position: relative;
+  width: 1px;
+  height: 56px;
+  background: rgba(143, 255, 138, 0.18);
+  overflow: hidden;
+}
+
+.scroll-line::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -30%;
+  width: 100%;
+  height: 30%;
+  background: var(--color-signal);
+  animation: scroll-dot 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* The feed polls and re-renders; honour a reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .grain::after,
+  .ticker-track,
+  .live-dot::after,
+  .breath,
+  .scroll-line::after {
+    animation: none !important;
+  }
 }

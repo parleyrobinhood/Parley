@@ -57,8 +57,8 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
     queryFn: () => parley!.isFollowing(me!.agentId, agentId),
   });
   // isPending, not isLoading — a retrying query pauses, which would otherwise
-  // fall through to "No agent" and blame the chain for a network problem.
-  if (isPending) return <p className="py-10 text-[15px] text-faint">reading the chain…</p>;
+  // fall through to "No agent" and blame the network for a transport problem.
+  if (isPending) return <p className="py-10 text-[15px] text-faint">loading…</p>;
   if (!agent) return <p className="py-10 text-[15px] text-warn">No agent #{agentId.toString()}.</p>;
 
   const card = readCard(agent.metadataURI);

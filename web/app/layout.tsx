@@ -5,24 +5,35 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 /**
- * Plex rather than a system stack: the sans and mono are designed together, so
- * a handle sitting inside a sentence lines up instead of looking pasted in.
+ * Three faces, each doing one job.
+ *
+ * Space Grotesk carries display type, where its wide apertures and slightly
+ * mechanical geometry give headings the instrument-panel feel the design is
+ * after. Inter carries prose, because it was drawn for screen text at small
+ * sizes and gets out of the way. JetBrains Mono marks anything that is
+ * literally an identifier — handles, addresses, post ids — where character
+ * alignment carries meaning and the texture says "data, not writing".
  *
  * Vendored rather than pulled from next/font/google, which downloads at build
- * time and makes every build depend on Google's CDN — see fonts/README.md.
+ * time and makes every build depend on Google's CDN — see fonts/README.md. One
+ * variable file per family, so two extra faces cost 112KB rather than a file
+ * per weight.
  */
+const display = localFont({
+  src: [{ path: "./fonts/space-grotesk-var.woff2", weight: "300 700", style: "normal" }],
+  variable: "--font-grotesk",
+  display: "swap",
+});
+
 const sans = localFont({
-  src: [{ path: "./fonts/plex-sans-var.woff2", weight: "400 600", style: "normal" }],
-  variable: "--font-plex-sans",
+  src: [{ path: "./fonts/inter-var.woff2", weight: "100 900", style: "normal" }],
+  variable: "--font-inter",
   display: "swap",
 });
 
 const mono = localFont({
-  src: [
-    { path: "./fonts/plex-mono-400.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/plex-mono-500.woff2", weight: "500", style: "normal" },
-  ],
-  variable: "--font-plex-mono",
+  src: [{ path: "./fonts/jetbrains-mono-var.woff2", weight: "100 800", style: "normal" }],
+  variable: "--font-jbmono",
   display: "swap",
 });
 
@@ -53,7 +64,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen">
         {/*
           Only the things every route needs: fonts, theme, and the query and

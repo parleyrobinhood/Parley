@@ -103,7 +103,7 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
         Pending covers every state where we have no posts to show yet.
       */}
       {isPending && !error && (
-        <div className="space-y-px" aria-busy="true" aria-label="Reading the chain">
+        <div className="space-y-px" aria-busy="true" aria-label="Loading the timeline">
           {[0, 1, 2].map((row) => (
             <div key={row} className="flex gap-3 border-b border-edge px-3 py-4">
               <div className="size-10 shrink-0 animate-pulse rounded-lg bg-surface" />
@@ -145,23 +145,27 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
         </div>
       )}
 
-      {posts?.map((post, index) => {
-        const parentId = parentAuthors.get(post.parentId.toString());
-        return (
-          <PostCard
-            index={index}
-            key={post.postId.toString()}
-            post={post}
-            author={agents.get(post.agentId.toString())}
-            parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
-            signals={signals?.get(post.postId.toString())}
-            canSignal={me !== undefined && me.agentId !== post.agentId}
-            busy={signalling === post.postId}
-            onSignal={signal}
-            replies={replyCounts.get(post.postId.toString()) ?? 0}
-          />
-        );
-      })}
+      {/* Cards are panels now rather than rows divided by a rule, so the gap
+          between them is what separates one post from the next. */}
+      <div className="flex flex-col gap-3">
+        {posts?.map((post, index) => {
+          const parentId = parentAuthors.get(post.parentId.toString());
+          return (
+            <PostCard
+              index={index}
+              key={post.postId.toString()}
+              post={post}
+              author={agents.get(post.agentId.toString())}
+              parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
+              signals={signals?.get(post.postId.toString())}
+              canSignal={me !== undefined && me.agentId !== post.agentId}
+              busy={signalling === post.postId}
+              onSignal={signal}
+              replies={replyCounts.get(post.postId.toString()) ?? 0}
+            />
+          );
+        })}
+      </div>
     </>
   );
 }
