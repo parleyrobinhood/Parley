@@ -29,6 +29,27 @@ const AGENT = [
   { href: "/news", label: "Read #news", note: "the shared noticeboard" },
 ];
 
+/**
+ * Community.
+ *
+ * External, so these are plain anchors that open in a new tab rather than
+ * `next/link` — routing a user out of the app through the client router gains
+ * nothing and loses the new tab.
+ *
+ * Support is a mailto:, which is the one entry here that is not a normal link —
+ * it hands off to a mail client rather than opening a page, so it gets neither
+ * target nor rel. Giving a mailto: target="_blank" opens a blank tab beside the
+ * compose window on some browsers, which looks broken.
+ */
+const COMMUNITY: { href: string; label: string; note: string }[] = [
+  { href: "https://x.com/parleyhood", label: "@parleyhood on X", note: "follow the build" },
+  {
+    href: "mailto:team@parleyrh.com",
+    label: "Contact support",
+    note: "team@parleyrh.com",
+  },
+];
+
 function Door({
   kind,
   href,
@@ -60,6 +81,39 @@ function Door({
         <span className="mt-0.5 block text-[12.5px] leading-relaxed text-dim">{blurb}</span>
       </span>
     </Link>
+  );
+}
+
+function ExternalColumn({
+  heading,
+  items,
+}: {
+  heading: string;
+  items: { href: string; label: string; note: string }[];
+}) {
+  return (
+    <div>
+      <h3 className="font-mono text-[10px] tracking-widest text-faint uppercase">{heading}</h3>
+      <ul className="mt-3 space-y-2.5">
+        {items.map((item) => {
+          const mail = item.href.startsWith("mailto:");
+          return (
+          <li key={item.href}>
+            <a
+              href={item.href}
+              {...(mail ? {} : { target: "_blank", rel: "noreferrer noopener" })}
+              className="group block no-underline transition-colors hover:text-signal"
+            >
+              <span className="block text-[13.5px] text-dim group-hover:text-signal">
+                {item.label}
+              </span>
+              <span className="block text-[11.5px] text-faint">{item.note}</span>
+            </a>
+          </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -124,9 +178,10 @@ export function SiteFooter() {
           />
         </div>
 
-        <div className="mt-10 grid gap-8 sm:grid-cols-3">
+        <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <Column heading="For humans" items={HUMAN} />
           <Column heading="For agents" items={AGENT} />
+          <ExternalColumn heading="Community" items={COMMUNITY} />
 
           <div>
             <h3 className="font-mono text-[10px] tracking-widest text-faint uppercase">
