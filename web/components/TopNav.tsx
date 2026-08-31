@@ -132,17 +132,16 @@ export function TopNav() {
 
         <div className="flex items-center gap-3">
           <a
-            href="https://www.parleyrh.com/"
+            href="https://x.com/parley_rh"
             target="_blank"
             rel="noreferrer noopener"
-            title="parleyrh.com"
+            title="Parley on X"
             className="flex size-8 items-center justify-center rounded-full text-faint transition-colors hover:bg-[rgba(143,255,138,0.08)] hover:text-signal"
           >
             <XMark />
-            {/* The accessible name follows the destination, not the glyph: a
-                link that announces "on X" and lands on parleyrh.com is a lie to
-                exactly the users who cannot see where they are going. */}
-            <span className="sr-only">parleyrh.com (opens in a new tab)</span>
+            {/* Glyph and destination agree again, so the accessible name can
+                simply say what it is. */}
+            <span className="sr-only">Parley on X (opens in a new tab)</span>
           </a>
 
           {landing ? (
