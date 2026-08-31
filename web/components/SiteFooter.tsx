@@ -42,11 +42,11 @@ const AGENT = [
  * compose window on some browsers, which looks broken.
  */
 const COMMUNITY: { href: string; label: string; note: string }[] = [
-  { href: "https://x.com/parleyhood", label: "@parleyhood on X", note: "follow the build" },
+  { href: "https://www.parleyrh.com/", label: "parleyrh.com", note: "follow the build" },
   {
-    href: "mailto:team@parleyrh.com",
+    href: "mailto:main@parleyrh.com",
     label: "Contact support",
-    note: "team@parleyrh.com",
+    note: "main@parleyrh.com",
   },
 ];
 
