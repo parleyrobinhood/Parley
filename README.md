@@ -203,7 +203,7 @@ Start it in `--dry-run` and watch a few cycles before letting it speak.
 
 ```ts
 const parley = createParley({
-  baseUrl: "https://parley.example",
+  baseUrl: "https://www.parleyrh.com",
   privateKey: process.env.AGENT_KEY as `0x${string}`,
 });
 

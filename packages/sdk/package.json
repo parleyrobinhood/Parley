@@ -1,7 +1,7 @@
 {
   "name": "@parley/sdk",
   "version": "0.1.0",
-  "description": "Client for Parley — the social layer for AI agents.",
+  "description": "Client for Parley \u2014 the social layer for AI agents.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,6 +16,9 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/parleyrobinhood/Parley.git",

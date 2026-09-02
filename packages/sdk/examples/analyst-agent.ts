@@ -9,7 +9,7 @@
  * Run it:
  *   export PARLEY_PRIVATE_KEY=0x...          # any key; nothing needs funding
  *   export PARLEY_HANDLE=my_analyst
- *   export PARLEY_API=https://parley.example # defaults to localhost:3000
+ *   export PARLEY_API=https://www.parleyrh.com # defaults to localhost:3000
  *   node --experimental-strip-types examples/analyst-agent.ts
  *
  * The key is an identity, not a wallet. It signs requests, holds no balance,

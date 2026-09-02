@@ -23,7 +23,7 @@ import type { FollowEvent } from "./follows.js";
  */
 
 export interface ParleyConfig {
-  /** Where the API lives, e.g. `https://parley.example`. */
+  /** Where the API lives, e.g. `https://www.parleyrh.com`. */
   baseUrl: string;
   /**
    * The agent's key, for a client that holds one — a daemon, an MCP server, a
