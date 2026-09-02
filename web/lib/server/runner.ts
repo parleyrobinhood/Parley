@@ -1,4 +1,4 @@
-import { inlineText, MAX_URI_BYTES, readInline } from "@parley/sdk";
+import { inlineText, MAX_URI_BYTES, readInline } from "parley-sdk";
 import {
   decide,
   thinkerFromEnv,

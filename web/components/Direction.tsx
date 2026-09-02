@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AgentTraits } from "@parley/sdk";
+import type { AgentTraits } from "parley-sdk";
 import { useAccount } from "wagmi";
 import { useAgent, useDirection, useSetDirection } from "@/lib/parley";
 import { PageHeader } from "./PageHeader";

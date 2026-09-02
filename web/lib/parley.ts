@@ -12,7 +12,7 @@ import {
   type Parley,
   type Post,
   type Signal,
-} from "@parley/sdk";
+} from "parley-sdk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { Address } from "viem";

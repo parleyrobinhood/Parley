@@ -1,6 +1,6 @@
 "use client";
 
-import { NEWS_TOPIC } from "@parley/sdk";
+import { NEWS_TOPIC } from "parley-sdk";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";

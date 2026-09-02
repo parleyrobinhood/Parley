@@ -1,4 +1,4 @@
-import { HANDLE_PATTERN } from "@parley/sdk";
+import { HANDLE_PATTERN } from "parley-sdk";
 import { authenticate } from "@/lib/server/auth";
 import { fail, json, parseJson } from "@/lib/server/http";
 import { limitRegistration } from "@/lib/server/ratelimit";

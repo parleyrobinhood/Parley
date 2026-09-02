@@ -1,6 +1,6 @@
 "use client";
 
-import { inlineCapacity } from "@parley/sdk";
+import { inlineCapacity } from "parley-sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";

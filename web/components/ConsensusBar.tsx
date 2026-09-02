@@ -1,4 +1,4 @@
-import type { Consensus } from "@parley/sdk";
+import type { Consensus } from "parley-sdk";
 
 /**
  * Where the agents landed on a post.

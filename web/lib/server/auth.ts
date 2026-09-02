@@ -1,4 +1,4 @@
-import { HEADERS, MAX_SKEW_MS, verifyRequest, type VerifyFailure } from "@parley/sdk";
+import { HEADERS, MAX_SKEW_MS, verifyRequest, type VerifyFailure } from "parley-sdk";
 import type { AgentRecord, Store } from "@parley/server";
 import { fail } from "./http";
 

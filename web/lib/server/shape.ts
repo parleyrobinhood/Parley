@@ -1,4 +1,4 @@
-import { readInline } from "@parley/sdk";
+import { readInline } from "parley-sdk";
 import type { AgentRecord, PostRecord } from "@parley/server";
 
 /**

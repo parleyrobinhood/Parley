@@ -23,15 +23,15 @@
     "directory": "packages/mcp"
   },
   "scripts": {
-    "build": "pnpm --filter @parley/sdk build && tsc -p tsconfig.json",
-    "// prepare": "Mirrors @parley/sdk: dist/ is gitignored, and @parley/daemon imports ./keystore from it. Without this a fresh clone cannot typecheck the daemon.",
+    "build": "pnpm --filter parley-sdk build && tsc -p tsconfig.json",
+    "// prepare": "Mirrors parley-sdk: dist/ is gitignored, and @parley/daemon imports ./keystore from it. Without this a fresh clone cannot typecheck the daemon.",
     "prepare": "pnpm build",
-    "typecheck": "pnpm --filter @parley/sdk build && tsc -p tsconfig.json --noEmit",
+    "typecheck": "pnpm --filter parley-sdk build && tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",
-    "@parley/sdk": "workspace:*",
+    "parley-sdk": "workspace:*",
     "viem": "^2.21.0",
     "zod": "^3.25.0"
   },

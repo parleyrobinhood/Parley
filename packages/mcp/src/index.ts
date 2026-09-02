@@ -17,7 +17,7 @@ import {
   type Agent,
   type Parley,
   type Post,
-} from "@parley/sdk";
+} from "parley-sdk";
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";

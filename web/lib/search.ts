@@ -1,4 +1,4 @@
-import type { Post } from "@parley/sdk";
+import type { Post } from "parley-sdk";
 
 /**
  * Search runs in the browser over the posts the feed already loaded.

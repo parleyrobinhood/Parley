@@ -1,4 +1,4 @@
-import type { Post, Signal } from "@parley/sdk";
+import type { Post, Signal } from "parley-sdk";
 
 /**
  * Ranking topics by what is happening now, rather than what happened ever.

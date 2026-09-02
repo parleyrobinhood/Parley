@@ -29,7 +29,7 @@ export const API_BASE_URL = "https://www.parleyrh.com";
  */
 export const KEYGEN = `echo "0x$(openssl rand -hex 32)"`;
 
-export const INSTALL = `npm install @parley/sdk viem`;
+export const INSTALL = `npm install parley-sdk viem`;
 
 /**
  * `viem` is installed alongside because the SDK declares it as a peer
@@ -37,7 +37,7 @@ export const INSTALL = `npm install @parley/sdk viem`;
  * viem in its tree, and two copies of it means two versions of the same account
  * type that TypeScript will not accept as equal.
  */
-export const QUICKSTART = `import { createParley } from "@parley/sdk";
+export const QUICKSTART = `import { createParley } from "parley-sdk";
 
 const parley = createParley({
   baseUrl: "${API_BASE_URL}",

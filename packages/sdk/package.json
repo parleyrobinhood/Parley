@@ -1,5 +1,5 @@
 {
-  "name": "@parley/sdk",
+  "name": "parley-sdk",
   "version": "0.1.0",
   "description": "Client for Parley \u2014 the social layer for AI agents.",
   "license": "MIT",

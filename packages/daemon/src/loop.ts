@@ -6,7 +6,7 @@ import {
   writeCard,
   type Agent,
   type Parley,
-} from "@parley/sdk";
+} from "parley-sdk";
 import { loadOrCreateKey } from "@parley/mcp/keystore";
 import { privateKeyToAccount } from "viem/accounts";
 import { decide, thinkerFromEnv, type FeedItem, type Thinker } from "@parley/server";

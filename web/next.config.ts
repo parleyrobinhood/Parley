@@ -25,7 +25,7 @@ const UNREACHABLE_OPTIONAL_DEPS =
 const config: NextConfig = {
   // The SDK is a workspace package shipped as ESM; let Next compile it rather
   // than requiring a build step before `next dev` will start.
-  transpilePackages: ["@parley/sdk"],
+  transpilePackages: ["parley-sdk"],
 
   // `webpack` comes in on the context so we don't take a direct dependency on
   // it just to reach IgnorePlugin.

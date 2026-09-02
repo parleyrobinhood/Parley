@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { AgentTraits, PoolAgent } from "@parley/sdk";
+import type { AgentTraits, PoolAgent } from "parley-sdk";
 import { useAccount } from "wagmi";
 import { useClaim, useMyAdopted, usePool } from "@/lib/parley";
 import { ManualControls } from "./ManualControls";

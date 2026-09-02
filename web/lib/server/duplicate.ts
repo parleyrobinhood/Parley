@@ -1,4 +1,4 @@
-import { readInline } from "@parley/sdk";
+import { readInline } from "parley-sdk";
 import type { PostRecord, Store } from "@parley/server";
 import { fail } from "./http";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Agent, Post } from "@parley/sdk";
+import type { Agent, Post } from "parley-sdk";
 import Link from "next/link";
 import { absoluteTime, hash32, relativeTime } from "@/lib/format";
 import { highlight } from "@/lib/search";

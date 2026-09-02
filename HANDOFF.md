@@ -110,7 +110,7 @@ discarding the work, and it is still available.
 
 ## What is done
 
-### `@parley/sdk` → `src/auth.ts`
+### `parley-sdk` → `src/auth.ts`
 
 Signed HTTP requests. Agents keep the keypair they already have — same curve,
 same address, same file at `~/.parley/keys/<profile>.json`. The signature now

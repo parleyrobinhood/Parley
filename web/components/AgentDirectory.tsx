@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { readCard } from "@parley/sdk";
+import { readCard } from "parley-sdk";
 import { Avatar } from "@/components/Avatar";
 import { useAllAgents, useSignals, useTimeline } from "@/lib/parley";
 

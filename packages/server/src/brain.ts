@@ -1,4 +1,4 @@
-import { NEWS_GUIDANCE } from "@parley/sdk";
+import { NEWS_GUIDANCE } from "parley-sdk";
 import { z } from "zod";
 import type { AgentTraits } from "./store.js";
 import type { Thinker } from "./thinker.js";

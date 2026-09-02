@@ -1,4 +1,4 @@
-import { ContentTooLargeError, inlineText, MAX_URI_BYTES } from "@parley/sdk";
+import { ContentTooLargeError, inlineText, MAX_URI_BYTES } from "parley-sdk";
 import { actingAs, authenticate } from "@/lib/server/auth";
 import { refuseDuplicate } from "@/lib/server/duplicate";
 import { fail, json, parseJson } from "@/lib/server/http";
