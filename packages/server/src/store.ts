@@ -328,6 +328,22 @@ export interface Store {
    * `now` is injectable so the behaviour can be tested without sleeping, the
    * same way `verifyRequest` takes one.
    */
+  /**
+   * Hand back the most recent attempt in a bucket, as though it never happened.
+   *
+   * For work that was charged up front and then did not occur — a model call
+   * billed before it was made, which then failed transiently. Without this the
+   * caller has to choose between charging for outages and not charging until
+   * after the fact, and the second loses the limit's whole purpose: the point
+   * of charging first is that a crash mid-call cannot be used to get free
+   * attempts.
+   *
+   * Removes one attempt, not all of them, and reports whether there was one to
+   * remove. Refunding a bucket that was never charged is a no-op rather than an
+   * error, because the caller usually cannot tell.
+   */
+  refundRateLimit(input: { bucket: string; subject: string }): Promise<boolean>;
+
   rateLimit(input: {
     /** What is being limited, e.g. "register". Keeps counters from colliding. */
     bucket: string;

@@ -480,6 +480,23 @@ export class MemoryStore implements Store {
 
   /* abuse */
 
+  async refundRateLimit(input: { bucket: string; subject: string }) {
+    const key = `${input.bucket}:${input.subject}`;
+    const kept = this.attempts.get(key);
+    if (!kept || kept.length === 0) return false;
+
+    // The newest, because that is the one the caller just made. Dropping the
+    // oldest would shift the window forward and quietly extend the block.
+    let newestAt = 0;
+    for (let i = 1; i < kept.length; i += 1) {
+      if (kept[i]! > kept[newestAt]!) newestAt = i;
+    }
+    kept.splice(newestAt, 1);
+    this.attempts.set(key, kept);
+    this.persist();
+    return true;
+  }
+
   async rateLimit(input: {
     bucket: string;
     subject: string;

@@ -109,10 +109,15 @@ async function tick(
 
   const label = { agentId: config.agentId, handle: agent.handle };
 
-  // The budget is checked before the model call, because the model call is the
-  // thing that costs money. A refused think must not be recorded as a wake
-  // either, or a budgeted-out agent would silently restart its idle timer and
-  // never think again once it recovered.
+  // Charged before the model call, not after: charging afterwards would mean a
+  // crash mid-call bought a free attempt, and the whole point of a budget is
+  // that it cannot be escaped by failing. The cost of charging first is that a
+  // call which never happens has still been paid for — refunded below, on the
+  // one failure mode where nothing was spent.
+  //
+  // A refused think is also not recorded as a wake, or a budgeted-out agent
+  // would silently restart its idle timer and never think again once it
+  // recovered.
   const budget = await store.rateLimit({
     bucket: "think",
     subject: String(config.agentId),
@@ -145,16 +150,27 @@ async function tick(
       { feed, said, actionsLeftThisHour: config.maxActionsPerHour },
     );
   } catch (cause) {
-    // A rate limit or an outage says nothing about this agent, so it must not
-    // cost it its turn — leave it due and it is picked up by the next sweep.
-    // Marking it woken here would send every agent caught in one quota
-    // exhaustion to the back of a six-hour idle period.
+    // A rate limit or an outage says nothing about this agent, so it must cost
+    // it neither its turn nor its budget. Not marked woken, so it stays due for
+    // the next sweep; and refunded, because the think it was charged for never
+    // happened.
+    //
+    // Refunding matters more than it looks. Without it an outage is not a pause
+    // but a spend: every sweep charges an agent, the call fails, and after
+    // `dailyThinkBudget` attempts — three, by default — the agent reports "out
+    // of thinks for today" and stops trying until the window rolls. A provider
+    // having a bad afternoon turned into a silent network for over a week that
+    // way, with the cron running and succeeding the whole time. The turn was
+    // being protected and the budget was not; the two decisions were made in
+    // different places and disagreed.
     if (cause instanceof TransientThinkerError) {
+      await store.refundRateLimit({ bucket: "think", subject: String(config.agentId) });
       return { ...label, action: "deferred", detail: (cause as Error).message.split("\n")[0] };
     }
 
-    // A real failure does cost the turn: retrying a prompt the model refused
-    // or could not parse would fail the same way every sweep, forever.
+    // A real failure does cost the turn, and keeps the charge: the model was
+    // reached and answered, it just answered with something unusable. Retrying
+    // a prompt it refused or could not parse would fail identically forever.
     await store.markWoken(config.agentId);
     return { ...label, action: "failed", detail: (cause as Error).message.split("\n")[0] };
   }

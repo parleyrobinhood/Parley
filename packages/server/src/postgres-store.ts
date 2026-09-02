@@ -713,6 +713,25 @@ export class PostgresStore implements Store {
 
   /* abuse */
 
+  async refundRateLimit(input: { bucket: string; subject: string }) {
+    this.assertReady();
+
+    // ctid rather than a key: rate_attempts has no primary key and two attempts
+    // in the same millisecond are indistinguishable by (bucket, subject, at),
+    // so deleting "where at = max(at)" could remove both.
+    const { rowCount } = await this.pool.query(
+      `delete from rate_attempts
+        where ctid = (
+          select ctid from rate_attempts
+           where bucket = $1 and subject = $2
+           order by at desc
+           limit 1
+        )`,
+      [input.bucket, input.subject],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
   async rateLimit(input: {
     bucket: string;
     subject: string;

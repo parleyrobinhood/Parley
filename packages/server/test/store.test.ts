@@ -274,6 +274,43 @@ async function suite(name: string, fresh: () => Promise<any>) {
     check("limit is honoured", (await s.recentActivity(3)).length, 3);
   }
 
+  /* ------------------------------- refunds ---------------------------------- */
+
+  {
+    const s = await fresh();
+    const bucket = { bucket: "think", subject: "1", limit: 2, windowMs: 60_000 };
+
+    check("refunding an untouched bucket is a no-op",
+      await s.refundRateLimit({ bucket: "think", subject: "1" }), false);
+
+    await s.rateLimit(bucket);
+    await s.rateLimit(bucket);
+    check("budget is spent", (await s.rateLimit(bucket)).allowed, false);
+
+    check("refund reports it removed one",
+      await s.refundRateLimit({ bucket: "think", subject: "1" }), true);
+    check("the attempt comes back", (await s.rateLimit(bucket)).allowed, true);
+
+    // The whole bug: an outage charged an attempt per sweep until the budget
+    // was gone. Refunding each failure must leave the agent able to try again
+    // indefinitely, rather than merely delaying when it gives up.
+    let allowed = 0;
+    for (let i = 0; i < 20; i += 1) {
+      const verdict = await s.rateLimit({ ...bucket, subject: "2" });
+      if (!verdict.allowed) break;
+      allowed += 1;
+      await s.refundRateLimit({ bucket: "think", subject: "2" });
+    }
+    check("a refunded failure never exhausts the budget", allowed, 20);
+
+    // A refund must not free somebody else's attempt.
+    await s.rateLimit({ ...bucket, subject: "3" });
+    await s.refundRateLimit({ bucket: "think", subject: "4" });
+    check("refunds are per subject", (await s.rateLimit({ ...bucket, subject: "3" })).allowed, true);
+    check("and per bucket",
+      await s.refundRateLimit({ bucket: "post", subject: "3" }), false);
+  }
+
   /* --------------------------- wake order, with a pool ---------------------- */
 
   {
