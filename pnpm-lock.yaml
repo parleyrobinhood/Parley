@@ -13,12 +13,12 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.117.1
         version: 0.117.1(zod@3.25.76)
-      '@parley/mcp':
-        specifier: workspace:*
-        version: link:../mcp
       '@parley/server':
         specifier: workspace:*
         version: link:../server
+      parley-mcp:
+        specifier: workspace:*
+        version: link:../mcp
       parley-sdk:
         specifier: workspace:*
         version: link:../sdk
@@ -42,8 +42,8 @@ importers:
         specifier: ^1.20.0
         version: 1.30.0(zod@3.25.76)
       parley-sdk:
-        specifier: workspace:*
-        version: link:../sdk
+        specifier: ^0.1.0
+        version: 0.1.0(viem@2.55.13(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76))
       viem:
         specifier: ^2.21.0
         version: 2.55.13(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
@@ -2211,6 +2211,11 @@ packages:
   p-try@2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
     engines: {node: '>=6'}
+
+  parley-sdk@0.1.0:
+    resolution: {integrity: sha512-0oqjV14qKjqUW6EMPa8dJgDeyJWq2IAG0Et8OglDUAE3PKPmQf7CoquqAsQF820PGXHFK4IS59+Op6boYKKj8w==}
+    peerDependencies:
+      viem: ^2.21.0
 
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
@@ -5884,6 +5889,10 @@ snapshots:
       p-limit: 2.3.0
 
   p-try@2.2.0: {}
+
+  parley-sdk@0.1.0(viem@2.55.13(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)):
+    dependencies:
+      viem: 2.55.13(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@3.25.76)
 
   parseurl@1.3.3: {}
 

@@ -13,7 +13,7 @@
     "build": "pnpm --filter @parley/web build",
     "// typecheck": "Packages resolve each other through dist/, which is gitignored \u2014 so every workspace dep must be built before anything is typechecked. Doing it here, topologically, is what keeps a cold clone (and CI) from failing on module resolution.",
     "typecheck": "pnpm packages:build && pnpm -r typecheck",
-    "packages:build": "pnpm --filter parley-sdk build && pnpm --filter @parley/server build && pnpm --filter @parley/mcp build && pnpm --filter @parley/daemon build",
+    "packages:build": "pnpm --filter parley-sdk build && pnpm --filter @parley/server build && pnpm --filter parley-mcp build && pnpm --filter @parley/daemon build",
     "sdk:build": "pnpm --filter parley-sdk build",
     "test": "pnpm --filter parley-sdk test && pnpm --filter @parley/server test"
   },

@@ -24,7 +24,11 @@ import { keyLocation, loadOrCreateKey } from "./keystore.js";
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
 
-const API = process.env["PARLEY_API"] ?? "http://localhost:3000";
+// Defaults to the live network, not localhost. This ships to people who did
+// not clone the repo: a default of http://localhost:3000 means every install
+// that forgets PARLEY_API fails against a machine that is not running Parley,
+// with a connection error that says nothing about why.
+const API = process.env["PARLEY_API"] ?? "https://www.parleyrh.com";
 
 const key = loadOrCreateKey(profile);
 const account = privateKeyToAccount(key.privateKey);

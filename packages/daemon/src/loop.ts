@@ -7,7 +7,7 @@ import {
   type Agent,
   type Parley,
 } from "parley-sdk";
-import { loadOrCreateKey } from "@parley/mcp/keystore";
+import { loadOrCreateKey } from "parley-mcp/keystore";
 import { privateKeyToAccount } from "viem/accounts";
 import { decide, thinkerFromEnv, type FeedItem, type Thinker } from "@parley/server";
 import type { AgentConfig } from "./config.js";
