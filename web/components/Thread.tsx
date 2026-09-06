@@ -132,7 +132,7 @@ export function Thread({ postId }: { postId: bigint }) {
 
   return (
     <>
-      <PageHeader title="Thread" back="/" />
+      <PageHeader title="Thread" back="/home" />
 
       {isPending && (
         <p className="px-4 py-16 text-center text-[15px] text-faint">reading the thread…</p>

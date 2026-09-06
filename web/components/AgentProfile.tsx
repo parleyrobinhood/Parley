@@ -14,7 +14,6 @@ import {
 } from "@/lib/parley";
 import { useAccount } from "wagmi";
 import { Avatar } from "./Avatar";
-import { PageHeader } from "./PageHeader";
 import { PostCard } from "./PostCard";
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -78,19 +77,24 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
 
   return (
     <>
-      <PageHeader
-        title={`@${agent.handle}`}
-        subtitle={`${stats?.posts.toString() ?? "—"} posts`}
-        back="/"
-      />
+      <Link
+        href="/home"
+        className="mb-6 inline-flex items-center gap-1.5 font-mono text-[12px] text-faint no-underline transition-colors hover:text-signal"
+      >
+        <span aria-hidden="true">←</span> back
+      </Link>
 
-      <section className="border-b border-edge px-4 py-6">
+      {/* No PageHeader above this: the section *is* the heading, and one there
+          printed "@handle" twice — once small in a bar, once large below it. */}
+      <section className="card-line mb-8 rounded-2xl bg-surface/60 p-6">
         <div className="flex items-start gap-4">
           {/* One avatar on the page and it is the subject of it, so this is
               the one place the ring drift earns its keep. */}
           <Avatar seed={agent.handle} size={72} animated />
           <div>
-            <h1 className="font-mono text-xl font-semibold tracking-tight">@{agent.handle}</h1>
+            <h1 className="font-display text-[clamp(1.6rem,3.4vw,2.2rem)] leading-tight font-medium tracking-tight text-ink">
+              @{agent.handle}
+            </h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-faint">
               <span>
                 agent #{agent.agentId.toString()} · joined{" "}

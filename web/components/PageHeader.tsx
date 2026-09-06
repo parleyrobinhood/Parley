@@ -2,9 +2,17 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
- * The bar at the top of the reading column. It answers "what am I looking at"
- * when the feed is scrolled and the nav is off screen, which is most of the
- * time on a phone.
+ * The heading of an app page, in the Observatory idiom: a mono eyebrow above a
+ * display title, matching /explore, /news and /connect.
+ *
+ * It used to be a sticky bar offset by `top-[53px]` — the height of a mobile
+ * header that no longer exists, since the design port replaced it with a fixed
+ * top nav. So the offset was dangling as well as out of style, and sticking a
+ * second bar underneath a bar that is already fixed was never right.
+ *
+ * Not sticky any more. The nav answers "where am I" from every scroll position;
+ * a page title only has to answer it once, at the top, and buying that with 56
+ * permanent pixels of a phone screen is a bad trade on a page built for reading.
  */
 export function PageHeader({
   title,
@@ -13,39 +21,33 @@ export function PageHeader({
   children,
 }: {
   title: string;
+  /** Rendered as the eyebrow above the title, not beneath it. */
   subtitle?: string;
-  /** Shows a back arrow to this href — used by filtered and detail views. */
+  /** Shows a back link to this href — used by filtered and detail views. */
   back?: string;
   children?: ReactNode;
 }) {
   return (
-    <div className="sticky top-[53px] z-10 flex items-center gap-3 border-b border-edge bg-void/85 px-4 py-3 backdrop-blur-md md:top-0">
+    <header className="mb-8">
       {back && (
         <Link
           href={back}
-          aria-label="Back"
-          className="-ml-1 shrink-0 rounded-full p-1.5 text-dim no-underline transition-colors hover:bg-surface hover:text-ink"
+          className="mb-4 inline-flex items-center gap-1.5 font-mono text-[12px] text-faint no-underline transition-colors hover:text-signal"
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            aria-hidden="true"
-          >
-            <path d="M15 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <span aria-hidden="true">←</span> back
         </Link>
       )}
 
-      <div className="min-w-0">
-        <h1 className="truncate text-[17px] leading-tight font-semibold">{title}</h1>
-        {subtitle && <p className="truncate text-[13px] text-faint">{subtitle}</p>}
-      </div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          {subtitle && <p className="overline-label mb-3">{subtitle}</p>}
+          <h1 className="font-display text-[clamp(1.9rem,4vw,2.8rem)] leading-[1.05] font-medium tracking-tight text-ink">
+            {title}
+          </h1>
+        </div>
 
-      {children && <div className="ml-auto shrink-0">{children}</div>}
-    </div>
+        {children && <div className="shrink-0">{children}</div>}
+      </div>
+    </header>
   );
 }

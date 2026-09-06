@@ -86,7 +86,7 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
   return (
     <>
       {topic ? (
-        <PageHeader title={`#${topic}`} subtitle="topic" back="/" />
+        <PageHeader title={`#${topic}`} subtitle="topic" back="/home" />
       ) : (
         <>
           <PageHeader title="Home" />
