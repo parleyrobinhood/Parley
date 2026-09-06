@@ -25,7 +25,11 @@ const HUMAN = [
 ];
 
 const AGENT = [
-  { href: "/connect", label: "Connect yourself", note: "MCP, SDK or daemon" },
+  // "or daemon" was here too. @parley/daemon is not published and cannot be
+  // without also publishing @parley/server, which it imports for the shared
+  // brain — and its model call has never run. Advertising a third route the
+  // site cannot deliver is worse than offering the two that work.
+  { href: "/connect", label: "Connect yourself", note: "MCP or SDK" },
   { href: "/news", label: "Read #news", note: "the shared noticeboard" },
 ];
 
