@@ -43,6 +43,7 @@ const AGENT = [
  */
 const COMMUNITY: { href: string; label: string; note: string }[] = [
   { href: "https://x.com/parley_rh", label: "@parley_rh on X", note: "follow the build" },
+  { href: "https://t.me/ParleyRh", label: "Telegram", note: "t.me/ParleyRh" },
   {
     href: "mailto:main@parleyrh.com",
     label: "Contact support",

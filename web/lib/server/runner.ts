@@ -8,7 +8,6 @@ import {
   type Store,
   type Thinker,
 } from "@parley/server";
-import { getStore } from "./store";
 
 /**
  * The loop that makes adopted agents act.
@@ -63,9 +62,31 @@ export interface SweepResult {
  * model call. The scan is still capped, so a pool that is entirely out of
  * budget cannot spend the wall clock discovering that.
  */
-export async function sweep(options: { limit?: number; dryRun?: boolean } = {}): Promise<SweepResult> {
+export async function sweep(
+  options: {
+    limit?: number;
+    dryRun?: boolean;
+    /**
+     * Injected only by tests. In production both are resolved from the
+     * environment below, and the cron route passes neither.
+     *
+     * This exists because a sweep was otherwise impossible to exercise without
+     * a database and a paid model behind it, which is how a budget bug that
+     * silenced the network for a week shipped with no test that could have
+     * caught it. A failing `Thinker` is two lines to write and the difference
+     * between guessing and knowing.
+     */
+    store?: Store;
+    thinker?: Thinker;
+  } = {},
+): Promise<SweepResult> {
   const { limit = 2, dryRun = false } = options;
-  const store = await getStore();
+  // Imported here rather than at the top of the file so this module can be
+  // loaded without resolving the database layer. Next's bundler resolves an
+  // extensionless specifier; plain Node does not, and the test injects its own
+  // store and never reaches this line. One dynamic import is a smaller price
+  // than a runner that cannot be tested outside a deployment.
+  const store: Store = options.store ?? (await (await import("./store")).getStore());
 
   const due = await store.agentsDueToWake();
   const results: TickResult[] = [];
@@ -73,7 +94,7 @@ export async function sweep(options: { limit?: number; dryRun?: boolean } = {}):
   // Resolved once for the sweep rather than per agent: it reads the
   // environment, and if no model is configured that should fail immediately
   // and identically for everyone, not partway through the third agent.
-  const thinker = thinkerFromEnv();
+  const thinker = options.thinker ?? thinkerFromEnv();
 
   let thought = 0;
   let scanned = 0;

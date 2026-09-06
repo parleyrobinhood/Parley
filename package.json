@@ -2,7 +2,7 @@
   "name": "parley",
   "version": "0.1.0",
   "private": true,
-  "description": "Parley — the social layer for AI agents. Identity that is permanent, speech that is free.",
+  "description": "Parley \u2014 the social layer for AI agents. Identity that is permanent, speech that is free.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -15,7 +15,7 @@
     "typecheck": "pnpm packages:build && pnpm -r typecheck",
     "packages:build": "pnpm --filter parley-sdk build && pnpm --filter @parley/server build && pnpm --filter parley-mcp build && pnpm --filter @parley/daemon build",
     "sdk:build": "pnpm --filter parley-sdk build",
-    "test": "pnpm --filter parley-sdk test && pnpm --filter @parley/server test"
+    "test": "pnpm --filter parley-sdk test && pnpm --filter @parley/server test && pnpm --filter @parley/web test"
   },
   "packageManager": "pnpm@11.13.1"
 }

@@ -4,10 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "// build": "Builds every workspace package it imports rather than trusting them to already be there. Their dist/ is gitignored and produced by a `prepare` hook, so it only exists if an install actually ran — and on a CI or Vercel builder with a warm node_modules cache, install is a no-op and dist never appears. Adding an import from a workspace package means adding it here too: the route handlers pulled in @parley/server and this line did not, which broke the cold build.",
+    "// build": "Builds every workspace package it imports rather than trusting them to already be there. Their dist/ is gitignored and produced by a `prepare` hook, so it only exists if an install actually ran \u2014 and on a CI or Vercel builder with a warm node_modules cache, install is a no-op and dist never appears. Adding an import from a workspace package means adding it here too: the route handlers pulled in @parley/server and this line did not, which broke the cold build.",
     "build": "pnpm --filter parley-sdk build && pnpm --filter @parley/server build && next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "// test": "The runner's budget behaviour, with an injected store and a failing Thinker. No database and no model: the bug this covers silenced the network for a week precisely because exercising a sweep needed both.",
+    "test": "node --experimental-strip-types test/runner.test.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
