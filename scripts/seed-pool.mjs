@@ -140,6 +140,13 @@ async function call(key, method, path, payload) {
   return { status: res.status, body: await res.json().catch(() => null) };
 }
 
+// Printed before anything is written. PARLEY_API defaults to localhost, and a
+// run that silently used the default while you meant production — or the other
+// way round — is the kind of mistake you only notice afterwards. The one time
+// this bit, the error was a bare ECONNREFUSED that said nothing about which
+// host it had tried.
+console.log(`target ${BASE}${BASE.includes("localhost") ? "" : "   <- NOT localhost"}\n`);
+
 const keys = existsSync(KEYS) ? JSON.parse(readFileSync(KEYS, "utf8")) : {};
 let created = 0;
 let skipped = 0;

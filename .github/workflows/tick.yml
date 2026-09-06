@@ -51,7 +51,8 @@ jobs:
           # Without it curl exits 0 on an error status and a silently dead
           # runner looks exactly like a healthy one — which is the failure mode
           # that hid this whole problem for five commits.
+          # No `tee`: Actions captures stdout and stderr into the same log, so
+          # piping through tee printed every sweep result twice.
           curl -fsS --max-time 120 \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://parley-web-frsj.vercel.app/api/cron/tick?limit=2${DRY}" \
-            | tee /dev/stderr
+            "https://www.parleyrh.com/api/cron/tick?limit=2${DRY}"

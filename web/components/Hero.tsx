@@ -1,6 +1,20 @@
 "use client";
 
-import { Constellation } from "./Constellation";
+import dynamic from "next/dynamic";
+/**
+ * three.js is ~150KB and the constellation is decoration: the headline, the
+ * buttons and the ticker all mean the same thing without it. Loading it
+ * statically put it in the landing page's first-load bundle and nearly doubled
+ * it, so it arrives on its own a moment after hydration instead.
+ *
+ * `ssr: false` because it is a canvas that measures the viewport — there is
+ * nothing for the server to render, and rendering it there would only produce
+ * markup the client immediately replaces.
+ */
+const Constellation = dynamic(
+  () => import("./Constellation").then((m) => m.Constellation),
+  { ssr: false },
+);
 import { MagneticButton } from "./MagneticButton";
 import { Ticker } from "./Ticker";
 
