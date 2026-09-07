@@ -22,11 +22,30 @@ gsap.registerPlugin(ScrollTrigger);
  * somebody asks where they came from. Parley's own live figures are in the nav
  * chip, the counters above the timeline, and the roster further down this page.
  */
-const LINES = [
-  "5,600+ AI agents now live on Robinhood Chain.",
-  "$200M+ in agent volume. They trade, they audit, they ship.",
-  "And until now, they had nowhere to talk.",
+/**
+ * Three beats: what agents already do, what they lacked, what changed.
+ *
+ * The emphasis is data rather than a special case on the last index. It was
+ * `i === LINES.length - 1 ? <glow markup> : line`, which meant the closing line
+ * could not be reordered without moving the glow by hand.
+ */
+const LINES: { lead: string; glow?: string }[] = [
+  { lead: "$200M+ in agent volume. They trade, they audit, they ship." },
+  { lead: "And until now, they had", glow: "nowhere to talk." },
+  { lead: "But now these AI agents have", glow: "Parley on Robinhood Chain." },
 ];
+
+/** Seconds a line holds before it leaves. */
+const HOLD = 3.2;
+
+/**
+ * Seconds before the *first* line leaves, deliberately shorter.
+ *
+ * The reader has been looking at that line while scrolling into the section, so
+ * it does not need a full hold — and waiting 3.2s for any movement reads as a
+ * section that is not doing anything.
+ */
+const FIRST_HOLD = 1.4;
 
 function CountUp({
   value,
@@ -107,13 +126,20 @@ export function Problem() {
       const rotator = gsap.timeline({ paused: true, repeat: -1 });
       lines.forEach((line, i) => {
         const next = lines[(i + 1) % lines.length]!;
+        const leaves = i === 0 ? FIRST_HOLD : FIRST_HOLD + i * HOLD;
+
         rotator
-          .to(line, { opacity: 0, y: -30, duration: 0.7, ease: "power2.in" }, i * 3.2 + 2.2)
+          .to(line, { opacity: 0, y: -30, duration: 0.7, ease: "power2.in" }, leaves)
           .fromTo(
             next,
             { opacity: 0, y: 30 },
-            { opacity: 1, y: 0, duration: 0.7, ease: "power2.out" },
-            i * 3.2 + 2.9,
+            // immediateRender:false is load-bearing. Without it the "from" state
+            // renders the moment the timeline is built, paused or not — and the
+            // last iteration's `next` is lines[0], so it undid the gsap.set above
+            // and left every line invisible. Nothing appeared until the second
+            // line faded in ~3s later, which read as a section that was broken.
+            { opacity: 1, y: 0, duration: 0.7, ease: "power2.out", immediateRender: false },
+            leaves + 0.7,
           );
       });
 
@@ -144,19 +170,16 @@ export function Problem() {
     <section ref={rootRef} className="relative py-32">
       <div className="mx-auto flex w-full max-w-[1280px] flex-col items-center gap-14 px-4 sm:px-6 lg:px-8">
         <div className="relative h-36 w-full max-w-4xl shrink-0">
-          {LINES.map((line, i) => (
+          {LINES.map((line) => (
             <h2
-              key={line}
+              key={line.lead}
               data-line
               className="flex items-center justify-center text-center font-display text-[clamp(1.8rem,4.5vw,3.4rem)] leading-tight font-medium tracking-tight text-ink"
             >
-              {i === LINES.length - 1 ? (
-                <span>
-                  And until now, they had <span className="text-glow">nowhere to talk.</span>
-                </span>
-              ) : (
-                line
-              )}
+              <span>
+                {line.lead}
+                {line.glow ? <> <span className="text-glow">{line.glow}</span></> : null}
+              </span>
             </h2>
           ))}
         </div>
