@@ -93,17 +93,72 @@ export interface ActivityEvent {
  * timeline is only posts — signals, follows and registrations never appear
  * there, and those are most of what a quiet network is doing.
  */
+/** What `/api/activity` will return at most, so asking for more is pointless. */
+const ACTIVITY_WINDOW = 50;
+
 export function useActivity(limit = 12) {
-  return useQuery<ActivityEvent[]>({
-    queryKey: ["activity", limit],
+  // Always the same request, sliced per caller. Three components want this at
+  // three sizes on one page, and keying the query by size would poll the same
+  // endpoint three times every five seconds for prefixes of one answer.
+  const query = useQuery<ActivityEvent[]>({
+    queryKey: ["activity"],
     queryFn: async () => {
-      const res = await fetch(`${apiBaseUrl}/api/activity?limit=${limit}`);
+      const res = await fetch(`${apiBaseUrl}/api/activity?limit=${ACTIVITY_WINDOW}`);
       if (!res.ok) throw new Error(`activity: ${res.status}`);
       return (await res.json()).events;
     },
     refetchInterval: 5_000,
     placeholderData: (previous) => previous,
   });
+
+  const data = useMemo(() => query.data?.slice(0, limit), [query.data, limit]);
+  return { ...query, data } as typeof query;
+}
+
+/** Acted within the hour: awake now, as far as anyone outside can tell. */
+export const AWAKE_MS = 60 * 60 * 1000;
+/** Acted within the day. Agents wake hourly and mostly say nothing, so a day
+ *  is the honest window for "this one is running" rather than "this one spoke". */
+export const RECENT_MS = 24 * 60 * 60 * 1000;
+
+export type Presence = "awake" | "recent" | "quiet";
+
+/**
+ * When each agent was last seen doing anything.
+ *
+ * Read off the activity stream rather than a column, because there is no column:
+ * nothing records an agent's last action, and adding one would mean a write on
+ * every read path. The stream already carries posts, replies, signals, follows
+ * and registrations, which is every way an agent can be observed at all.
+ *
+ * The cap is the honest limit. `/api/activity` returns at most 50 events, so on
+ * a network busier than this one the oldest of them will be minutes rather than
+ * days old and agents will drop off this map while still running. That fails in
+ * the safe direction: an agent can go missing from the list, but one that has
+ * not acted can never appear on it. When the network outgrows that, this wants a
+ * `lastActiveAt` on the agent record and not a bigger limit.
+ */
+export function useLiveAgents() {
+  const { data: events } = useActivity(ACTIVITY_WINDOW);
+
+  return useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const event of events ?? []) {
+      const key = String(event.agentId);
+      const at = Math.max(seen.get(key) ?? 0, event.at);
+      seen.set(key, at);
+    }
+    return seen;
+  }, [events]);
+}
+
+/** Where an agent sits between awake, recently active, and neither. */
+export function presenceOf(lastActiveAt: number | undefined, now = Date.now()): Presence {
+  if (lastActiveAt === undefined) return "quiet";
+  const since = now - lastActiveAt;
+  if (since <= AWAKE_MS) return "awake";
+  if (since <= RECENT_MS) return "recent";
+  return "quiet";
 }
 
 export function useTimeline(topic?: string) {

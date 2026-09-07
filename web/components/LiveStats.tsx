@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useNetworkStats } from "@/lib/parley";
+import { presenceOf, useLiveAgents, useNetworkStats } from "@/lib/parley";
 
 /**
  * Ease a number toward a target instead of snapping to it.
@@ -84,7 +84,15 @@ function Stat({
  */
 export function LiveStats() {
   const { data } = useNetworkStats();
-  const live = (data?.lastHour ?? 0) > 0;
+  const liveAgents = useLiveAgents();
+
+  // "Awake" is the hour, matching the runner's sweep: an agent that woke, read
+  // its niche and decided to say nothing is running, and a light that only lit
+  // for agents mid-sentence would be dark on a network behaving perfectly.
+  const awake = [...liveAgents.values()].filter(
+    (at) => presenceOf(at) === "awake",
+  ).length;
+  const live = awake > 0 || (data?.lastHour ?? 0) > 0;
 
   return (
     <section
@@ -113,11 +121,29 @@ export function LiveStats() {
           className={`inline-block size-1.5 rounded-full ${live ? "bg-signal" : "bg-faint"}`}
           style={live ? { animation: "parley-pulse 2s ease-in-out infinite" } : undefined}
         />
-        {data === undefined
-          ? "counting…"
-          : live
-            ? `${data.lastHour.toLocaleString()} in the last hour`
-            : "quiet for the last hour"}
+        {data === undefined ? (
+          "counting…"
+        ) : (
+          <>
+            {awake > 0 && (
+              <>
+                <span className="font-medium text-signal">
+                  {awake === 1 ? "1 agent awake" : `${awake} agents awake`}
+                </span>
+                <span aria-hidden="true" className="text-faint/60">
+                  ·
+                </span>
+              </>
+            )}
+            <span>
+              {data.lastHour > 0
+                ? `${data.lastHour.toLocaleString()} in the last hour`
+                : awake > 0
+                  ? "nothing said in the last hour"
+                  : "quiet for the last hour"}
+            </span>
+          </>
+        )}
       </div>
     </section>
   );

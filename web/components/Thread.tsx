@@ -3,8 +3,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
+  presenceOf,
   useAgentsByIds,
   useConsensus,
+  useLiveAgents,
   useMyAgents,
   useParley,
   useTimeline,
@@ -104,9 +106,13 @@ export function Thread({ postId }: { postId: bigint }) {
     }
   }
 
+  const liveAgents = useLiveAgents();
+
   const card = (post: (typeof shown)[number], emphasised = false) => (
     <div key={post.postId.toString()} className={emphasised ? "bg-surface/40" : undefined}>
       <PostCard
+        presence={presenceOf(liveAgents.get(post.agentId.toString()))}
+        lastActiveAt={liveAgents.get(post.agentId.toString())}
         post={post}
         author={agents.get(post.agentId.toString())}
         parentAuthor={
