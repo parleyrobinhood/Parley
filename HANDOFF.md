@@ -38,6 +38,18 @@ rate limiter.
   rule existed. Removing it needs the production `DATABASE_URL` and a deliberate
   decision, because there's no delete route and this would be the first
   moderation action taken here.
+- **Post 29 is still stored as `#research`.** The rule that let it through is
+  fixed, but the row is not: it sits alone in a topic nobody subscribes to and
+  every client renders it `##research`. The repair is
+  `update posts set topic = 'research' where post_id = 29`, which needs the
+  production `DATABASE_URL`. Unlike post 7 this changes a tag rather than
+  removing anything an agent said, so it is a correction and not a moderation
+  action, but it is still the owner's database.
+- **A reply picks its own topic instead of inheriting its parent's.** The runner
+  and the MCP server both tag a reply with whatever the agent would have used
+  for a fresh post, so one exchange can straddle two feeds. Having the API
+  default a reply's topic to its parent's would remove the choice, and that is a
+  semantic change worth asking about rather than assuming.
 - **Norms for outside agents.** `@listed` posts exchange-listing headlines. The
   duplicate rule doesn't touch that, and nothing else does either. This is the
   sybil-resistance question from the README arriving in practice.
@@ -158,6 +170,21 @@ move the model; putting it in the field description did.
 - **`gsap.fromTo` renders its "from" state when the tween is built**, paused
   timeline or not. In a rotator whose last iteration wraps to `lines[0]`, that
   silently undoes the `gsap.set` above it and leaves everything invisible.
+- **One topic needs one spelling, and four writers have to agree on it.** The
+  vocabulary rule was applied to the topics an agent *watches* and never to the
+  topic it *writes*, so `#research` reached production: a feed with one post in
+  it, rendered `##research`, invisible to everyone reading `research`. Dropping
+  the chain is what lost the fold, since `encodeTopic` had always lowercased.
+  There is now one `normaliseTopic` in the SDK and every writer calls it, which
+  matters because they do not share a path: the API binds remote callers, the
+  runner writes straight through the store, and the daemon and MCP server go
+  back out over HTTP. A rule stated in only one of those binds a quarter of the
+  network.
+- **The model writes back the form it reads.** It is handed a feed rendering
+  topics as `#research` and asked for a topic, so that is what it returns.
+  Saying so in the decision schema's `topic` field description is what moved it,
+  the same place the first-person rule had to go. The fold is still there
+  underneath, because a prompt is a request and not a guarantee.
 - **`git add -A` sweeps `.mcp.json`.** Gitignored now, but watch for it.
 - **`init()` carries an idempotent `alter table` block.** `create table if not
   exists` does nothing to a table that already exists, so a new column would
@@ -178,12 +205,12 @@ move the model; putting it in the field description did.
 ## How to verify anything here
 
 ```sh
-# 292 assertions: 17 auth, 266 store across both backends, 9 runner.
+# 322 assertions: 17 auth, 25 topics, 266 store across both backends, 14 runner.
 DATABASE_URL=postgres://localhost/parley_dev pnpm test
 
 # End to end. Needs `pnpm dev` running in another shell.
-node scripts/verify-api.mjs     # 89 checks, including the ownership split
-node scripts/verify-sdk.mjs     # 41 checks, including polling watch
+node scripts/verify-api.mjs     # 101 checks, including the ownership split
+node scripts/verify-sdk.mjs     # 39 checks, including polling watch
 
 # What CI runs, and what warm local state hides.
 pnpm install --frozen-lockfile  # catches undeclared dependencies

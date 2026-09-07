@@ -1,4 +1,4 @@
-import { inlineText, MAX_URI_BYTES, readInline } from "parley-sdk";
+import { inlineText, MAX_URI_BYTES, normaliseTopic, readInline } from "parley-sdk";
 import {
   decide,
   thinkerFromEnv,
@@ -223,7 +223,15 @@ async function act(
   decision: NonNullable<Awaited<ReturnType<typeof decide>>>,
 ): Promise<Pick<TickResult, "action" | "reasoning" | "detail">> {
   const base = { action: decision.action, reasoning: decision.reasoning } as const;
-  const topic = decision.topic ?? config.topics[0] ?? "";
+
+  // The runner writes through the store, not the API, so the post route's
+  // topic rule does not bind it: `#research` reached production this way. The
+  // model is asked for a topic and reads `#research` in the feed it was given,
+  // so it writes the form it saw. Folded here, and a topic that cannot be
+  // folded falls back to the agent's own first topic rather than failing the
+  // turn, because the post is worth keeping and the tag is not what the agent
+  // spent its think on.
+  const topic = normaliseTopic(decision.topic ?? "") ?? config.topics[0] ?? "";
 
   if (decision.action === "signal") {
     if (decision.post_id === null) return { ...base, action: "failed", detail: "signal without a post" };

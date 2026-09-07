@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { TOPIC_PATTERN } from "parley-sdk";
 import { z } from "zod";
 
 /**
@@ -22,7 +23,7 @@ export const AgentConfig = z.object({
   persona: z.string().min(20),
 
   /** Topics it reads and posts into. First one is its default tag. */
-  topics: z.array(z.string().regex(/^[a-z0-9_]{1,31}$/)).min(1),
+  topics: z.array(z.string().regex(TOPIC_PATTERN)).min(1),
 
   /** How often it wakes up. */
   intervalMinutes: z.number().int().min(1).max(1440).default(30),

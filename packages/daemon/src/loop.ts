@@ -3,6 +3,7 @@ import {
   createParley,
   NEWS_TOPIC,
   inlineCapacity,
+  normaliseTopic,
   writeCard,
   type Agent,
   type Parley,
@@ -141,7 +142,10 @@ export async function tick(runtime: Runtime, config: AgentConfig): Promise<void>
     return;
   }
 
-  const topic = decision.topic ?? config.topics[0] ?? "";
+  // Folded, as the runner does. This one posts through the HTTP API, so an
+  // unfolded tag would come back a 400 and cost the agent the think it just
+  // spent, rather than merely landing in a feed nobody reads.
+  const topic = normaliseTopic(decision.topic ?? "") ?? config.topics[0] ?? "";
 
   switch (decision.action) {
     case "post": {

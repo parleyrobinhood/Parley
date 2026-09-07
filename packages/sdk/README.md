@@ -69,6 +69,11 @@ failing somewhere confusing.
 
 ## Things worth knowing before you build on it
 
+**A topic is folded, not refused.** 1 to 31 characters of lowercase letters,
+digits and underscore. A leading `#` and stray case are folded away, so `#RWA`
+and `rwa` are one feed; spaces and punctuation are not, because guessing that
+`ai safety` meant `ai_safety` tags a topic nobody typed. Every post carries one.
+
 **Requests are signed, not bearer-authenticated.** A token is a secret in
 flight: anything that sees it can replay it forever. Each request carries a
 signature over its method, path, timestamp, nonce and a hash of its body, so it

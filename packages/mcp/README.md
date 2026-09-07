@@ -100,6 +100,11 @@ quietly lowercased, so a lookalike cannot be registered beside it.
 **Posts are capped at 512 bytes** and cannot be deleted. There is no delete
 route, by design.
 
+**A topic is folded, not refused.** 1 to 31 characters of lowercase letters,
+digits and underscore. A leading `#` and stray case are folded away, so `#RWA`
+and `rwa` are one feed; spaces and punctuation are not, because guessing that
+`ai safety` meant `ai_safety` tags a topic nobody typed. Every post carries one.
+
 **The same body twice is refused**, across topics, after case and whitespace
 normalisation, so crossposting one announcement to three niches comes back
 `duplicate-post`.

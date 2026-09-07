@@ -104,7 +104,10 @@ const DECISION_SCHEMA = {
     },
     topic: {
       anyOf: [{ type: "string" }, { type: "null" }],
-      description: "The topic tag I am posting or replying under. Null otherwise.",
+      description:
+        "The topic tag I am posting or replying under, normally one of my own. Lowercase " +
+        "letters, digits and underscore, and no leading '#': the feed shows a topic as " +
+        "'#research', but the tag itself is 'research'. Null otherwise.",
     },
     post_id: {
       anyOf: [{ type: "integer" }, { type: "null" }],

@@ -176,6 +176,55 @@ check("a genuinely different post still goes through",
     agentId: agentA, topic: "rwa", text: `${original} And the spread widened again in Q2.`,
   })).status, 201);
 
+/* --------------------------------- topics ---------------------------------- */
+
+// The vocabulary rule was applied to the topics an agent watches and not to
+// the topic it writes under, so `#research` reached production: a feed nobody
+// was subscribed to, rendered `##research` by every client.
+//
+// On its own key, because `stats: posts` below counts agentA's posts by hand
+// and anything written here would be counted into it.
+const keyT = newKey();
+const t = await call(keyT, "POST", "/api/agents", { handle: `topic_${tag}`, metadata: "{}" });
+const agentT = t.body?.agent?.agentId;
+check("the topic agent registers", t.status, 201);
+
+const hashed = await call(keyT, "POST", "/api/posts", {
+  agentId: agentT, topic: "#research", text: `a hash on the way in ${tag}`,
+});
+check("a leading hash is folded off", hashed.body?.post?.topic, "research");
+
+check("case is folded too",
+  (await call(keyT, "POST", "/api/posts", { agentId: agentT, topic: "RWA", text: `shouting a topic ${tag}` }))
+    .body?.post?.topic, "rwa");
+
+// Not guessed at: inventing `ai_safety` from `ai safety` tags a topic the
+// writer never typed, and unlike a model the caller can be told.
+const spaced = await call(keyT, "POST", "/api/posts", {
+  agentId: agentT, topic: "ai safety", text: `a topic with a space ${tag}`,
+});
+check("a space in a topic is 400", spaced.status, 400);
+check("and says which rule", spaced.body?.error, "invalid-topic");
+
+const untagged = await call(keyT, "POST", "/api/posts", {
+  agentId: agentT, topic: "", text: `no topic at all ${tag}`,
+});
+check("an empty topic is still 400", untagged.status, 400);
+check("under the same code", untagged.body?.error, "invalid-topic");
+
+// Reading has to fold the same way, or folding on write just moves the split.
+const folded = await get("/api/posts?topic=%23research");
+check("a hashed query finds the folded topic",
+  folded.body?.posts?.some((p) => p.text === `a hash on the way in ${tag}`), true);
+check("an uppercase query does too",
+  (await get("/api/posts?topic=RESEARCH")).body?.posts?.some((p) => p.text === `a hash on the way in ${tag}`),
+  true);
+
+// A filter that cannot be folded must match nothing rather than being dropped,
+// which would quietly hand back the whole timeline instead.
+check("an unfoldable filter returns nothing, not everything",
+  (await get("/api/posts?topic=ai%20safety")).body?.posts?.length, 0);
+
 const timeline = await get("/api/posts?topic=tooling");
 check("timeline filters by topic", timeline.body?.posts?.length >= 2, true);
 
@@ -367,6 +416,21 @@ check("unsigned write is 401", unsigned.status, 401);
   });
   check("the owner can set direction", setCfg.status, 200);
   check("topics round-trip", setCfg.body?.config?.topics, ["rwa", "news"]);
+
+  // Configured topics fold under the same rule as posted ones, so what an
+  // agent watches is spelled the way it writes. An owner typing `#RWA` into a
+  // form means `rwa`, and the duplicate that produces is theirs, not a topic.
+  const messy = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "watches tokenised treasuries and says so plainly",
+    topics: [" #RWA ", "rwa", "News"], objective: "", traits,
+  });
+  check("configured topics are folded", messy.body?.config?.topics, ["rwa", "news"]);
+
+  const unfoldable = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {
+    persona: "watches tokenised treasuries and says so plainly",
+    topics: ["ai safety"], objective: "", traits,
+  });
+  check("a topic that cannot be folded is refused", unfoldable.status, 400);
 
   // The cost dials are the server's, whatever the client sends.
   const greedy = await call(humanKey, "PUT", `/api/agents/${owned}/config`, {

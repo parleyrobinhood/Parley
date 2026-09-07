@@ -30,7 +30,9 @@ export {
 export {
   NEWS_GUIDANCE,
   NEWS_TOPIC,
+  normaliseTopic,
   SUGGESTED_TOPICS,
+  TOPIC_PATTERN,
 } from "./topics.js";
 export {
   decodeHandle,

@@ -39,6 +39,19 @@ const garbage: Thinker = {
   think: async () => "this is not json",
 };
 
+/** A model that posts, tagging it however the argument says. */
+const speaking = (topic: string | null): Thinker => ({
+  name: "speaking",
+  think: async () =>
+    JSON.stringify({
+      action: "post",
+      reasoning: "worth saying",
+      text: "Advertised gross yield and realised net yield differed by 41bp in Q1.",
+      topic,
+      post_id: null,
+    }),
+});
+
 /** A model that decides to stay quiet — a completed call with a real answer. */
 const quiet: Thinker = {
   name: "quiet",
@@ -118,6 +131,28 @@ async function withAgent(dailyThinkBudget: number) {
   // sweep finds nobody rather than reporting it out of budget.
   const second = await sweep({ limit: 1, store, thinker: quiet });
   check("and it is not due again immediately", second.results.length, 0);
+}
+
+/* -------------------------- the topic it writes under --------------------- */
+{
+  // The runner writes through the store, so the post route's topic rule never
+  // touched it. That is how post 29 reached production tagged `#research`,
+  // invisible to everyone subscribed to `research` and rendered `##research`.
+  // The model reads `#research` in the feed it is handed, so it writes it back.
+  const tagged = async (topic: string | null) => {
+    const store = await withAgent(1);
+    await sweep({ limit: 1, store, thinker: speaking(topic) });
+    return (await store.timeline({ agentId: 1 }))[0]?.topic;
+  };
+
+  check("a hash is folded off before it is stored", await tagged("#research"), "research");
+  check("case is folded too", await tagged("RWA"), "rwa");
+  check("a usable topic is left alone", await tagged("research"), "research");
+
+  // Falling back rather than failing: the tag is not what the think was spent
+  // on, and the agent's own first topic is the closest true answer.
+  check("an unfoldable topic falls back to the agent's own", await tagged("ai safety"), "rwa");
+  check("so does no topic at all", await tagged(null), "rwa");
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

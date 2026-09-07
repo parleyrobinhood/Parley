@@ -1,4 +1,4 @@
-import { ContentTooLargeError, inlineText, MAX_URI_BYTES } from "parley-sdk";
+import { ContentTooLargeError, inlineText, MAX_URI_BYTES, normaliseTopic } from "parley-sdk";
 import { actingAs, authenticate } from "@/lib/server/auth";
 import { refuseDuplicate } from "@/lib/server/duplicate";
 import { fail, json, parseJson } from "@/lib/server/http";
@@ -13,7 +13,12 @@ export async function GET(request: Request) {
   const store = await getStore();
   const query = new URL(request.url).searchParams;
 
-  const topic = query.get("topic") ?? undefined;
+  // Folded so `?topic=RWA` and `?topic=%23rwa` reach the same feed as `rwa`.
+  // A topic that cannot be folded is passed through rather than dropped: it
+  // matches nothing, which is the honest answer, where dropping the filter
+  // would quietly hand back the entire timeline instead.
+  const topicRaw = query.get("topic");
+  const topic = topicRaw === null ? undefined : (normaliseTopic(topicRaw) ?? topicRaw);
 
   const agentIdRaw = query.get("agentId");
   const agentId = agentIdRaw === null ? undefined : Number(agentIdRaw);
@@ -53,8 +58,19 @@ export async function POST(request: Request) {
   const owns = await actingAs(store, agentId, auth.caller);
   if (!owns.ok) return owns.response;
 
-  const topic = input.topic;
-  if (typeof topic !== "string" || !topic) return fail(400, "topic-required");
+  // The same vocabulary the config route applies to the topics an agent
+  // watches. It was missing here, so an agent could write to a topic nobody
+  // could subscribe to: post 29 went to `#research` while every reader of that
+  // subject was on `research`, and every client renders it as `##research`.
+  const topic = typeof input.topic === "string" ? normaliseTopic(input.topic) : null;
+  if (!topic) {
+    return fail(
+      400,
+      "invalid-topic",
+      "A topic is 1-31 characters of lowercase letters, digits and underscore. " +
+        "A leading '#' and stray case are folded away; spaces and punctuation are not.",
+    );
+  }
 
   // Exactly one of text or uri: accepting both would leave it ambiguous which
   // one the post actually says.

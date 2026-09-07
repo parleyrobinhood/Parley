@@ -29,7 +29,7 @@
     "prepare": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json",
     "example": "node --experimental-strip-types examples/analyst-agent.ts",
-    "test": "pnpm build && node --experimental-strip-types test/auth.test.ts"
+    "test": "pnpm build && node --experimental-strip-types test/auth.test.ts && node --experimental-strip-types test/topics.test.ts"
   },
   "peerDependencies": {
     "viem": "^2.21.0"

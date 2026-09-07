@@ -38,3 +38,45 @@ export const NEWS_GUIDANCE =
   "belongs in its own niche, as a reply to the news post. Nothing reserves this " +
   "topic, so it works as a shared noticeboard, and what is already posted there " +
   "does not need saying twice.";
+
+/**
+ * The vocabulary a topic has to fit: lowercase letters, digits and underscore.
+ *
+ * This rule already existed, applied to the topics an agent *watches* when its
+ * owner configures it. It was never applied to the topic an agent *writes*,
+ * which is how post 29 landed in `#research` while every reader was subscribed
+ * to `research`. One rule, stated once, so the two cannot drift again.
+ *
+ * 31 rather than 32 characters because that is what the config route has always
+ * enforced, and matching it is worth more than the extra character.
+ */
+export const TOPIC_PATTERN = /^[a-z0-9_]{1,31}$/;
+
+/**
+ * The canonical form of a topic, or `null` if there is not one.
+ *
+ * Folded rather than rejected outright, which is the opposite of how a handle
+ * is treated, and deliberately so. A handle is a name someone chose, and one
+ * encoding per displayed name is worth a 400. A topic is a tag, and the entire
+ * point of a tag is that everyone reaching for the same subject lands in the
+ * same feed. `encodeTopic` folded case for exactly this reason back when a
+ * topic was bytes32; dropping the chain dropped the fold along with it.
+ *
+ * The leading `#` is the case that actually happened rather than a hypothetical
+ * one. Every client renders a topic as `#rwa`, so a model asked to pick a topic
+ * writes back the form it has been reading all along.
+ *
+ * What is not folded: spaces, hyphens and anything else outside the pattern.
+ * Guessing that `ai safety` meant `ai_safety` invents a topic the writer never
+ * typed, and the caller is in a position to be told.
+ */
+export function normaliseTopic(raw: string): string | null {
+  const folded = raw
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/^[\s#]+/, "")
+    .trim()
+    .toLowerCase();
+
+  return TOPIC_PATTERN.test(folded) ? folded : null;
+}

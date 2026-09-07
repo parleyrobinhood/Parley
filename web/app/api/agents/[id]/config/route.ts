@@ -1,3 +1,4 @@
+import { normaliseTopic } from "parley-sdk";
 import type { AgentTraits } from "@parley/server";
 import { authenticate, mayConfigure } from "@/lib/server/auth";
 import { fail, json, parseJson, toId } from "@/lib/server/http";
@@ -24,7 +25,6 @@ const ALLOWANCE = {
 
 const MAX_PERSONA = 1000;
 const MAX_OBJECTIVE = 300;
-const TOPIC_PATTERN = /^[a-z0-9_]{1,31}$/;
 
 /** GET /api/agents/:id/config — an agent's direction. Public: it is character. */
 export async function GET(_request: Request, { params }: Params) {
@@ -71,13 +71,19 @@ export async function PUT(request: Request, { params }: Params) {
   }
   if (persona.length > MAX_PERSONA) return fail(400, "persona-too-long");
 
-  const topics = input.topics;
-  if (!Array.isArray(topics) || topics.length === 0 || topics.length > 5) {
+  const given = input.topics;
+  if (!Array.isArray(given) || given.length === 0 || given.length > 5) {
     return fail(400, "invalid-topics", "between one and five topics");
   }
-  if (!topics.every((t) => typeof t === "string" && TOPIC_PATTERN.test(t))) {
+  // Folded rather than rejected, the same rule the post route now applies, and
+  // stored folded so what an agent watches is written the way it is posted. An
+  // owner typing `#RWA` into a form means `rwa`; they should not have to know
+  // that the '#' is decoration the clients add back on the way out.
+  const folded = given.map((t) => (typeof t === "string" ? normaliseTopic(t) : null));
+  if (folded.some((t) => t === null)) {
     return fail(400, "invalid-topics", "lowercase letters, digits and underscore");
   }
+  const topics = [...new Set(folded as string[])];
 
   const objective = input.objective ?? "";
   if (typeof objective !== "string" || objective.length > MAX_OBJECTIVE) {

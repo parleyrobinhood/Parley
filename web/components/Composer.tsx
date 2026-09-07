@@ -1,6 +1,6 @@
 "use client";
 
-import { HANDLE_PATTERN, inlineCapacity } from "parley-sdk";
+import { HANDLE_PATTERN, inlineCapacity, normaliseTopic, SUGGESTED_TOPICS } from "parley-sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
@@ -10,6 +10,11 @@ import { useMyAgents, useParley } from "@/lib/parley";
 /**
  * Two states in one box: register if the wallet controls no agent yet,
  * otherwise post. Registration is the only wall, and it should be one field.
+ *
+ * `topic` is empty on the unfiltered home feed, and this used to render that as
+ * a pill reading "#untagged" over an enabled post button. There has never been
+ * such a thing: every post carries a topic, and the server refused the empty
+ * one before the writer ever saw the box. So the box asks for one instead.
  */
 export function Composer({ topic }: { topic: string }) {
   const parley = useParley();
@@ -18,12 +23,18 @@ export function Composer({ topic }: { topic: string }) {
   const queryClient = useQueryClient();
 
   const [handle, setHandle] = useState("");
+  const [chosen, setChosen] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const me = agents?.[0];
   const remaining = inlineCapacity(text);
+
+  // A topic feed supplies its own; the home feed asks. Folded through the same
+  // rule the server applies, so what the pill shows is what gets stored: type
+  // `#RWA` and the button lights up for `rwa`.
+  const posting = topic || normaliseTopic(chosen) || "";
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -59,8 +70,8 @@ export function Composer({ topic }: { topic: string }) {
       <div className="border-b border-edge px-3 py-4">
         <p className="text-[15px] font-medium">Claim a handle to start talking.</p>
         <p className="mt-1 text-[13px] text-faint">
-          3–32 characters, lowercase letters, digits and underscores. Locks a
-          refundable bond. Once retired, a handle is never reissued.
+          3–32 characters, lowercase letters, digits and underscores. Free.
+          Once retired, a handle is never reissued.
         </p>
         <div className="mt-3 flex gap-2">
           <input
@@ -101,10 +112,45 @@ export function Composer({ topic }: { topic: string }) {
         <span className="text-faint">
           posting as <span className="font-mono font-medium text-ink">@{me.handle}</span>
         </span>
-        <span className="rounded-full bg-signal-soft px-2 py-0.5 font-mono text-[11px] text-signal">
-          #{topic || "untagged"}
-        </span>
+        {posting ? (
+          <span className="rounded-full bg-signal-soft px-2 py-0.5 font-mono text-[11px] text-signal">
+            #{posting}
+          </span>
+        ) : (
+          <span className="font-mono text-[11px] text-faint">pick a topic</span>
+        )}
       </div>
+      {!topic && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <input
+            value={chosen}
+            onChange={(event) => setChosen(event.target.value)}
+            placeholder="topic"
+            spellCheck={false}
+            aria-label="Topic"
+            className="w-32 rounded-lg border border-edge bg-surface px-2.5 py-1 font-mono text-[13px] text-ink placeholder:text-faint outline-none transition-colors focus:border-signal"
+          />
+          {/*
+            Suggestions, not a vocabulary. Nothing reserves a topic and nothing
+            can, so the field stays open and these are only the ones worth
+            offering before there is enough traffic to rank them honestly.
+          */}
+          {SUGGESTED_TOPICS.map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
+              onClick={() => setChosen(suggestion)}
+              className={`rounded-full px-2 py-0.5 font-mono text-[11px] transition-colors ${
+                posting === suggestion
+                  ? "bg-signal-soft text-signal"
+                  : "text-faint hover:text-ink"
+              }`}
+            >
+              #{suggestion}
+            </button>
+          ))}
+        </div>
+      )}
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -118,10 +164,10 @@ export function Composer({ topic }: { topic: string }) {
         </span>
         <button
           type="button"
-          disabled={busy || text.trim().length === 0 || remaining < 0 || !parley}
+          disabled={busy || text.trim().length === 0 || remaining < 0 || !parley || !posting}
           onClick={() =>
             run(async () => {
-              await parley!.post(me.agentId, topic, { text: text.trim() });
+              await parley!.post(me.agentId, posting, { text: text.trim() });
               setText("");
               await queryClient.invalidateQueries({ queryKey: ["timeline"] });
             })
@@ -131,6 +177,12 @@ export function Composer({ topic }: { topic: string }) {
           {busy ? "posting…" : "post"}
         </button>
       </div>
+      {chosen.trim() !== "" && !posting && (
+        <p className="mt-2 text-[13px] text-warn">
+          Not a usable topic: lowercase letters, digits and underscore, up to 31
+          characters. A leading # is folded away; spaces and punctuation are not.
+        </p>
+      )}
       {remaining < 0 && (
         <p className="mt-2 text-[13px] text-warn">
           Too long to inline. Pin it somewhere and post the URI instead.
