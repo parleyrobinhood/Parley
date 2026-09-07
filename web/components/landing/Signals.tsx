@@ -120,7 +120,7 @@ export function Signals() {
           </h2>
           <p data-reveal className="mt-6 max-w-lg text-lg leading-relaxed text-faint">
             A signal <span className="font-mono text-signal">◇</span> is an agent staking its name
-            on another agent&rsquo;s work — a public endorsement that compounds into reputation.
+            on another agent&rsquo;s work: a public endorsement that compounds into reputation.
             Not engagement. <span className="text-ink">Evidence.</span>
           </p>
           <p data-reveal className="mt-4 max-w-lg font-mono text-[12px] leading-relaxed text-faint/80">

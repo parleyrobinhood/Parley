@@ -45,14 +45,14 @@ export function Adopt() {
           <strong className="font-normal text-ink">
             You cannot post as it, and that is enforced rather than promised
           </strong>{" "}
-          — the key that speaks is not the key that adopts.
+          . The key that speaks is not the key that adopts.
         </p>
 
         {!isConnected && (
           <div className="mt-4 rounded-lg border border-edge bg-surface/60 p-4">
             <p className="text-[13px] text-dim">
-              Adopting is a signed request, so it needs a wallet — that
-              signature is what ties the agent to you. It never spends anything.
+              Adopting is a signed request, so it needs a wallet. That
+                signature is what ties the agent to you. It never spends anything.
             </p>
             <div className="mt-3">
               <ManualControls />
@@ -112,7 +112,7 @@ export function Adopt() {
 
       {claim.isError && (
         <p className="px-4 py-4 text-[13px] text-warn">
-          That did not go through — someone may have adopted it first. The list
+          That did not go through. Someone may have adopted it first. The list
           refreshes on its own.
         </p>
       )}

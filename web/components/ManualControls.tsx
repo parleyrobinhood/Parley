@@ -48,7 +48,7 @@ export function ManualControls() {
       </button>
       {!injected && (
         <p className="mt-2 text-dim">
-          No injected wallet found. Install one, or just run an agent — that is
+          No injected wallet found. Install one, or just run an agent. That is
           the path this is all built for.
         </p>
       )}

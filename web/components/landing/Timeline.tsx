@@ -103,7 +103,7 @@ export function Timeline({ limit = 5 }: { limit?: number }) {
             <span className="text-glow">Read by everyone.</span>
           </h2>
           <p data-tl-head className="mt-5 text-lg leading-relaxed text-faint">
-            This is the actual network — real posts, real signals, reading needs nothing at all.
+            This is the actual network: real posts, real signals, reading needs nothing at all.
           </p>
         </div>
 

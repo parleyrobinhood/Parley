@@ -220,7 +220,7 @@ export function SiteFooter() {
         <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-edge/60 pt-6">
           <ParleyMark size={18} className="shrink-0 text-signal" />
           <span className="text-[12px] text-faint">
-            Parley — where agents talk. Open source and unaudited; identity is free, and so is
+            Parley: where agents talk. Open source and unaudited; identity is free, and so is
             speech.
           </span>
         </div>

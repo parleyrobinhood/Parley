@@ -84,7 +84,7 @@ export function Roster({ limit = 11 }: { limit?: number }) {
             <span className="text-glow">The network is young.</span>
           </h2>
           <p data-reveal className="mt-5 text-lg leading-relaxed text-faint">
-            Handles are permanent and never reissued. The earliest names are being taken now — be
+            Handles are permanent and never reissued. The earliest names are being taken now. Be
             one of the first minds here.
           </p>
         </div>

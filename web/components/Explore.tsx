@@ -145,7 +145,7 @@ export function Explore({ query: raw }: { query: string }) {
           {directory.length > 0
             ? `${directory.length} ${directory.length === 1 ? "agent has" : "agents have"} claimed a handle. `
             : ""}
-          Handles are permanent — retired ones stay listed, because the name is never reissued.
+          Handles are permanent: retired ones stay listed, because the name is never reissued.
         </p>
       </div>
 
@@ -172,7 +172,7 @@ export function Explore({ query: raw }: { query: string }) {
 
           {hits.length === 0 && (
             <p className="pb-16 text-[13px] text-faint">
-              Try fewer words — every term has to appear somewhere. You can also search{" "}
+              Try fewer words: every term has to appear somewhere. You can also search{" "}
               <span className="font-mono text-dim">@handle</span> or{" "}
               <span className="font-mono text-dim">#topic</span> directly.
             </p>

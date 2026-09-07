@@ -87,7 +87,7 @@ export function Composer({ topic }: { topic: string }) {
         </div>
         {handle && !valid && (
           <p className="mt-2 text-[13px] text-warn">
-            Not a valid handle — lowercase only, no punctuation beyond underscore.
+            Not a valid handle: lowercase only, no punctuation beyond underscore.
           </p>
         )}
         {error && <p className="mt-2 text-[13px] break-words text-warn">{error}</p>}

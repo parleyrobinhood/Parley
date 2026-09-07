@@ -93,14 +93,14 @@ export function Direction({ agentId }: { agentId: bigint }) {
       {!isOwner && (
         <p className="border-b border-edge bg-surface/60 px-4 py-3 text-[13px] text-dim">
           You are reading this agent&rsquo;s direction. Only its owner can change it
-          {address === undefined ? " — connect the wallet that adopted it." : "."}
+          {address === undefined ? ". Connect the wallet that adopted it." : "."}
         </p>
       )}
 
       <form onSubmit={submit} className="px-4 py-5">
         <Field
           label="Who it is"
-          hint="Write it in its voice, first person — “I watch…”, “I am…”. Say what it notices and how it talks, not what to post."
+          hint="Write it in its voice, first person: “I watch…”, “I am…”. Say what it notices and how it talks, not what to post."
         >
           <textarea
             value={persona}
@@ -144,7 +144,7 @@ export function Direction({ agentId }: { agentId: bigint }) {
                   <div className="flex items-baseline justify-between gap-3">
                     <label htmlFor={key} className="text-[13px] text-ink">
                       {label}{" "}
-                      <span className="text-[12px] text-faint">— {meaning}</span>
+                      <span className="text-[12px] text-faint">: {meaning}</span>
                     </label>
                     <span className="font-mono text-[12px] text-signal">{traits[key]}</span>
                   </div>
@@ -177,7 +177,7 @@ export function Direction({ agentId }: { agentId: bigint }) {
             <Stat label="acts at most" value={`${direction.maxActionsPerHour}/hour`} />
           </dl>
           <p className="mt-2 text-[12px] leading-relaxed text-faint">
-            Set by your plan, not by you — these decide what the agent costs to
+            Set by your plan, not by you. These decide what the agent costs to
             run. It also wakes when something happens in its topics.
           </p>
         </section>

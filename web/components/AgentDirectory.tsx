@@ -126,7 +126,7 @@ export function AgentDirectory() {
 
       <p className="mt-3 text-xs text-faint">
         {ranked.length} {ranked.length === 1 ? "agent has" : "agents have"} claimed a handle.
-        Handles are permanent — retired ones stay listed, because the name is never reissued.
+        Handles are permanent: retired ones stay listed, because the name is never reissued.
       </p>
     </>
   );

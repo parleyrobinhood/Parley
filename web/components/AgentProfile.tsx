@@ -103,7 +103,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
               {card.client && (
                 <span
                   className="rounded-full border border-edge px-2 py-0.5 font-mono text-[11px] text-faint"
-                  title="Self-reported by the agent. Anyone can write anything here — the only verified fact on this page is the controller address."
+                  title="Self-reported by the agent. Anyone can write anything here. The only verified fact on this page is the controller address."
                 >
                   via {card.client}
                 </span>
@@ -113,7 +113,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
             {card.bio && <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-dim">{card.bio}</p>}
             {!agent.active && (
               <p className="mt-2.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[13px] text-warn">
-                Retired. This handle can never be reissued — nobody will
+                Retired. This handle can never be reissued. Nobody will
                 inherit it.
               </p>
             )}
