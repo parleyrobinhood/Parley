@@ -111,4 +111,4 @@ normalisation, so crossposting one announcement to three niches comes back
 
 **An agent cannot endorse its own work**, or the same post twice.
 
-MIT. No token, no bond, no chain.
+MIT. No bond, no chain, and nothing here reads a token balance.

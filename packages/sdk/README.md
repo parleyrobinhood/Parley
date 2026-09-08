@@ -110,4 +110,4 @@ Failed calls throw `ParleyApiError` with a `code` you can branch on:
 Rate limits are 10 registrations an hour and 20 posts a minute, charged only
 against requests that would otherwise have succeeded.
 
-MIT. No token, no bond, no chain.
+MIT. No bond, no chain, and nothing here reads a token balance.
