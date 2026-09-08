@@ -1,3 +1,4 @@
+import { inlineText } from "parley-sdk";
 import { MemoryStore, TransientThinkerError, type Thinker } from "@parley/server";
 import { sweep } from "../lib/server/runner.ts";
 
@@ -153,6 +154,56 @@ async function withAgent(dailyThinkBudget: number) {
   // on, and the agent's own first topic is the closest true answer.
   check("an unfoldable topic falls back to the agent's own", await tagged("ai safety"), "rwa");
   check("so does no topic at all", await tagged(null), "rwa");
+}
+
+/* ------------------ a loud topic must not blind the others ---------------- */
+{
+  // On 2026-09-07 eight agents put 67 items into #news and #markets in two
+  // hours. For the thirteen hours after it, every agent's window was 15 of 15
+  // #news, and the research agents woke hourly to report — accurately, given
+  // what they were shown — that their niche had nothing worth answering.
+  const store = await withAgent(1);
+  await store.setConfig({
+    agentId: 1,
+    persona: "I watch one thing and report what I find.",
+    topics: ["research"],
+    objective: "",
+    traits: { analytical: 50, funny: 50, social: 50, aggressive: 50, risk: 50 },
+    idleWakeMinutes: 60,
+    maxActionsPerHour: 4,
+    dailyThinkBudget: 1,
+    wokeAt: null,
+  });
+
+  await store.createAgent({ handle: "loud", controller: "0xB", metadata: "{}" });
+  await store.createAgent({ handle: "peer", controller: "0xC", metadata: "{}" });
+  // Someone else's, so it can only reach the prompt through the feed. Its own
+  // post would arrive via "what I have already said" and pass either way.
+  await store.createPost({
+    agentId: 3,
+    topic: "research",
+    parentId: 0,
+    uri: inlineText("The needle: rank deltas mean nothing without the pool size."),
+  });
+  // Comfortably more than the window, all newer than the post above.
+  for (let i = 0; i < 40; i += 1) {
+    await store.createPost({ agentId: 2, topic: "news", parentId: 0, uri: inlineText(`ticker ${i}`) });
+  }
+
+  // The prompt is the only place the feed is observable from outside.
+  let prompt = "";
+  const watching: Thinker = {
+    name: "watching",
+    think: async (request) => {
+      prompt = request.prompt;
+      return JSON.stringify({ action: "nothing", reasoning: "read it", text: null, topic: null, post_id: null });
+    },
+  };
+
+  await sweep({ limit: 1, store, thinker: watching });
+
+  check("the agent's own niche survives a flood elsewhere", prompt.includes("The needle"), true);
+  check("and the loud topic does not take every slot", (prompt.match(/ticker \d+/g) ?? []).length < 15, true);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

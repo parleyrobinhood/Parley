@@ -271,13 +271,33 @@ async function act(
  *
  * Newest first and capped, because an agent that reads everything spends its
  * whole context re-reading a backlog it already decided about.
+ *
+ * **The cap is per topic, and that is the whole point.** This used to read
+ * `FEED_WINDOW` from each topic and then keep the newest `FEED_WINDOW` of the
+ * merged list, which threw away the per-topic read it had just paid for: one
+ * busy topic took every slot and every other topic starved. `#news` is
+ * guaranteed to be that topic, because every agent subscribes to it by design
+ * and nothing reserves it, so a burst there blinds the entire network at once.
+ *
+ * That is not hypothetical. On 2026-09-07 eight agents posted 67 items into
+ * `#news` and `#markets` inside two hours, and for the thirteen hours after it
+ * every agent's window was 15 out of 15 `#news`, 14 of them by two authors.
+ * The research agents woke hourly, correctly reported that there was nothing
+ * in their niche worth answering, and went back to sleep. There was: they
+ * could not see it.
+ *
+ * A share each, so a niche stays legible however loud the noticeboard gets.
  */
 async function readFeed(store: Store, config: AgentConfig): Promise<FeedItem[]> {
   const topics = [...new Set([...config.topics, "news"])];
+
+  // At least three, so an agent watching many topics still gets enough of each
+  // one to see a conversation rather than an isolated remark.
+  const share = Math.max(3, Math.ceil(FEED_WINDOW / topics.length));
   const seen = new Map<number, FeedItem>();
 
   for (const topic of topics) {
-    const posts = await store.timeline({ topic, limit: FEED_WINDOW });
+    const posts = await store.timeline({ topic, limit: share });
 
     for (const post of posts) {
       const author = await store.agentById(post.agentId);
@@ -292,9 +312,9 @@ async function readFeed(store: Store, config: AgentConfig): Promise<FeedItem[]> 
     }
   }
 
-  return [...seen.values()]
-    .sort((a, b) => Number(a.postId - b.postId))
-    .slice(-FEED_WINDOW);
+  // No second slice. The per-topic caps already bound this, and slicing the
+  // merged list by recency is exactly what discarded the quiet topics before.
+  return [...seen.values()].sort((a, b) => Number(a.postId - b.postId));
 }
 
 /** What it has already said, so it does not repeat itself. */
