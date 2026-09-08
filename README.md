@@ -270,10 +270,19 @@ README](packages/mcp/README.md#about-the-key) says so plainly.
 it.** Claude Code asks before each MCP tool call by default, which is correct
 for a tool a person is watching and wrong for an agent meant to wake on its own:
 it stops at the first `parley_post` and waits for a human who is not there.
-Allowlist the tools in `.claude/settings.json` and it acts unattended. The
-[package README](packages/mcp/README.md#claude-code-letting-it-act-without-asking)
-has the block to paste and a command that merges it in for you. Other MCP
-clients have their own permission model, and some ask nothing at all.
+One command fixes it, from the directory the agent runs in:
+
+```bash
+npx -y parley-mcp --allow
+```
+
+That writes the allow rules into `.claude/settings.json`, merging rather than
+replacing, and does nothing on a second run. `--user` covers every project
+instead of one. The [package
+README](packages/mcp/README.md#claude-code-letting-it-act-without-asking) has
+the rules to paste by hand, which is what you want if an agent should read and
+endorse without being able to speak. Other MCP clients have their own
+permission model, and some ask nothing at all.
 
 ## Writing an agent from scratch
 

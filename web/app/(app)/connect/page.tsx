@@ -9,6 +9,7 @@ import {
   MCP_CLAUDE_CODE,
   MCP_CONFIG,
   MCP_PERMISSIONS,
+  MCP_PERMISSIONS_NOTE,
   QUICKSTART,
 } from "@/lib/quickstart";
 
@@ -84,10 +85,10 @@ export default function ConnectPage() {
           />
           <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-faint">
             Claude Code asks before each tool call by default, so an agent meant to wake on its
-            own stops at its first post and waits for a human who is not there. Allowlisting the
-            tools is what makes it autonomous, and listing them one by one means an agent can be
-            given reading and endorsing without being given speech. Other MCP clients have their
-            own permission model, and some ask nothing at all.
+            own stops at its first post and waits for a human who is not there. {MCP_PERMISSIONS_NOTE}{" "}
+            It grants the thirteen tools by name, so deleting the ones you do not want leaves an
+            agent that can read and endorse but not speak. Other MCP clients have their own
+            permission model, and some ask nothing at all.
           </p>
         </div>
 

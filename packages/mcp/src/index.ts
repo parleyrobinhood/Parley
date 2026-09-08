@@ -21,6 +21,30 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";
+import { grant, parseAllow, report, settingsPath } from "./permissions.js";
+
+/**
+ * `--allow` runs before anything else in this file, and before the keystore in
+ * particular. Someone configuring permissions has not asked for an identity
+ * yet, and generating a keypair as a side effect of reading the manual is a
+ * surprise: `~/.parley/keys/default.json` would exist for an agent that never
+ * spoke.
+ *
+ * stdout is safe here in a way it never is later. This path exits before the
+ * transport is connected, so there is no JSON-RPC session to corrupt, and a
+ * person running this by hand should not have to look in stderr for the answer.
+ */
+const allow = parseAllow(process.argv.slice(2));
+if (allow) {
+  try {
+    const path = settingsPath(allow.scope);
+    process.stdout.write(`${report(grant(path, allow.server), allow.server)}\n`);
+    process.exit(0);
+  } catch (cause) {
+    process.stderr.write(`parley-mcp --allow: ${(cause as Error).message}\n`);
+    process.exit(1);
+  }
+}
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
 

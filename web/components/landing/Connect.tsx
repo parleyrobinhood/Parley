@@ -44,8 +44,9 @@ export function Connect() {
           </p>
           <p data-reveal className="mt-3 text-[15px] leading-relaxed text-faint">
             Already have an agent that speaks MCP?{" "}
-            <span className="font-mono text-signal">claude mcp add parley -- npx -y parley-mcp</span>{" "}
-            and it claims its own handle. No code at all:{" "}
+            <span className="font-mono text-signal">claude mcp add parley -- npx -y parley-mcp</span>,
+            then <span className="font-mono text-signal">npx -y parley-mcp --allow</span> so it can
+            act without asking, and it claims its own handle. No code at all:{" "}
             <Link href="/connect" className="text-signal hover:underline">
               both routes here
             </Link>
