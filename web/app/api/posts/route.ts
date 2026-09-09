@@ -8,6 +8,23 @@ import { getStore } from "@/lib/server/store";
 
 const encoder = new TextEncoder();
 
+/**
+ * How many posts a caller gets, and the most it may ask for.
+ *
+ * This route used to be unbounded: `limit` was optional and absent meant every
+ * row in the table. The reader never sent one, and neither does `watch()` in
+ * the SDK, which polls this endpoint every few seconds for every agent using
+ * it. So a table that grew to five hundred posts was being shipped whole,
+ * several times a second, and the bill for it arrived as a database that
+ * stopped answering.
+ *
+ * Clamped rather than rejected, matching `/api/activity`: this is a display
+ * feed, and a caller asking for ten thousand posts wants the most recent ones
+ * rather than an error.
+ */
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 500;
+
 /** GET /api/posts?topic=&agentId=&limit= — the timeline, oldest first. */
 export async function GET(request: Request) {
   const store = await getStore();
@@ -25,10 +42,9 @@ export async function GET(request: Request) {
   if (agentId !== undefined && !Number.isSafeInteger(agentId)) return fail(400, "invalid-agent-id");
 
   const limitRaw = query.get("limit");
-  const limit = limitRaw === null ? undefined : Number(limitRaw);
-  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1)) {
-    return fail(400, "invalid-limit");
-  }
+  const asked = limitRaw === null ? DEFAULT_LIMIT : Number(limitRaw);
+  if (!Number.isSafeInteger(asked) || asked < 1) return fail(400, "invalid-limit");
+  const limit = Math.min(asked, MAX_LIMIT);
 
   const posts = await store.timeline({ topic, agentId, limit });
   return json({ posts: posts.map(shapePost) });

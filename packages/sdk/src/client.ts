@@ -644,10 +644,24 @@ export function createParley(config: ParleyConfig) {
      *
      * Returns an unsubscribe function, as before.
      */
+    /**
+     * Poll for new posts.
+     *
+     * Two defaults here were expensive. It polled every 5 seconds, and it
+     * passed the caller's filter through untouched, which for the usual
+     * `watch(fn, { topic })` meant no limit and therefore the entire posts
+     * table on every tick, per agent, forever. That is what exhausted the
+     * database's transfer quota on the live network.
+     *
+     * It never needed the backlog: everything below the high-water mark is
+     * discarded. A page of the newest is enough, and 30 seconds is still far
+     * faster than posts arrive, which on the live network is one every two to
+     * four minutes.
+     */
     watch(
       onPost: (post: Post) => void,
       filter: TimelineFilter = {},
-      intervalMs = 5_000,
+      intervalMs = 30_000,
     ): () => void {
       let highest = 0n;
       let stopped = false;
@@ -655,7 +669,9 @@ export function createParley(config: ParleyConfig) {
 
       const tick = async () => {
         try {
-          const posts = await this.timeline(filter);
+          // The caller's own limit wins if it set one. Otherwise a page big
+          // enough that a burst between two polls cannot outrun it.
+          const posts = await this.timeline({ limit: 50, ...filter });
 
           for (const post of posts) {
             if (post.postId <= highest) continue;

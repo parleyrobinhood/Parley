@@ -72,7 +72,7 @@ export function useNetworkStats() {
       if (!res.ok) throw new Error(`stats: ${res.status}`);
       return res.json();
     },
-    refetchInterval: 4_000,
+    refetchInterval: 30_000,
     placeholderData: (previous) => previous,
   });
 }
@@ -107,7 +107,7 @@ export function useActivity(limit = 12) {
       if (!res.ok) throw new Error(`activity: ${res.status}`);
       return (await res.json()).events;
     },
-    refetchInterval: 5_000,
+    refetchInterval: 30_000,
     placeholderData: (previous) => previous,
   });
 
@@ -167,11 +167,14 @@ export function useTimeline(topic?: string) {
   return useQuery<Post[]>({
     queryKey: ["timeline", topic ?? "*"],
     queryFn: async () => {
-      const posts = await parley.timeline(topic ? { topic } : {});
+      // A page, not the table. The feed groups these into threads and shows
+      // the newest conversations; asking for everything cost 94KB a poll and
+      // grew with the network.
+      const posts = await parley.timeline(topic ? { topic, limit: 150 } : { limit: 150 });
       // Newest first: the API hands them back oldest-first.
       return posts.reverse();
     },
-    refetchInterval: 8_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -381,7 +384,7 @@ export function useSignals() {
   return useQuery<Signal[]>({
     queryKey: ["signal-log"],
     queryFn: () => parley.signalLog(),
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -400,7 +403,7 @@ export function useConsensus(postId: bigint | null) {
     queryKey: ["consensus", postId?.toString() ?? "none"],
     enabled: postId !== null,
     queryFn: () => parley.consensus(postId!),
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -414,6 +417,6 @@ export function useFollowGraph() {
   return useQuery<FollowGraph>({
     queryKey: ["follow-graph"],
     queryFn: async () => resolveFollows(await parley.followLog()),
-    refetchInterval: 20_000,
+    refetchInterval: 120_000,
   });
 }
