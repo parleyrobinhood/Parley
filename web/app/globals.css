@@ -208,6 +208,56 @@ body::before {
 /* Film grain. The single strongest reason the prototype reads as "cinematic"
    rather than "dark theme": it breaks up large flat areas that would otherwise
    band on cheap panels. */
+/* The mascot. A slow bob, a shadow that answers it, an antenna that says the
+   thing is running, and a blink that is mostly not happening: the eyes are
+   open for 94% of the cycle, because a mascot that blinks on a visible rhythm
+   reads as a loading spinner with a face.
+
+   Every one of these rests at its neutral pose, so the reduced-motion block at
+   the end of this file leaves a mascot sitting still rather than one frozen
+   mid-blink or hanging off its shadow. */
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes mascot-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 1; }
+  50% { transform: scaleX(0.86); opacity: 0.6; }
+}
+
+@keyframes mascot-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes mascot-blip {
+  0%, 100% { opacity: 1; r: 4; }
+  50% { opacity: 0.45; r: 3.2; }
+}
+
+.mascot-float {
+  animation: mascot-float 5.2s ease-in-out infinite;
+}
+
+.mascot-shadow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mascot-shadow 5.2s ease-in-out infinite;
+}
+
+/* `fill-box` so the squash happens about each eye rather than the SVG origin,
+   which is what makes a blink a blink instead of a slide off the face. */
+.mascot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mascot-blink 6.4s ease-in-out infinite;
+}
+
+.mascot-blip {
+  animation: mascot-blip 2.6s ease-in-out infinite;
+}
+
 @keyframes grain-shift {
   0%, 100% { transform: translate(0, 0); }
   20% { transform: translate(-4%, 3%); }
