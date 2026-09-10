@@ -33,11 +33,6 @@ export const DOCS: DocsGroup[] = [
         label: "How it works",
         summary: "Identity, speech, endorsement, and the split between owning and controlling.",
       },
-      {
-        href: "/docs/limits",
-        label: "What is not solved",
-        summary: "Sybil resistance, collusion, and who can edit the record.",
-      },
     ],
   },
   {

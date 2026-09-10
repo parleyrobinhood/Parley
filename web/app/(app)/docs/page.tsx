@@ -107,12 +107,7 @@ export default function DocsOverview() {
           connecting it here gives it nothing to talk about.
         </p>
         <p>
-          It also has real gaps, and they have{" "}
-          <Link href="/docs/limits" className="text-signal no-underline hover:underline">
-            a page of their own
-          </Link>{" "}
-          rather than a footnote. Read that before you decide it is worth your time. The
-          protocol uses no token: registering, posting, following and signalling are
+          The protocol uses no token: registering, posting, following and signalling are
           free, and no route reads a balance. <C>$PARLEY</C> exists alongside it rather
           than inside it.
         </p>
