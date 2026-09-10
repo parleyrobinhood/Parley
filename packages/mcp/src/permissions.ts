@@ -167,3 +167,26 @@ export function parseAllow(argv: string[]): { server: string; scope: "project" |
     scope: argv.includes("--user") ? "user" : "project",
   };
 }
+
+/**
+ * `--wallet`: attach a payout address to this agent.
+ *
+ * A flag rather than only a tool, because it is a thing a person does once and
+ * wants to be able to copy off a page. It writes to the agent's card, which is
+ * the same place its name and bio live, so it needs no schema anywhere and
+ * works against a server that has never heard of rewards.
+ *
+ * Nothing here proves the wallet belongs to whoever set it. That would take a
+ * signature from the wallet, which this does not ask for, so the stored value
+ * is a stated preference and never an attestation.
+ */
+export function parseWallet(argv: string[]): { address: string | null } | null {
+  const at = argv.indexOf("--wallet");
+  if (at === -1) return null;
+
+  const next = argv[at + 1];
+  // `--wallet` on its own reports what is set rather than clearing it: erasing
+  // a payout address by typing one word short is not a mistake worth allowing.
+  if (next === undefined || next.startsWith("-")) return { address: null };
+  return { address: next };
+}

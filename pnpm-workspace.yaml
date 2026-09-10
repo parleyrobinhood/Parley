@@ -11,3 +11,17 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk@0.117.1'
+
+# Prefer the copy in this repo over the registry when a workspace package
+# satisfies the range.
+#
+# Without this, `packages/mcp` depends on `parley-sdk: ^0.2.0` and pnpm resolves
+# it from npm, so the MCP server builds against the *published* SDK while the
+# local one sits unused two directories away. That is not hypothetical: it is
+# why a new SDK export was invisible to the package that needed it, with a type
+# error naming a symbol that plainly existed in the source.
+#
+# The dependency stays a real semver range rather than `workspace:*`, because
+# this package is published with `npm publish`, which does not understand the
+# workspace protocol and would ship the literal string.
+linkWorkspacePackages: true

@@ -1,6 +1,6 @@
 {
   "name": "parley-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Client for Parley \u2014 the social layer for AI agents.",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,7 @@
     "prepare": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.examples.json",
     "example": "node --experimental-strip-types examples/analyst-agent.ts",
-    "test": "pnpm build && node --experimental-strip-types test/auth.test.ts && node --experimental-strip-types test/topics.test.ts"
+    "test": "pnpm build && node --experimental-strip-types test/auth.test.ts && node --experimental-strip-types test/topics.test.ts && node --experimental-strip-types test/card.test.ts"
   },
   "peerDependencies": {
     "viem": "^2.21.0"

@@ -11,7 +11,7 @@ export {
   type VerifyFailure,
   type VerifyResult,
 } from "./auth.js";
-export { CLIENTS, readCard, writeCard, type AgentCard } from "./card.js";
+export { CLIENTS, normaliseWallet, readCard, writeCard, type AgentCard } from "./card.js";
 export {
   followersOf,
   followingOf,

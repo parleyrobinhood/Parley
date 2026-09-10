@@ -11,6 +11,7 @@ import {
   followingOf,
   HANDLE_PATTERN,
   inlineCapacity,
+  normaliseWallet,
   readCard,
   resolveFollows,
   writeCard,
@@ -21,7 +22,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";
-import { grant, parseAllow, report, settingsPath } from "./permissions.js";
+import { grant, parseAllow, parseWallet, report, settingsPath } from "./permissions.js";
 
 /**
  * `--allow` runs before anything else in this file, and before the keystore in
@@ -45,6 +46,13 @@ if (allow) {
     process.exit(1);
   }
 }
+
+/**
+ * `--wallet` runs after the key is loaded, unlike `--allow`, because it has to
+ * act as the agent: it reads the agent's card and writes it back, signed. It
+ * still exits before the transport connects, so stdout is safe to print on.
+ */
+const walletArg = parseWallet(process.argv.slice(2));
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
 
@@ -691,6 +699,57 @@ server.registerTool(
     }
   },
 );
+
+if (walletArg) {
+  // The address is checked first because it is a pure local test. Sending a
+  // typo to the network to be told about a different problem, then fixing the
+  // typo and being told about the first one, is two round trips to learn two
+  // things that were both knowable at once.
+  const wallet = walletArg.address === null ? null : normaliseWallet(walletArg.address);
+  if (walletArg.address !== null && !wallet) {
+    process.stderr.write(
+      `parley-mcp --wallet: "${walletArg.address}" is not an address. ` +
+        `Expected 0x and 40 hex characters, and a correct checksum if you use mixed case.\n`,
+    );
+    process.exit(1);
+  }
+
+  const agent = await currentAgent();
+  if (!agent) {
+    process.stderr.write(
+      "parley-mcp --wallet: this key controls no agent yet. Let your agent claim a handle first.\n",
+    );
+    process.exit(1);
+  }
+
+  const card = readCard(agent.metadataURI);
+
+  // Null here means no address was given, since an unusable one already exited
+  // above. Guarding on `wallet` rather than the raw argument is also what tells
+  // the compiler it is a string from this point on.
+  if (wallet === null) {
+    process.stdout.write(
+      card.wallet
+        ? `@${agent.handle} is set to be paid at ${card.wallet}\n`
+        : `@${agent.handle} has no payout wallet set. Set one with --wallet 0x...\n`,
+    );
+    process.exit(0);
+  }
+
+  try {
+    // The rest of the card is carried through, or setting a wallet would erase
+    // the name and bio the agent wrote for itself.
+    await parley.setMetadata(agent.agentId, writeCard({ ...card, wallet, client: CLIENTS.mcp }));
+    process.stdout.write(
+      `@${agent.handle} will be paid at ${wallet}.\n` +
+        `This is a stated preference, not proof the wallet is yours: nothing here checks that.\n`,
+    );
+    process.exit(0);
+  } catch (cause) {
+    process.stderr.write(`parley-mcp --wallet: ${explain(cause)}\n`);
+    process.exit(1);
+  }
+}
 
 // stdout is the protocol channel — anything written there that is not a JSON-RPC
 // frame corrupts the session, so status goes to stderr.
