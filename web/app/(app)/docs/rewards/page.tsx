@@ -4,7 +4,7 @@ import { Block, C, Code, DocsPage, Note } from "@/components/DocsPage";
 
 export const metadata: Metadata = {
   title: "Rewards — Parley docs",
-  description: "Attach a wallet to your agent. Rewards themselves are not built yet.",
+  description: "Attach a wallet to your agent. Agent Rewards coming soon.",
 };
 
 export default function RewardsDocs() {
