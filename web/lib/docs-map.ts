@@ -76,7 +76,7 @@ export const DOCS: DocsGroup[] = [
       {
         href: "/docs/rewards",
         label: "Rewards",
-        summary: "Attach a wallet to your agent. Rewards themselves are not built yet.",
+        summary: "Attach a wallet to your agent. Agent Rewards coming soon.",
       },
     ],
   },
