@@ -258,6 +258,135 @@ body::before {
   animation: mascot-blip 2.6s ease-in-out infinite;
 }
 
+/* Looking around. Eyes do not sweep, they jump and then hold, so the movement
+   between positions takes a fraction of the cycle and the rest is spent
+   stopped. A smooth sine here reads as swaying; the holds are what make it
+   read as searching for something.
+
+   7.6s against the blink's 6.4s and the float's 5.2s, none of them dividing
+   into another, so the three never settle into a single visible loop. */
+@keyframes mascot-gaze {
+  0%, 12% { transform: translateX(0); }
+  18%, 34% { transform: translateX(-3.4px); }
+  40%, 52% { transform: translateX(0); }
+  58%, 76% { transform: translateX(3.4px); }
+  82%, 100% { transform: translateX(0); }
+}
+
+.mascot-gaze {
+  animation: mascot-gaze 7.6s cubic-bezier(0.5, 0, 0.2, 1) infinite;
+}
+
+/* A blink on demand, for a click. One pass and then the class comes off, which
+   hands the eyes back to the idle rhythm above.
+
+   Declared after `.mascot-eye` on purpose: both set `animation` at the same
+   specificity, so source order is the whole mechanism by which this one wins
+   for as long as it is applied. */
+@keyframes mascot-wink {
+  0%, 100% { transform: scaleY(1); }
+  45%, 55% { transform: scaleY(0.1); }
+}
+
+.mascot-eye.mascot-wink {
+  animation: mascot-wink 260ms ease-in-out;
+}
+
+/* ---------------------------------------------------------------------------
+   Three agents milling about
+
+   One 18s clock for all six animations below, which is the entire mechanism by
+   which a bump exists: two agents are written to arrive at the same percentage,
+   so the squash written at that same percentage always lands. Nothing is
+   simulated, and nothing needs a requestAnimationFrame loop running forever
+   under a page that already polls every minute.
+
+   Travel is `left` in percentages, so what they cross is the strip's width
+   whatever it turns out to be. Each wrapper carries a constant
+   `translateX(-50%)`, so a percentage here means an agent's centre, and two
+   centres 13% apart is a touch at the widths this strip is allowed to be. That
+   is why the stage is capped: at an unbounded width 13% is a gap you could
+   park a third agent in, and on a phone it would be an overlap.
+
+   A meets B at 34%. C arrives from the right and bumps B at 68%. A is at the
+   far left by then, well clear, because two agents passing through each other
+   while neither reacts is worse than no collision at all.
+--------------------------------------------------------------------------- */
+@keyframes mascot-walk-a {
+  0% { left: 22%; }
+  30% { left: 41%; }
+  34% { left: 43%; }
+  40% { left: 36%; }
+  60% { left: 26%; }
+  100% { left: 22%; }
+}
+
+@keyframes mascot-walk-b {
+  0% { left: 78%; }
+  30% { left: 58%; }
+  34% { left: 56%; }
+  40% { left: 64%; }
+  62% { left: 70%; }
+  68% { left: 74%; }
+  74% { left: 68%; }
+  100% { left: 78%; }
+}
+
+@keyframes mascot-walk-c {
+  0% { left: 94%; }
+  50% { left: 91%; }
+  68% { left: 87%; }
+  74% { left: 93%; }
+  100% { left: 94%; }
+}
+
+/* The squash. Origin at the foot so a knock reads as weight landing rather
+   than the whole agent inflating. Overshooting slightly on the way back is
+   what stops it looking like a dent. */
+@keyframes mascot-bump-a {
+  0%, 32% { transform: scale(1, 1); }
+  34% { transform: scale(0.88, 1.1); }
+  37% { transform: scale(1.05, 0.96); }
+  41%, 100% { transform: scale(1, 1); }
+}
+
+@keyframes mascot-bump-b {
+  0%, 32% { transform: scale(1, 1); }
+  34% { transform: scale(0.88, 1.1); }
+  37% { transform: scale(1.05, 0.96); }
+  41%, 66% { transform: scale(1, 1); }
+  68% { transform: scale(0.9, 1.08); }
+  71% { transform: scale(1.04, 0.97); }
+  75%, 100% { transform: scale(1, 1); }
+}
+
+@keyframes mascot-bump-c {
+  0%, 66% { transform: scale(1, 1); }
+  68% { transform: scale(0.9, 1.08); }
+  71% { transform: scale(1.04, 0.97); }
+  75%, 100% { transform: scale(1, 1); }
+}
+
+.mascot-walk-a,
+.mascot-walk-b,
+.mascot-walk-c {
+  transform: translateX(-50%);
+}
+
+.mascot-walk-a { animation: mascot-walk-a 18s cubic-bezier(0.45, 0, 0.35, 1) infinite; }
+.mascot-walk-b { animation: mascot-walk-b 18s cubic-bezier(0.45, 0, 0.35, 1) infinite; }
+.mascot-walk-c { animation: mascot-walk-c 18s cubic-bezier(0.45, 0, 0.35, 1) infinite; }
+
+.mascot-bump-a,
+.mascot-bump-b,
+.mascot-bump-c {
+  transform-origin: 50% 100%;
+}
+
+.mascot-bump-a { animation: mascot-bump-a 18s linear infinite; }
+.mascot-bump-b { animation: mascot-bump-b 18s linear infinite; }
+.mascot-bump-c { animation: mascot-bump-c 18s linear infinite; }
+
 @keyframes grain-shift {
   0%, 100% { transform: translate(0, 0); }
   20% { transform: translate(-4%, 3%); }
@@ -398,4 +527,13 @@ body::before {
   .card-hover:hover {
     transform: none;
   }
+
+  /* The agents stand where they started instead of collapsing onto their
+     final keyframe, which for two of them is mid-approach. Spelled out rather
+     than left to the duration collapse above, because "no animation" and "the
+     last frame, instantly" are different pictures and only one of them is
+     three agents standing still. */
+  .mascot-walk-a { left: 22%; }
+  .mascot-walk-b { left: 78%; }
+  .mascot-walk-c { left: 94%; }
 }

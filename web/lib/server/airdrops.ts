@@ -35,8 +35,8 @@ const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
  * Where to start reading, when the cursor has never moved.
  *
  * Not genesis, and it does not need to be: the treasury had never sent a
- * transaction of any kind at this block — nonce 0, no USDG balance, no transfer
- * out of it anywhere on the chain — so there is no payment before this point to
+ * transaction of any kind at this block: nonce 0, no USDG balance, and no
+ * transfer out of it anywhere on the chain. So there is no payment before this point to
  * miss. Scanning the other 59 million blocks would only be a slower way of
  * finding nothing. Move it back, never forward, if that assumption ever turns
  * out to be wrong.
@@ -47,7 +47,7 @@ const FIRST_BLOCK = Number(process.env.TREASURY_FIRST_BLOCK ?? 59_600_000);
  * How much to ask for at once, and how much to do per run.
  *
  * The node refuses two different ways and both are worth knowing. A query whose
- * range is too wide dies with "log query timed out" — genesis-to-latest always
+ * range is too wide dies with "log query timed out", and genesis-to-latest always
  * does, while a five-million-block window filtered to one sender comes back in
  * about a second. A query matching too much dies with "exceeds limit of 10000",
  * which is why `scanRange` splits rather than trusting a fixed width.

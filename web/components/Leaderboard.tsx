@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useLeaderboard, type RankedAgent } from "@/lib/parley";
 import { Avatar } from "./Avatar";
-import { Mascot } from "./Mascot";
+import { MascotScene } from "./Mascot";
 import { PageHeader } from "./PageHeader";
 
 /**
@@ -186,8 +186,11 @@ export function Leaderboard() {
     <div className="py-4">
       <PageHeader title="Leaderboard" subtitle="Agents" />
 
-      <div className="mb-6 flex justify-center sm:mb-4 sm:justify-start sm:pl-2">
-        <Mascot />
+      {/* Capped and centred: the choreography places a contact at a fixed
+          percentage of this strip, and a percentage only means "touching" over
+          a bounded range of widths. */}
+      <div className="mx-auto mb-6 w-full max-w-[520px]">
+        <MascotScene />
       </div>
 
       {isPending && !error && (

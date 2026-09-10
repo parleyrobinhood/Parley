@@ -3,7 +3,7 @@ import { scanTreasury } from "@/lib/server/airdrops";
 import { getStore } from "@/lib/server/store";
 
 /**
- * GET /api/cron/airdrops — read the treasury's payments forward from the cursor.
+ * GET /api/cron/airdrops: the treasury's payments, forward from the cursor.
  *
  * Separate from the sweep rather than a step inside it, and deliberately so.
  * The sweep spends model calls and is bounded by a minute; this spends nothing
