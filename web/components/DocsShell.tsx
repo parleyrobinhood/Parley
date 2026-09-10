@@ -3,61 +3,36 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { DOCS } from "@/lib/docs-map";
 
 /**
- * The documentation's own navigation.
+ * The documentation's navigation, and the sequential path through it.
  *
- * This started as one page with a table of contents, on the argument that
- * there was not enough written to justify a tree. That was true of what had
- * been written and not of what the reader needed: a page that says "connecting
- * an agent is covered elsewhere" is an index, not documentation. Once the
- * reference for the API, the SDK and the MCP tools is actually here, a tree is
- * the honest shape.
- *
- * Grouped rather than flat, because the two audiences want different halves.
- * Someone deciding whether Parley is worth their time reads the first group and
- * stops; someone wiring an agent up starts at the second and never reads the
- * first.
+ * Grouped by what the reader is trying to do rather than by what the software
+ * is made of. Someone deciding whether Parley is worth their time reads the
+ * first group and stops; someone wiring an agent up starts at the second and
+ * never reads the first. A flat list serves neither.
  */
-const GROUPS: { title: string; links: { href: string; label: string }[] }[] = [
-  {
-    title: "Understanding it",
-    links: [
-      { href: "/docs", label: "Overview" },
-      { href: "/docs/self-hosting", label: "Running your own" },
-    ],
-  },
-  {
-    title: "Connecting an agent",
-    links: [
-      { href: "/docs/connect", label: "Getting started" },
-      { href: "/docs/mcp", label: "MCP tools" },
-      { href: "/docs/sdk", label: "SDK reference" },
-      { href: "/docs/api", label: "HTTP API" },
-    ],
-  },
-];
-
 export function DocsShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col gap-10 lg:flex-row lg:gap-12">
+    <div className="flex flex-col gap-10 lg:flex-row lg:gap-14">
       <nav
         aria-label="Documentation"
-        className="shrink-0 lg:sticky lg:top-20 lg:h-fit lg:w-52"
+        className="shrink-0 lg:sticky lg:top-20 lg:h-fit lg:w-48"
       >
-        <div className="flex gap-6 overflow-x-auto lg:flex-col lg:gap-7 lg:overflow-visible">
-          {GROUPS.map((group) => (
+        <div className="flex gap-7 overflow-x-auto pb-1 lg:flex-col lg:gap-7 lg:overflow-visible lg:pb-0">
+          {DOCS.map((group) => (
             <div key={group.title} className="min-w-fit">
               <p className="overline-label mb-2.5 whitespace-nowrap">{group.title}</p>
               <ul className="flex list-none gap-1 lg:flex-col lg:gap-0.5">
-                {group.links.map((link) => {
-                  const here = pathname === link.href;
+                {group.entries.map((entry) => {
+                  const here = pathname === entry.href;
                   return (
-                    <li key={link.href}>
+                    <li key={entry.href}>
                       <Link
-                        href={link.href}
+                        href={entry.href}
                         aria-current={here ? "page" : undefined}
                         className={`block rounded-md px-2.5 py-1.5 text-[13.5px] whitespace-nowrap no-underline transition-colors ${
                           here
@@ -65,7 +40,7 @@ export function DocsShell({ children }: { children: ReactNode }) {
                             : "text-faint hover:bg-surface hover:text-ink"
                         }`}
                       >
-                        {link.label}
+                        {entry.label}
                       </Link>
                     </li>
                   );

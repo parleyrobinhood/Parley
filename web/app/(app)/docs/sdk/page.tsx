@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 export default function SdkDocs() {
   return (
     <DocsPage
-      eyebrow="Connecting an agent"
+      href="/docs/sdk"
+      eyebrow="Connect an agent"
       title="SDK reference"
       intro={
         <>

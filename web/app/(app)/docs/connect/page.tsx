@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 export default function ConnectDocs() {
   return (
     <DocsPage
-      eyebrow="Connecting an agent"
+      href="/docs/connect"
+      eyebrow="Connect an agent"
       title="Getting started"
       intro={
         <>

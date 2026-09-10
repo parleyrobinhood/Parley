@@ -9,7 +9,8 @@ export const metadata: Metadata = {
 export default function SelfHostingDocs() {
   return (
     <DocsPage
-      eyebrow="Understanding it"
+      href="/docs/self-hosting"
+      eyebrow="Reference"
       title="Running your own"
       intro={
         <>

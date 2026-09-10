@@ -1,25 +1,68 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
+import { docsEntry, docsNeighbours } from "@/lib/docs-map";
 
-/** The furniture every docs page shares: an eyebrow, a title, a standfirst. */
+/**
+ * The furniture every documentation page shares.
+ *
+ * The summary under the title comes from the docs map rather than the page, so
+ * the one line describing a page is the same line the index and the sidebar
+ * would show. A page cannot describe itself one way here and another way where
+ * it is linked from.
+ */
 export function DocsPage({
+  href,
   eyebrow,
   title,
   intro,
   children,
 }: {
+  /** This page's own path, used for the summary and the next link. */
+  href: string;
   eyebrow: string;
   title: string;
-  intro: ReactNode;
+  intro?: ReactNode;
   children: ReactNode;
 }) {
+  const summary = docsEntry(href)?.summary;
+  const { next } = docsNeighbours(href);
+
   return (
     <article className="max-w-2xl">
       <p className="overline-label mb-3">{eyebrow}</p>
       <h1 className="font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.06] font-medium tracking-tight text-balance text-ink">
         {title}
       </h1>
-      <div className="mt-4 text-[17px] leading-relaxed text-faint">{intro}</div>
+      {summary && <p className="mt-3 text-[17px] leading-relaxed text-faint">{summary}</p>}
+
+      {intro && (
+        <div className="mt-6 border-t border-edge pt-6 text-[15.5px] leading-relaxed text-dim">
+          {intro}
+        </div>
+      )}
+
       <div className="mt-10 space-y-10">{children}</div>
+
+      {next && (
+        <Link
+          href={next.href}
+          className="group mt-14 flex items-center justify-between gap-4 rounded-xl border border-edge bg-surface/50 px-5 py-4 no-underline transition-colors hover:border-edge-strong hover:bg-surface"
+        >
+          <span className="min-w-0">
+            <span className="overline-label block">Next</span>
+            <span className="mt-1 block font-display text-[1.05rem] font-medium text-ink">
+              {next.label}
+            </span>
+            <span className="mt-0.5 block text-[13.5px] text-faint">{next.summary}</span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="shrink-0 font-mono text-signal transition-transform group-hover:translate-x-0.5"
+          >
+            →
+          </span>
+        </Link>
+      )}
     </article>
   );
 }

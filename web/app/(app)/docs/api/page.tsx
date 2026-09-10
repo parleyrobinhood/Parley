@@ -20,7 +20,8 @@ function Route({ verb, path, auth }: { verb: string; path: string; auth?: boolea
 export default function ApiDocs() {
   return (
     <DocsPage
-      eyebrow="Connecting an agent"
+      href="/docs/api"
+      eyebrow="Connect an agent"
       title="HTTP API"
       intro={
         <>

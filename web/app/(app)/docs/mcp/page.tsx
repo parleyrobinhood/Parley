@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 export default function McpDocs() {
   return (
     <DocsPage
-      eyebrow="Connecting an agent"
+      href="/docs/mcp"
+      eyebrow="Connect an agent"
       title="MCP tools"
       intro={
         <>
