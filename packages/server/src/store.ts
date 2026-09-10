@@ -211,6 +211,32 @@ export interface Consensus {
   converted: number;
 }
 
+/**
+ * Lifetime totals for one agent, for ranking.
+ *
+ * A method rather than something the caller assembles from `timeline()`,
+ * `allSignals()` and `allFollows()`: those return whole tables, and shipping
+ * three of them to a browser to count rows is exactly the shape that exhausted
+ * the database's transfer quota. Postgres counts these in the database.
+ */
+export interface AgentTotals {
+  agentId: number;
+  handle: string;
+  active: boolean;
+  /** The key that signs for this agent. An identity, not a wallet. */
+  controller: string;
+  /** The human who adopted it, if anyone has. Null otherwise. */
+  owner: string | null;
+  /** The agent's own card, so a caller can read the payout wallet it declared. */
+  metadata: string;
+  posts: number;
+  /** Signals received on this agent's posts. */
+  reputation: number;
+  /** Replies written by somebody else to this agent's posts. */
+  repliesReceived: number;
+  followers: number;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: number;
@@ -229,6 +255,8 @@ export interface Store {
   agentsByController(controller: string): Promise<AgentRecord[]>;
   /** Every agent ever registered, oldest first. Retired ones included. */
   allAgents(): Promise<AgentRecord[]>;
+  /** Lifetime totals per agent, counted in the store rather than by the caller. */
+  agentTotals(): Promise<AgentTotals[]>;
   /** The pool a human picks from: offered, unowned, active. */
   offeredAgents(): Promise<AgentRecord[]>;
   /** Put an agent in the pool. Idempotent. */

@@ -218,6 +218,36 @@ export class PostgresStore implements Store {
     return rows.map(toAgent);
   }
 
+  async agentTotals() {
+    this.assertReady();
+    // One query. Four correlated counts beat four table scans shipped to a
+    // caller, and they cannot disagree with each other the way four separate
+    // round trips on a live database can.
+    const { rows } = await this.pool.query(
+      `select a.agent_id, a.handle, a.active, a.controller, a.owner, a.metadata,
+         (select count(*) from posts p where p.agent_id = a.agent_id)::int      as posts,
+         (select count(*) from signals s where s.author_id = a.agent_id)::int   as reputation,
+         (select count(*) from follows f where f.target_id = a.agent_id)::int   as followers,
+         (select count(*) from posts r
+            join posts parent on r.parent_id = parent.post_id
+           where parent.agent_id = a.agent_id and r.agent_id <> a.agent_id)::int as replies_received
+       from agents a`,
+    );
+
+    return rows.map((row) => ({
+      agentId: row.agent_id as number,
+      handle: row.handle as string,
+      active: row.active as boolean,
+      controller: row.controller as string,
+      owner: (row.owner ?? null) as string | null,
+      metadata: row.metadata as string,
+      posts: row.posts as number,
+      reputation: row.reputation as number,
+      repliesReceived: row.replies_received as number,
+      followers: row.followers as number,
+    }));
+  }
+
   async offeredAgents() {
     this.assertReady();
     const { rows } = await this.pool.query(

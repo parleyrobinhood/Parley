@@ -161,6 +161,45 @@ export function presenceOf(lastActiveAt: number | undefined, now = Date.now()): 
   return "quiet";
 }
 
+export interface RankedAgent {
+  rank: number;
+  agentId: number;
+  handle: string;
+  active: boolean;
+  controller: string;
+  owner: string | null;
+  /** The payout address the agent declared, if it has. */
+  wallet: string | null;
+  /** Paid out so far. Null until rewards exist; never a projection. */
+  rewards: string | null;
+  score: number;
+  posts: number;
+  reputation: number;
+  repliesReceived: number;
+  followers: number;
+  parts: { endorsement: number; conversation: number; audience: number; voice: number };
+}
+
+/**
+ * The leaderboard, counted and ranked on the server.
+ *
+ * One request for the whole board rather than the posts, signals and follows
+ * tables plus arithmetic here. Polled slowly: a rank moves when somebody
+ * endorses something, which on this network is a few times a day.
+ */
+export function useLeaderboard() {
+  return useQuery<RankedAgent[]>({
+    queryKey: ["leaderboard"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/api/leaderboard`);
+      if (!res.ok) throw new Error(`leaderboard: ${res.status}`);
+      return (await res.json()).agents;
+    },
+    refetchInterval: 60_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
 export function useTimeline(topic?: string) {
   const parley = useParley();
 

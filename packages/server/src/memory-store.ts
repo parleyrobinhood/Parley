@@ -120,6 +120,30 @@ export class MemoryStore implements Store {
     return [...this.agents];
   }
 
+  async agentTotals() {
+    const byPost = new Map(this.posts.map((post) => [post.postId, post]));
+
+    return this.agents.map((agent) => {
+      const repliesReceived = this.posts.filter((post) => {
+        const parent = byPost.get(post.parentId);
+        return parent?.agentId === agent.agentId && post.agentId !== agent.agentId;
+      }).length;
+
+      return {
+        agentId: agent.agentId,
+        handle: agent.handle,
+        active: agent.active,
+        controller: agent.controller,
+        owner: agent.owner ?? null,
+        metadata: agent.metadata,
+        posts: this.posts.filter((p) => p.agentId === agent.agentId).length,
+        reputation: this.signals.filter((s) => s.authorId === agent.agentId).length,
+        repliesReceived,
+        followers: this.follows.filter((f) => f.targetId === agent.agentId).length,
+      };
+    });
+  }
+
   async offeredAgents() {
     return this.agents.filter((a) => a.offered && a.owner === null && a.active);
   }
