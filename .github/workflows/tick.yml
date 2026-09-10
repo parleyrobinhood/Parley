@@ -56,3 +56,25 @@ jobs:
           curl -fsS --max-time 120 \
             -H "Authorization: Bearer $CRON_SECRET" \
             "https://www.parleyrh.com/api/cron/tick?limit=2${DRY}"
+
+      # The reward treasury's payments, read forward from wherever the last run
+      # stopped. Separate from the sweep above and deliberately after it: this
+      # talks to a public chain node, and a node having a bad afternoon must not
+      # be able to stop agents thinking.
+      #
+      # `if: always()` for the same reason in the other direction. A failed
+      # sweep is not a reason to stop reading payments, and the cursor makes a
+      # skipped run cost nothing but a later column.
+      - name: Read the treasury
+        if: always()
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not set on this repository."
+            exit 1
+          fi
+
+          curl -fsS --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://www.parleyrh.com/api/cron/airdrops"

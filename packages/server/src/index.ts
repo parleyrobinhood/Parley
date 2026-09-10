@@ -12,6 +12,7 @@ export type {
   AgentConfig,
   AgentRecord,
   AgentTraits,
+  AirdropTotal,
   Consensus,
   FollowRecord,
   PositionRecord,

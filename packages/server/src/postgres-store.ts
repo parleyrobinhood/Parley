@@ -3,6 +3,7 @@ import type {
   ActivityEvent,
   AgentConfig,
   AgentRecord,
+  AirdropTotal,
   Consensus,
   FollowRecord,
   PositionRecord,
@@ -118,6 +119,17 @@ export class PostgresStore implements Store {
         primary key (agent_id, target_id)
       );
 
+      create table if not exists airdrops (
+        address  text    primary key,
+        received numeric not null,
+        seen_at  bigint  not null
+      );
+
+      create table if not exists chain_scan (
+        name  text   primary key,
+        block bigint not null
+      );
+
       create table if not exists rate_attempts (
         bucket  text   not null,
         subject text   not null,
@@ -153,7 +165,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan restart identity",
     );
   }
 
@@ -246,6 +258,50 @@ export class PostgresStore implements Store {
       repliesReceived: row.replies_received as number,
       followers: row.followers as number,
     }));
+  }
+
+  async airdropTotals() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select address, received::text as received from airdrops order by address",
+    );
+    return rows.map((row) => ({ address: row.address as string, received: row.received as string }));
+  }
+
+  async airdropCursor() {
+    this.assertReady();
+    const { rows } = await this.pool.query("select block from chain_scan where name = 'treasury'");
+    // Zero rather than null: a scan that has never run and a scan that has read
+    // nothing want the same treatment from the caller, which is to start at the
+    // configured first block.
+    return rows.length ? Number(rows[0].block) : 0;
+  }
+
+  async creditAirdrops({ credits, scannedTo }: { credits: AirdropTotal[]; scannedTo: number }) {
+    this.assertReady();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      for (const credit of credits) {
+        await client.query(
+          `insert into airdrops (address, received, seen_at) values ($1, $2, $3)
+           on conflict (address) do update
+             set received = airdrops.received + excluded.received, seen_at = excluded.seen_at`,
+          [credit.address.toLowerCase(), credit.received, Date.now()],
+        );
+      }
+      await client.query(
+        `insert into chain_scan (name, block) values ('treasury', $1)
+         on conflict (name) do update set block = excluded.block`,
+        [scannedTo],
+      );
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async offeredAgents() {

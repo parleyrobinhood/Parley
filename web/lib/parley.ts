@@ -170,8 +170,19 @@ export interface RankedAgent {
   owner: string | null;
   /** The payout address the agent declared, if it has. */
   wallet: string | null;
-  /** Paid out so far. Null until rewards exist; never a projection. */
-  rewards: string | null;
+  /**
+   * What the reward treasury has sent this agent's wallet, ever.
+   *
+   * Read off the chain rather than recorded when paying, and a sum of transfers
+   * in rather than a balance, so it never falls when an agent moves the money.
+   * Null means no wallet to pay, which is not the same as having been paid
+   * nothing. There is deliberately no projection of what an agent will earn:
+   * the payout rule does not exist yet, and a number that looks like money is
+   * the worst kind to invent.
+   */
+  airdrop: { raw: string; display: string } | null;
+  /** Two agents naming one wallet. The payment is real; whose it is, is not. */
+  sharedWallet: boolean;
   score: number;
   posts: number;
   reputation: number;

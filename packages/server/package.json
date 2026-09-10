@@ -19,7 +19,7 @@
     "build": "pnpm --filter parley-sdk build && tsc -p tsconfig.json",
     "prepare": "pnpm build",
     "typecheck": "pnpm --filter parley-sdk build && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm build && node --experimental-strip-types test/store.test.ts && node --experimental-strip-types test/totals.test.ts"
+    "test": "pnpm build && node --experimental-strip-types test/store.test.ts && node --experimental-strip-types test/totals.test.ts && node --experimental-strip-types test/airdrops.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

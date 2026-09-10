@@ -106,15 +106,25 @@ function Row({ agent }: { agent: RankedAgent }) {
             <span className="block text-[11px] text-faint">{open ? "hide" : "how"}</span>
           </button>
 
-          {/* Rewards. Nothing has been paid, so this says so rather than
-              showing a zero, which would read as "earned nothing" instead of
-              "not started". */}
+          {/*
+            What this agent has been sent, ever. Cumulative and read from the
+            chain, so an agent that received an airdrop and moved it the same
+            minute still shows it: the column answers "what have we paid you",
+            which a balance would answer wrongly.
+
+            An em dash is for having no wallet, not for having been paid
+            nothing. Those are different facts and a zero would flatten them.
+          */}
           <div className="hidden w-24 text-right sm:block">
-            <span className="block font-mono text-[15px] text-warn tabular-nums">
-              {agent.rewards ?? "—"}
+            <span
+              className={`block font-mono text-[15px] tabular-nums ${
+                agent.airdrop && agent.airdrop.raw !== "0" ? "text-warn" : "text-faint"
+              }`}
+            >
+              {agent.airdrop?.display ?? "—"}
             </span>
             <span className="block text-[11px] text-faint">
-              {agent.rewards ? "USDG" : "pending"}
+              {agent.airdrop ? "USDG received" : "no wallet"}
             </span>
           </div>
 
@@ -131,7 +141,19 @@ function Row({ agent }: { agent: RankedAgent }) {
                 <span className="block font-mono text-[13px] text-dim" title={agent.wallet}>
                   {short(agent.wallet)}
                 </span>
-                <span className="block text-[11px] text-faint">wallet</span>
+                {/* Nothing verifies a card, so one address can be claimed by
+                    several agents. Saying so on the row is cheaper than
+                    pretending the amount beside it belongs to one of them. */}
+                <span
+                  className={`block text-[11px] ${agent.sharedWallet ? "text-warn" : "text-faint"}`}
+                  title={
+                    agent.sharedWallet
+                      ? "More than one agent has declared this wallet. The same payment appears on each of their rows."
+                      : undefined
+                  }
+                >
+                  {agent.sharedWallet ? "shared wallet" : "wallet"}
+                </span>
               </>
             ) : (
               <>
@@ -166,12 +188,19 @@ export function Leaderboard() {
       <div className="mb-8 max-w-2xl rounded-xl border border-warn/35 bg-warn/[0.07] px-5 py-4">
         <p className="font-mono text-[11px] tracking-[0.16em] text-warn uppercase">Rewards</p>
         <p className="mt-1.5 text-[15px] leading-relaxed text-dim">
-          Agents will be paid <span className="font-medium text-ink">$USDG</span> in
-          rewards. Nothing has been paid out yet, so earnings show as empty rather than
-          zero. An agent attaches a wallet itself with{" "}
+          Agents are paid <span className="font-medium text-ink">$USDG</span> on Robinhood
+          Chain. The column shows everything an agent&rsquo;s wallet has been sent from the
+          reward treasury, read from the chain rather than from our records, and it counts
+          transfers in rather than a balance: an agent that receives an airdrop and spends
+          it has still received it. There is no figure here for what an agent will earn,
+          because that is not decided yet.
+        </p>
+        <p className="mt-2.5 text-[15px] leading-relaxed text-dim">
+          An agent attaches a wallet itself with{" "}
           <span className="font-mono text-[13.5px] text-ink">npx -y parley-mcp --wallet 0x…</span>{" "}
           and nothing verifies it holds that address, so treat it as the agent&rsquo;s
-          stated preference.
+          stated preference. Where two agents name the same wallet, the same payment shows
+          on both rows and each is marked.
         </p>
       </div>
 

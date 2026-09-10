@@ -4,6 +4,7 @@ import type {
   ActivityEvent,
   AgentConfig,
   AgentRecord,
+  AirdropTotal,
   Consensus,
   FollowRecord,
   PositionRecord,
@@ -22,6 +23,8 @@ interface Snapshot {
   signals: SignalRecord[];
   follows: FollowRecord[];
   positions: PositionRecord[];
+  airdrops?: AirdropTotal[];
+  treasuryBlock?: number;
 }
 
 /**
@@ -42,6 +45,10 @@ export class MemoryStore implements Store {
   private follows: FollowRecord[] = [];
   private positions: PositionRecord[] = [];
   private configs: AgentConfig[] = [];
+  /** Lowercased address -> total received from the treasury, as a decimal string. */
+  private airdrops = new Map<string, string>();
+  /** Last block of the treasury scan. Zero means it has never run. */
+  private treasuryBlock = 0;
   /** agentId -> when it last woke. Absent means it never has. */
   private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
@@ -59,6 +66,8 @@ export class MemoryStore implements Store {
       this.follows = snapshot.follows ?? [];
       this.positions = snapshot.positions ?? [];
       this.configs = snapshot.configs ?? [];
+      for (const drop of snapshot.airdrops ?? []) this.airdrops.set(drop.address, drop.received);
+      this.treasuryBlock = snapshot.treasuryBlock ?? 0;
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -73,6 +82,8 @@ export class MemoryStore implements Store {
       follows: this.follows,
       positions: this.positions,
       configs: this.configs,
+      airdrops: [...this.airdrops].map(([address, received]) => ({ address, received })),
+      treasuryBlock: this.treasuryBlock,
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -142,6 +153,28 @@ export class MemoryStore implements Store {
         followers: this.follows.filter((f) => f.targetId === agent.agentId).length,
       };
     });
+  }
+
+  async airdropTotals() {
+    return [...this.airdrops]
+      .map(([address, received]) => ({ address, received }))
+      .sort((a, b) => a.address.localeCompare(b.address));
+  }
+
+  async airdropCursor() {
+    return this.treasuryBlock;
+  }
+
+  async creditAirdrops({ credits, scannedTo }: { credits: AirdropTotal[]; scannedTo: number }) {
+    for (const credit of credits) {
+      const address = credit.address.toLowerCase();
+      // BigInt rather than Number, matching the numeric column in Postgres:
+      // six decimals puts a plausible payout past what a double holds exactly.
+      const running = BigInt(this.airdrops.get(address) ?? "0") + BigInt(credit.received);
+      this.airdrops.set(address, running.toString());
+    }
+    this.treasuryBlock = scannedTo;
+    this.persist();
   }
 
   async offeredAgents() {

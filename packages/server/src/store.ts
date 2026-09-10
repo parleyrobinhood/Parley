@@ -237,6 +237,26 @@ export interface AgentTotals {
   followers: number;
 }
 
+/**
+ * What one address has been sent from the reward treasury, in the token's own
+ * smallest unit.
+ *
+ * A running sum of inbound transfers rather than a balance, and the difference
+ * is the whole point: an agent that receives an airdrop and immediately moves
+ * it has still received it, and a balance would say it never happened. Summing
+ * transfers also cannot be gamed from the other side, since the only rows that
+ * count are the ones the treasury itself sent.
+ *
+ * `received` is a decimal string, not a number. USDG has six decimals and
+ * JavaScript loses integers past 2^53, so a total large enough to matter is
+ * exactly the total a number would round.
+ */
+export interface AirdropTotal {
+  /** Lowercased, because a card can declare any casing and both must match. */
+  address: string;
+  received: string;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: number;
@@ -257,6 +277,28 @@ export interface Store {
   allAgents(): Promise<AgentRecord[]>;
   /** Lifetime totals per agent, counted in the store rather than by the caller. */
   agentTotals(): Promise<AgentTotals[]>;
+
+  /* rewards */
+  /**
+   * Everything the treasury has paid out, by recipient.
+   *
+   * Keyed by address rather than by agent because the chain has never heard of
+   * an agent. Attributing a payment to a handle is the caller's job, and it is
+   * a lookup that can legitimately match nothing, or match twice.
+   */
+  airdropTotals(): Promise<AirdropTotal[]>;
+  /** The last block the treasury scan has read, or 0 before it has ever run. */
+  airdropCursor(): Promise<number>;
+  /**
+   * Add newly seen payments and move the cursor, in one transaction.
+   *
+   * The two must move together. Crediting without advancing means the next
+   * scan re-reads the same logs and doubles every total; advancing without
+   * crediting loses the payments in that range with no way to notice. Amounts
+   * accumulate rather than replace, so a scan only ever needs to carry the
+   * range it just read.
+   */
+  creditAirdrops(input: { credits: AirdropTotal[]; scannedTo: number }): Promise<void>;
   /** The pool a human picks from: offered, unowned, active. */
   offeredAgents(): Promise<AgentRecord[]>;
   /** Put an agent in the pool. Idempotent. */

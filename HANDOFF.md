@@ -90,6 +90,15 @@ opens to show what produced its number.
   agents with three keys were pointed at one wallet and nothing objected. This
   matters only once rewards exist, and then it matters a lot. Proving it needs a
   signature from the wallet, which the flag does not ask for.
+- **The reward treasury has never paid anything, and may be on the wrong
+  chain.** `0xFcA9Ae576A2E1A814075a56d6EE34FD201e53371` is what the owner gave
+  as the address rewards are sent from, and on Robinhood Chain it is empty:
+  nonce 0, no ETH, no USDG, and no transfer out of it anywhere the scan could
+  reach. That is what a wallet nobody has funded yet looks like, and it is also
+  what an address belonging to a different chain looks like. The airdrop column
+  is correct either way and reads zero until the first payment lands, but if it
+  is still reading zero after an airdrop has gone out, this is the constant to
+  check first: `REWARD_TREASURY` in `web/lib/server/airdrops.ts`.
 - **What rewards actually pay for.** The unanswered half of the reward system,
   and the one that decides whether the wallet question above is dangerous. Pay
   per agent or per post and no wallet rule saves you, because addresses are as
@@ -275,6 +284,21 @@ move the model; putting it in the field description did.
   different database from the `parley_dev` the store suite truncates. It also
   carries `CRON_SECRET=local-dev-secret` and a `GEMINI_API_KEY`, which is what
   makes a local dry sweep possible.
+- **Robinhood Chain is back in the codebase, for one column only.** The airdrop
+  figure on the leaderboard is read from the chain, so the chain facts matter
+  again after `feat: retire the chain` deleted them. Mainnet is chain id 4663 at
+  `https://rpc.mainnet.chain.robinhood.com`, no key. USDG is
+  `0x5fc5360d0400a0fd4f2af552add042d716f1d168`, "Global Dollar", six decimals,
+  and it is the busiest token on the chain. **The Blockscout API is unusable
+  from a server**: `robinhoodchain.blockscout.com` answers with a Cloudflare
+  challenge page, so the raw RPC is the only way in.
+- **That RPC refuses two different ways, and the messages matter.** A range too
+  wide dies with "log query timed out" and genesis-to-latest always does, while
+  a five-million-block window filtered to one sender returns in about a second.
+  A query matching too much dies with "exceeds limit of 10000" instead, which is
+  why the scan halves its range on the row count rather than trusting a width.
+  Blocks are 100ms, so the chain makes about 36,000 an hour and an hourly scan
+  has to cover that.
 - **Gemini is the real cadence limit, not money.** The free tier ran out after
   about six calls in the first live sweep, and it has since returned 500s for
   days at a time. Actual numbers are per-project in AI Studio rather than in the
@@ -283,7 +307,8 @@ move the model; putting it in the field description did.
 ## How to verify anything here
 
 ```sh
-# 370 assertions: 17 auth, 25 topics, 16 card, 30 mcp, 266 store, 16 runner.
+# 424 assertions: 17 auth, 25 topics, 16 card, 30 mcp, 266 store, 28 totals,
+# 26 airdrops, 16 runner.
 DATABASE_URL=postgres://localhost/parley_dev pnpm test
 
 # End to end. Needs `pnpm dev` running in another shell.
