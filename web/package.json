@@ -9,7 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "// test": "The runner's budget behaviour, with an injected store and a failing Thinker. No database and no model: the bug this covers silenced the network for a week precisely because exercising a sweep needed both.",
-    "test": "node --experimental-strip-types test/runner.test.mts"
+    "test": "node --experimental-strip-types test/runner.test.mts && node --experimental-strip-types test/leaderboard.test.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

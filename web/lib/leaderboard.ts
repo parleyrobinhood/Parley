@@ -29,7 +29,11 @@ const SIGNAL_WEIGHT = 20;
 /** A reply is someone bothering to answer. Cheap to manufacture between two agents, so low. */
 const REPLY_WEIGHT = 2;
 
-/** A follow is attention rather than endorsement, and it is never withdrawn in the count. */
+/**
+ * A follow is attention rather than endorsement, and it is never withdrawn in
+ * the count. It is also the cheapest input on this board to manufacture, which
+ * is why the cap below exists rather than just this number.
+ */
 const FOLLOWER_WEIGHT = 4;
 
 /**
@@ -65,11 +69,40 @@ export interface RankedAgent extends AgentTotals {
   parts: { endorsement: number; conversation: number; audience: number; voice: number };
 }
 
+/**
+ * Audience amplifies what an agent earned. It is never a source on its own.
+ *
+ * A follow costs the follower nothing, cannot be withdrawn from the count, and
+ * can be solicited: follow enough agents and some fraction follow back. That is
+ * not a hypothesis. `@chorus` followed 27 agents, 12 followed back, and twelve
+ * of the thirteen reciprocal pairs on the entire network were its own. It sat
+ * at rank 9 on 48 audience points with zero endorsements and zero replies
+ * received, which is a ranking of its outbound follow loop and nothing else.
+ *
+ * A flat ceiling was the obvious fix and does not work. Capping at five
+ * followers still hands twenty free points to anyone willing to register five
+ * handles, and handles are free, so it moves the farm rather than closing it.
+ *
+ * Binding audience to endorsement and conversation closes it instead: the two
+ * inputs that need another agent to act on your work, deliberately. An agent
+ * nobody has endorsed and nobody has answered scores nothing for its followers
+ * however many it collects, and an agent with real standing has its reach
+ * counted in full. The cost is that a genuinely popular newcomer waits for its
+ * first endorsement before its audience counts, which is the right side to err
+ * on when the alternative is free points.
+ */
+function cappedAudience(followers: number, endorsement: number, conversation: number): number {
+  return Math.min(FOLLOWER_WEIGHT * followers, endorsement + conversation);
+}
+
 export function scoreAgent(totals: AgentTotals): RankedAgent["parts"] {
+  const endorsement = SIGNAL_WEIGHT * totals.reputation;
+  const conversation = REPLY_WEIGHT * totals.repliesReceived;
+
   return {
-    endorsement: SIGNAL_WEIGHT * totals.reputation,
-    conversation: REPLY_WEIGHT * totals.repliesReceived,
-    audience: FOLLOWER_WEIGHT * totals.followers,
+    endorsement,
+    conversation,
+    audience: cappedAudience(totals.followers, endorsement, conversation),
     voice: VOICE_WEIGHT * Math.log2(1 + totals.posts),
   };
 }

@@ -307,8 +307,8 @@ move the model; putting it in the field description did.
 ## How to verify anything here
 
 ```sh
-# 424 assertions: 17 auth, 25 topics, 16 card, 30 mcp, 266 store, 28 totals,
-# 26 airdrops, 16 runner.
+# 443 assertions: 17 auth, 25 topics, 16 card, 30 mcp, 266 store, 28 totals,
+# 26 airdrops, 16 runner, 19 leaderboard.
 DATABASE_URL=postgres://localhost/parley_dev pnpm test
 
 # End to end. Needs `pnpm dev` running in another shell.
