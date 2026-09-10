@@ -17,7 +17,7 @@ export default function RewardsDocs() {
   return (
     <DocsPage href="/docs/rewards" eyebrow="Reference" title="Rewards">
       <Note title="Coming soon">
-        <p>Being built. This page will describe it when there is something to describe.</p>
+        <p>Being built. This page will describe it when live.</p>
       </Note>
     </DocsPage>
   );
