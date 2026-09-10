@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CopyButton } from "./CopyButton";
 import type { ReactNode } from "react";
 import { docsEntry, docsNeighbours } from "@/lib/docs-map";
 
@@ -112,21 +113,68 @@ export function Point({ term, children }: { term: string; children: ReactNode })
 /** Inline code, at a size that sits on the line rather than above it. */
 export function C({ children }: { children: ReactNode }) {
   return (
-    // `anywhere` rather than `break-word`: an identifier like
-    // `x-parley-address` has nowhere to break, and inside a narrow table cell
-    // it was running under the panel's padding and being clipped mid-token.
-    <code className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[13.5px] text-signal [overflow-wrap:anywhere]">
+    // Never broken mid-token. `parley_whoami` split across three lines to fit a
+    // phone is less readable than a table the reader swipes, and the table has
+    // its own scroll container so nothing is clipped and the page itself never
+    // moves sideways.
+    <code className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[13.5px] text-signal ">
       {children}
     </code>
   );
 }
 
-/** A shell or code sample. Scrolls itself so the page never does. */
-export function Code({ children }: { children: string }) {
+/**
+ * A command, or the output of one.
+ *
+ * Near-black rather than the panel's own surface, because a code block sitting
+ * on a ground two shades from its own reads as a quotation rather than
+ * something to run. The contrast is the point: this is the part of the page a
+ * reader is going to copy.
+ *
+ * `output` marks a sample of what a command prints. Those get no copy button:
+ * a button offering to copy something nobody would ever paste is noise, and it
+ * makes the ones worth copying harder to pick out.
+ */
+export function Code({ children, output = false }: { children: string; output?: boolean }) {
   return (
-    <pre className="overflow-x-auto rounded-xl border border-edge bg-void/70 p-4 font-mono text-[13.5px] leading-relaxed text-dim">
-      <code>{children}</code>
-    </pre>
+    <div className="relative overflow-hidden rounded-xl border border-edge-strong bg-[#040704]">
+      {!output && (
+        <div className="absolute top-2.5 right-2.5 z-10">
+          <CopyButton value={children} />
+        </div>
+      )}
+      <pre
+        className={`overflow-x-auto px-4 py-3.5 font-mono text-[13.5px] leading-relaxed ${
+          output ? "text-[#a9bca9]" : "pr-20 text-[#eef5ee]"
+        }`}
+      >
+        <code>
+          {output
+            ? children
+            : // A trailing `# ...` is a note about the command rather than part
+              // of it, so it is set apart. Split rather than highlighted, since
+              // a real tokeniser here would be a lot of machinery for one case.
+              children.split("\n").map((line, i, all) => {
+                const at = line.indexOf("#");
+                const hasComment = at > 0 && line.slice(0, at).trim().length > 0;
+                return (
+                  // eslint-disable-next-line react/no-array-index-key -- lines are positional
+                  <span key={i}>
+                    {hasComment ? (
+                      <>
+                        {line.slice(0, at)}
+                        <span className="text-warn/70">{line.slice(at)}</span>
+                      </>
+                    ) : (
+                      line
+                    )}
+                    {i < all.length - 1 ? "\n" : ""}
+                  </span>
+                );
+              })}
+        </code>
+      </pre>
+    </div>
   );
 }
 
@@ -144,10 +192,7 @@ export function Note({ title, children }: { title: string; children: ReactNode }
 export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
   return (
     <div className="overflow-x-auto">
-      {/* The floor applies from `sm` up, where a two-column table needs the
-          room. Below it, letting the cells wrap reads better than a table that
-          scrolls sideways under the reader's thumb. */}
-      <table className="w-full border-collapse text-[15px] sm:min-w-[30rem]">
+      <table className="w-full border-collapse text-[15px] min-w-[30rem] sm:min-w-[34rem]">
         <thead>
           <tr>
             {head.map((cell) => (

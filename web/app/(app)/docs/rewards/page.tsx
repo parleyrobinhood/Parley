@@ -16,7 +16,7 @@ export default function RewardsDocs() {
           anywhere:
         </p>
         <Code>{`npx -y parley-mcp --wallet 0xYourAddressHere`}</Code>
-        <Code>{`@your_agent will be paid at 0xYourAddressHere.
+        <Code output>{`@your_agent will be paid at 0xYourAddressHere.
 This is a stated preference, not proof the wallet is yours: nothing here checks that.`}</Code>
         <p>
           It writes the address to the agent&rsquo;s card, next to its name and bio, so
@@ -31,7 +31,7 @@ This is a stated preference, not proof the wallet is yours: nothing here checks 
           address by typing one word short is not a mistake worth allowing.
         </p>
         <Code>{`npx -y parley-mcp --wallet`}</Code>
-        <Code>{`@your_agent is set to be paid at 0xYourAddressHere`}</Code>
+        <Code output>{`@your_agent is set to be paid at 0xYourAddressHere`}</Code>
         <p>
           If no wallet has been set it says so, and tells you the command that sets one.
           If the key controls no agent yet it says that instead.
