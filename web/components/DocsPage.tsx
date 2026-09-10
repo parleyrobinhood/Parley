@@ -28,7 +28,10 @@ export function DocsPage({
   const { next } = docsNeighbours(href);
 
   return (
-    <div className="max-w-2xl">
+    // Wider than the text wants to be, because the panel's padding comes out of
+    // it. At `max-w-2xl` the frame was taking 4.5rem off the measure and the
+    // page read as though the type had shrunk.
+    <div className="max-w-3xl">
       {/*
         The reading column is a panel rather than bare page.
         Two reasons beyond taste: the ambient field drifts behind everything on
@@ -36,7 +39,7 @@ export function DocsPage({
         competing with the words. It also gives the documentation an edge, so a
         reference table reads as being inside something rather than floating.
       */}
-      <article className="card-line rounded-2xl bg-surface/50 px-5 py-7 sm:px-9 sm:py-10">
+      <article className="card-line rounded-2xl bg-surface/50 px-5 py-7 sm:px-10 sm:py-11">
         <p className="overline-label mb-3">{eyebrow}</p>
         <h1 className="font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.06] font-medium tracking-tight text-balance text-ink">
           {title}
@@ -44,7 +47,7 @@ export function DocsPage({
         {summary && <p className="mt-3 text-[17px] leading-relaxed text-faint">{summary}</p>}
 
         {intro && (
-          <div className="mt-6 border-t border-edge pt-6 text-[15.5px] leading-relaxed text-dim">
+          <div className="mt-6 border-t border-edge pt-6 text-[16.5px] leading-relaxed text-dim">
             {intro}
           </div>
         )}
@@ -92,7 +95,7 @@ export function Block({
       <h2 className="font-display text-[1.35rem] leading-tight font-medium tracking-tight text-balance text-ink">
         {title}
       </h2>
-      <div className="mt-4 space-y-4 text-[15.5px] leading-relaxed text-dim">{children}</div>
+      <div className="mt-4 space-y-4 text-[16.5px] leading-relaxed text-dim">{children}</div>
     </section>
   );
 }
@@ -112,7 +115,7 @@ export function C({ children }: { children: ReactNode }) {
     // `anywhere` rather than `break-word`: an identifier like
     // `x-parley-address` has nowhere to break, and inside a narrow table cell
     // it was running under the panel's padding and being clipped mid-token.
-    <code className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[13px] text-signal [overflow-wrap:anywhere]">
+    <code className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[13.5px] text-signal [overflow-wrap:anywhere]">
       {children}
     </code>
   );
@@ -121,7 +124,7 @@ export function C({ children }: { children: ReactNode }) {
 /** A shell or code sample. Scrolls itself so the page never does. */
 export function Code({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-xl border border-edge bg-void/70 p-4 font-mono text-[13px] leading-relaxed text-dim">
+    <pre className="overflow-x-auto rounded-xl border border-edge bg-void/70 p-4 font-mono text-[13.5px] leading-relaxed text-dim">
       <code>{children}</code>
     </pre>
   );
@@ -132,7 +135,7 @@ export function Note({ title, children }: { title: string; children: ReactNode }
   return (
     <div className="rounded-r-xl border-l-2 border-warn/40 bg-warn/[0.06] py-3.5 pr-4 pl-4">
       <p className="font-mono text-[11px] tracking-[0.14em] text-warn uppercase">{title}</p>
-      <div className="mt-1.5 space-y-2 text-[14.5px] leading-relaxed text-dim">{children}</div>
+      <div className="mt-1.5 space-y-2 text-[15.5px] leading-relaxed text-dim">{children}</div>
     </div>
   );
 }
@@ -144,7 +147,7 @@ export function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
       {/* The floor applies from `sm` up, where a two-column table needs the
           room. Below it, letting the cells wrap reads better than a table that
           scrolls sideways under the reader's thumb. */}
-      <table className="w-full border-collapse text-[14px] sm:min-w-[30rem]">
+      <table className="w-full border-collapse text-[15px] sm:min-w-[30rem]">
         <thead>
           <tr>
             {head.map((cell) => (
