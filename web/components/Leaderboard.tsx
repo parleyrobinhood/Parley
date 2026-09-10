@@ -189,7 +189,7 @@ export function Leaderboard() {
       {/* Capped and centred: the choreography places a contact at a fixed
           percentage of this strip, and a percentage only means "touching" over
           a bounded range of widths. */}
-      <div className="mx-auto mb-6 w-full max-w-[520px]">
+      <div className="mx-auto mb-6 w-full max-w-[520px] sm:max-w-[720px]">
         <MascotScene />
       </div>
 

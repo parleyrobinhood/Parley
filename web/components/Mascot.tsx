@@ -20,7 +20,7 @@ import { useEffect, useId, useState } from "react";
  * mid-blink and leaning off their own shadows.
  */
 export function Mascot({
-  size = 76,
+  className = "size-[76px]",
   hue = 112,
   /**
    * Seconds to offset the idle rhythms by, negative so they start mid-cycle.
@@ -33,7 +33,15 @@ export function Mascot({
    */
   phase = 0,
 }: {
-  size?: number;
+  /**
+   * Sizing, as classes rather than a number, so it can differ by breakpoint.
+   *
+   * The scene's geometry is percentages of a strip and the agents are pixels,
+   * which only meet at a contact if the two scale together. A number here
+   * would make one size serve a phone and a monitor, and a bump tuned for the
+   * monitor is one orb halfway inside another on the phone.
+   */
+  className?: string;
   hue?: number;
   phase?: number;
 }) {
@@ -72,10 +80,8 @@ export function Mascot({
 
   return (
     <svg
-      width={size}
-      height={size}
       viewBox="0 0 132 132"
-      className="shrink-0 cursor-pointer overflow-visible"
+      className={`shrink-0 cursor-pointer overflow-visible ${className}`}
       role="img"
       aria-label="A Parley agent"
       onClick={() => setWinking(true)}
@@ -166,25 +172,32 @@ export function Mascot({
  */
 export function MascotScene() {
   return (
-    <div className="relative h-[132px] w-full select-none" aria-label="Three Parley agents milling about">
+    <div
+      // Height is the tallest agent plus enough for the bob and the antenna,
+      // and no more. The strip was half again as tall as they are, so three
+      // agents sat along the bottom of an empty box and the space above them
+      // read as a gap in the page rather than as room they were using.
+      className="relative h-[86px] w-full select-none sm:h-[122px]"
+      aria-label="Three Parley agents milling about"
+    >
       {/* A faint floor, so they read as moving across something. */}
       <div className="absolute inset-x-0 bottom-3 h-px bg-gradient-to-r from-transparent via-edge to-transparent" />
 
       <div className="mascot-walk-a absolute bottom-0">
         <div className="mascot-bump-a">
-          <Mascot size={76} hue={104} phase={-0.9} />
+          <Mascot className="size-[76px] sm:size-[108px]" hue={104} phase={-0.9} />
         </div>
       </div>
 
       <div className="mascot-walk-b absolute bottom-0">
         <div className="mascot-bump-b">
-          <Mascot size={68} hue={150} phase={-2.6} />
+          <Mascot className="size-[68px] sm:size-[96px]" hue={150} phase={-2.6} />
         </div>
       </div>
 
       <div className="mascot-walk-c absolute bottom-1">
         <div className="mascot-bump-c">
-          <Mascot size={60} hue={186} phase={-4.3} />
+          <Mascot className="size-[60px] sm:size-[84px]" hue={186} phase={-4.3} />
         </div>
       </div>
     </div>
