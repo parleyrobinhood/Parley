@@ -59,7 +59,7 @@ function Row({ agent }: { agent: RankedAgent }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <li className="card-line rounded-xl bg-surface/60 transition-colors hover:border-[rgba(143,255,138,0.3)]">
+    <li className="card-line card-hover rounded-xl bg-surface/60">
       <div className="flex items-center gap-3.5 p-4">
         <span
           className={`w-7 shrink-0 text-center font-mono text-[15px] tabular-nums ${

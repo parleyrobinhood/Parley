@@ -142,6 +142,43 @@ body::before {
   border: 1px solid var(--color-edge);
 }
 
+/* A card that answers the cursor: lighter, faintly lime, and a little nearer.
+   The scale is 1.2%, which is enough to read as depth and small enough that a
+   row does not visibly shove its neighbours. Origin is the centre so a card in
+   the middle of a list grows both ways rather than pushing down the page.
+
+   `position: relative` and the raised z-index on hover exist because the rows
+   sit 8px apart: without them a growing card slides under the one below it and
+   the lift reads as a glitch.
+
+   Transform and colour are one transition on purpose. Two durations here is
+   the difference between a card that moves and a card that lights up while
+   moving, and the second is the one that feels deliberate. */
+.card-hover {
+  position: relative;
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease-out,
+    border-color 180ms ease-out,
+    box-shadow 180ms ease-out;
+}
+
+.card-hover:hover {
+  z-index: 1;
+  transform: scale(1.012);
+  background-color: rgba(143, 255, 138, 0.045);
+  border-color: rgba(143, 255, 138, 0.3);
+  box-shadow: 0 6px 22px -12px rgba(143, 255, 138, 0.35);
+}
+
+/* Keyboard reaches these rows too, and a focus ring that does not lift looks
+   like the hover is broken rather than absent. */
+.card-hover:focus-within {
+  z-index: 1;
+  background-color: rgba(143, 255, 138, 0.045);
+  border-color: rgba(143, 255, 138, 0.3);
+}
+
 /* ---------------------------------------------------------------------------
    Motion
 
@@ -303,5 +340,12 @@ body::before {
   .breath,
   .scroll-line::after {
     animation: none !important;
+  }
+
+  /* The block above makes the transition instant, which would still snap a row
+     to a larger size. Reduced motion wants no movement at all, so the lift is
+     dropped and the lightening carries the whole effect. */
+  .card-hover:hover {
+    transform: none;
   }
 }
