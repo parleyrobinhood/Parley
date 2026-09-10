@@ -28,25 +28,35 @@ export function DocsPage({
   const { next } = docsNeighbours(href);
 
   return (
-    <article className="max-w-2xl">
-      <p className="overline-label mb-3">{eyebrow}</p>
-      <h1 className="font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.06] font-medium tracking-tight text-balance text-ink">
-        {title}
-      </h1>
-      {summary && <p className="mt-3 text-[17px] leading-relaxed text-faint">{summary}</p>}
+    <div className="max-w-2xl">
+      {/*
+        The reading column is a panel rather than bare page.
+        Two reasons beyond taste: the ambient field drifts behind everything on
+        this site, and a slightly opaque ground under long-form text stops it
+        competing with the words. It also gives the documentation an edge, so a
+        reference table reads as being inside something rather than floating.
+      */}
+      <article className="card-line rounded-2xl bg-surface/50 px-5 py-7 sm:px-9 sm:py-10">
+        <p className="overline-label mb-3">{eyebrow}</p>
+        <h1 className="font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.06] font-medium tracking-tight text-balance text-ink">
+          {title}
+        </h1>
+        {summary && <p className="mt-3 text-[17px] leading-relaxed text-faint">{summary}</p>}
 
-      {intro && (
-        <div className="mt-6 border-t border-edge pt-6 text-[15.5px] leading-relaxed text-dim">
-          {intro}
-        </div>
-      )}
+        {intro && (
+          <div className="mt-6 border-t border-edge pt-6 text-[15.5px] leading-relaxed text-dim">
+            {intro}
+          </div>
+        )}
 
-      <div className="mt-10 space-y-10">{children}</div>
+        <div className="mt-10 space-y-10">{children}</div>
+      </article>
 
+      {/* Outside the panel: this is a way out of the page, not part of it. */}
       {next && (
         <Link
           href={next.href}
-          className="group mt-14 flex items-center justify-between gap-4 rounded-xl border border-edge bg-surface/50 px-5 py-4 no-underline transition-colors hover:border-edge-strong hover:bg-surface"
+          className="group mt-4 flex items-center justify-between gap-4 rounded-xl border border-edge bg-surface/50 px-5 py-4 no-underline transition-colors hover:border-edge-strong hover:bg-surface"
         >
           <span className="min-w-0">
             <span className="overline-label block">Next</span>
@@ -63,7 +73,7 @@ export function DocsPage({
           </span>
         </Link>
       )}
-    </article>
+    </div>
   );
 }
 
@@ -99,7 +109,10 @@ export function Point({ term, children }: { term: string; children: ReactNode })
 /** Inline code, at a size that sits on the line rather than above it. */
 export function C({ children }: { children: ReactNode }) {
   return (
-    <code className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[13px] text-signal">
+    // `anywhere` rather than `break-word`: an identifier like
+    // `x-parley-address` has nowhere to break, and inside a narrow table cell
+    // it was running under the panel's padding and being clipped mid-token.
+    <code className="rounded bg-signal-soft px-1.5 py-0.5 font-mono text-[13px] text-signal [overflow-wrap:anywhere]">
       {children}
     </code>
   );

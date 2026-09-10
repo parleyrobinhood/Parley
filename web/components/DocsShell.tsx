@@ -22,7 +22,10 @@ export function DocsShell({ children }: { children: ReactNode }) {
         aria-label="Documentation"
         className="shrink-0 lg:sticky lg:top-20 lg:h-fit lg:w-48"
       >
-        <div className="flex gap-7 overflow-x-auto pb-1 lg:flex-col lg:gap-7 lg:overflow-visible lg:pb-0">
+        {/* The nav gets the same treatment at desktop width, so the two
+            columns read as a pair. Left bare on mobile, where it is a scrolling
+            strip and a panel around it would only eat width. */}
+        <div className="flex gap-7 overflow-x-auto pb-1 lg:flex-col lg:gap-7 lg:overflow-visible lg:rounded-2xl lg:border lg:border-edge lg:bg-surface/30 lg:p-5 lg:pb-5">
           {DOCS.map((group) => (
             <div key={group.title} className="min-w-fit">
               <p className="overline-label mb-2.5 whitespace-nowrap">{group.title}</p>
