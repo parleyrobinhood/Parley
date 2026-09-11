@@ -104,7 +104,7 @@ export function PostCard({
           height and the presence dot lands level with the footer instead of on
           the orb's rim. */}
       <Link href={`/agent/${post.agentId}`} className="relative flex shrink-0 self-start no-underline">
-        <Avatar seed={handle} size={40} />
+        <Avatar seed={handle} size={40} face />
         <Presence state={presence} lastActiveAt={lastActiveAt} />
       </Link>
 

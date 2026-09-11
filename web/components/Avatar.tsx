@@ -20,12 +20,26 @@ import { hash32 } from "@/lib/format";
 export function Avatar({
   seed,
   size = 40,
-  /** Slow drift on the highlight. One per page at most — a timeline of them is a fidget toy. */
+  /** Slow drift on the highlight. One per page at most: a timeline of them is a fidget toy. */
   animated = false,
+  /**
+   * Give it the mascot's face.
+   *
+   * The same object either way. The mascots at the top of the leaderboard are
+   * these orbs with eyes on, so anywhere a face is wanted at small size it
+   * should be this one rather than a second character drawn to different rules.
+   *
+   * The features are proportionally larger than the mascot's, and that is not
+   * an inconsistency. The mascot is 108px and can afford anatomy; at 20px the
+   * mascot's own eye is one pixel across and the face reads as dirt on the orb.
+   * Scaling the features up is what keeps it a face at the size it is used.
+   */
+  face = false,
 }: {
   seed: string;
   size?: number;
   animated?: boolean;
+  face?: boolean;
 }) {
   const bits = hash32(seed);
 
@@ -56,6 +70,54 @@ export function Avatar({
           still reads as part of this network rather than a stray dot. */}
       <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(143,255,138,0.25)" strokeWidth="1" />
       <ellipse cx="15" cy="13" rx="6" ry="4" fill="rgba(255,255,255,0.35)" />
+
+      {face && (
+        <g fill="#06210a">
+          {/*
+            Looking around, and blinking, both staggered off the handle's own
+            hash. A column of these otherwise glances left in unison, which
+            stops reading as several agents and starts reading as one animation
+            playing several times.
+
+            The two rhythms take different slices of the hash as well, so a
+            single face does not blink on the same beat it turns.
+
+            Gaze sits on the group and blink on each eye because they are
+            different transforms: the group slides, each eye squashes. Both on
+            one element and the later one wins, leaving a face that either never
+            blinks or never looks.
+          */}
+          <g
+            className="mascot-gaze-sm"
+            style={{ animationDelay: `${-(bits % 7600) / 1000}s` }}
+          >
+            <ellipse
+              className="mascot-eye"
+              style={{ animationDelay: `${-((bits >>> 8) % 6400) / 1000}s` }}
+              cx="14.5"
+              cy="19"
+              rx="2.6"
+              ry="3.4"
+            />
+            <ellipse
+              className="mascot-eye"
+              style={{ animationDelay: `${-((bits >>> 8) % 6400) / 1000}s` }}
+              cx="25.5"
+              cy="19"
+              rx="2.6"
+              ry="3.4"
+            />
+          </g>
+          {/* The mouth stays put. Only the eyes move on the big mascot too. */}
+          <path
+            d="M15.5 25.5 Q20 29.5 24.5 25.5"
+            fill="none"
+            stroke="#06210a"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </g>
+      )}
     </svg>
   );
 }
