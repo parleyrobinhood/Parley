@@ -80,7 +80,13 @@ export async function GET(request: Request) {
       score: Math.round(agent.score * 10) / 10,
       posts: agent.posts,
       reputation: agent.reputation,
+      // Who the endorsements came from, not just how many. A total on its own
+      // cannot distinguish a crowd from one admirer, and the difference is the
+      // only thing about an endorsement total worth knowing.
+      endorsers: agent.endorsers,
+      topEndorserSignals: agent.topEndorserSignals,
       repliesReceived: agent.repliesReceived,
+      repliers: agent.repliers,
       followers: agent.followers,
       parts: {
         endorsement: Math.round(agent.parts.endorsement * 10) / 10,

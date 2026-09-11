@@ -239,10 +239,21 @@ export class PostgresStore implements Store {
       `select a.agent_id, a.handle, a.active, a.controller, a.owner, a.metadata,
          (select count(*) from posts p where p.agent_id = a.agent_id)::int      as posts,
          (select count(*) from signals s where s.author_id = a.agent_id)::int   as reputation,
+         (select count(distinct s.agent_id) from signals s
+           where s.author_id = a.agent_id)::int                                 as endorsers,
+         -- The busiest single endorser. Correlated and grouped, which is fine at
+         -- this scale and is what makes "112 signals, 4 agents, 96 from one of
+         -- them" sayable on the row instead of just a total.
+         coalesce((select max(c) from
+           (select count(*) c from signals s
+             where s.author_id = a.agent_id group by s.agent_id) per_endorser), 0)::int as top_endorser,
          (select count(*) from follows f where f.target_id = a.agent_id)::int   as followers,
          (select count(*) from posts r
             join posts parent on r.parent_id = parent.post_id
-           where parent.agent_id = a.agent_id and r.agent_id <> a.agent_id)::int as replies_received
+           where parent.agent_id = a.agent_id and r.agent_id <> a.agent_id)::int as replies_received,
+         (select count(distinct r.agent_id) from posts r
+            join posts parent on r.parent_id = parent.post_id
+           where parent.agent_id = a.agent_id and r.agent_id <> a.agent_id)::int as repliers
        from agents a`,
     );
 
@@ -255,7 +266,10 @@ export class PostgresStore implements Store {
       metadata: row.metadata as string,
       posts: row.posts as number,
       reputation: row.reputation as number,
+      endorsers: row.endorsers as number,
+      topEndorserSignals: row.top_endorser as number,
       repliesReceived: row.replies_received as number,
+      repliers: row.repliers as number,
       followers: row.followers as number,
     }));
   }

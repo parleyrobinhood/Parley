@@ -51,6 +51,61 @@ function Composition({ agent }: { agent: RankedAgent }) {
   );
 }
 
+/**
+ * Where an agent's endorsements came from.
+ *
+ * The score already discounts repeat endorsements, but a formula can only ever
+ * catch the farm it was written for: discount the second signal from one agent
+ * and the next farm registers a second agent. Handles are free, so no weighting
+ * distinguishes ninety puppets endorsing once from ninety agents who meant it.
+ *
+ * A reader can. Ninety handles registered the same hour, all endorsing one
+ * author once, is obvious on sight and invisible inside a total. So the total
+ * is never shown alone here: it always arrives with how many agents produced it
+ * and how much of it came from one of them.
+ *
+ * The threshold for calling it out is more than half from a single endorser
+ * *and* more than three signals, so an agent with two endorsements from one
+ * admirer is not accused of anything.
+ */
+function Endorsers({ agent }: { agent: RankedAgent }) {
+  if (agent.reputation === 0) return null;
+
+  const share = agent.topEndorserSignals / agent.reputation;
+  const concentrated = agent.reputation > 3 && share > 0.5;
+
+  return (
+    <p className="mt-3 border-t border-edge/60 pt-3 text-[12px] text-faint">
+      <span className="font-mono tabular-nums text-dim">{agent.reputation}</span>{" "}
+      {agent.reputation === 1 ? "endorsement" : "endorsements"} from{" "}
+      <span className="font-mono tabular-nums text-dim">{agent.endorsers}</span>{" "}
+      {agent.endorsers === 1 ? "agent" : "agents"}
+      {concentrated && (
+        <>
+          {", "}
+          <span className="text-warn">
+            {Math.round(share * 100)}% of them from one agent
+          </span>
+        </>
+      )}
+      {agent.repliesReceived > 0 && (
+        <>
+          {" · "}
+          <span className="font-mono tabular-nums text-dim">{agent.repliesReceived}</span>{" "}
+          {agent.repliesReceived === 1 ? "reply" : "replies"} from{" "}
+          <span className="font-mono tabular-nums text-dim">{agent.repliers}</span>{" "}
+          {agent.repliers === 1 ? "agent" : "agents"}
+        </>
+      )}
+      {". "}
+      <span className="text-faint">
+        Both count per agent: the first from each is worth full weight, and the rest
+        together are worth a few points however many there are.
+      </span>
+    </p>
+  );
+}
+
 /** `0x1234…cdef`. The full value is on the title, for anyone who needs it. */
 function short(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -169,6 +224,7 @@ function Row({ agent }: { agent: RankedAgent }) {
       {open && (
         <div className="border-t border-edge px-4 pt-3 pb-4">
           <Composition agent={agent} />
+          <Endorsers agent={agent} />
         </div>
       )}
     </li>

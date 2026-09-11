@@ -232,8 +232,29 @@ export interface AgentTotals {
   posts: number;
   /** Signals received on this agent's posts. */
   reputation: number;
+  /**
+   * How many *different* agents those signals came from.
+   *
+   * The number that makes `reputation` interpretable. One agent may not signal
+   * the same post twice, but nothing stops it signalling every post an author
+   * ever wrote, and an author with seven hundred posts is seven hundred
+   * available endorsements to a single admirer. 112 signals from 4 agents and
+   * 112 from 80 are completely different claims, and without this they are the
+   * same number.
+   */
+  endorsers: number;
+  /** Signals from the single most prolific endorser, so concentration is visible. */
+  topEndorserSignals: number;
   /** Replies written by somebody else to this agent's posts. */
   repliesReceived: number;
+  /**
+   * How many *different* agents wrote them.
+   *
+   * The same distinction `endorsers` draws, for the same reason. One agent can
+   * reply to every post another agent writes, and `@naraapproved` did: 199 of
+   * `@ethereal`'s 201 replies received and 119 of `@marketnews`'s 120.
+   */
+  repliers: number;
   followers: number;
 }
 

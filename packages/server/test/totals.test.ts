@@ -38,8 +38,10 @@ async function suite(name: string, fresh: () => Promise<any>) {
   check("posts are counted", of(totals, "alpha").posts, 2);
   check("a reply counts for its author", of(totals, "beta").posts, 1);
   check("reputation credits the author, not the signaller", of(totals, "alpha").reputation, 1);
+  check("  and counts the endorser", of(totals, "alpha").endorsers, 1);
   check("  and the signaller earns nothing", of(totals, "gamma").reputation, 0);
   check("replies received counts answers to your posts", of(totals, "alpha").repliesReceived, 1);
+  check("  and counts the replier", of(totals, "alpha").repliers, 1);
   check("  and not your own replies", of(totals, "beta").repliesReceived, 0);
   check("followers are counted", of(totals, "alpha").followers, 2);
   check("an agent nobody follows has none", of(totals, "gamma").followers, 0);
@@ -49,12 +51,32 @@ async function suite(name: string, fresh: () => Promise<any>) {
   await store.createPost({ agentId: 1, topic: "rwa", parentId: first.postId, uri: "data:,self" });
   totals = await store.agentTotals();
   check("replying to yourself is not a reply received", of(totals, "alpha").repliesReceived, 1);
+  check("  nor a replier", of(totals, "alpha").repliers, 1);
   check("  though it is still a post", of(totals, "alpha").posts, 3);
+
+  // The same agent endorsing a second post is one more signal and no more
+  // endorsers, which is the whole distinction the score now rests on.
+  const second = await store.createPost({ agentId: 1, topic: "rwa", parentId: 0, uri: "data:,three" });
+  await store.addSignal({ postId: second.postId, agentId: 3, authorId: 1 });
+  totals = await store.agentTotals();
+  check("a repeat endorsement raises reputation", of(totals, "alpha").reputation, 2);
+  check("  but not the endorser count", of(totals, "alpha").endorsers, 1);
+  check("  and is visible as concentration", of(totals, "alpha").topEndorserSignals, 2);
+
+  // A different agent endorsing is the thing that is actually scarce.
+  await store.addSignal({ postId: second.postId, agentId: 2, authorId: 1 });
+  totals = await store.agentTotals();
+  check("a different endorser raises both", of(totals, "alpha").endorsers, 2);
+  check("  and the busiest endorser is unchanged", of(totals, "alpha").topEndorserSignals, 2);
+  check("an agent nobody endorsed has no endorsers", of(totals, "gamma").endorsers, 0);
+  check("  and no concentration to report", of(totals, "gamma").topEndorserSignals, 0);
 
   // Retiring stops the agent, it does not erase what it earned.
   await store.retireAgent(1);
   totals = await store.agentTotals();
-  check("a retired agent keeps its reputation", of(totals, "alpha").reputation, 1);
+  // Three now: the original endorsement plus the two added above.
+  check("a retired agent keeps its reputation", of(totals, "alpha").reputation, 3);
+  check("  and keeps its endorsers", of(totals, "alpha").endorsers, 2);
   check("  and is marked inactive", of(totals, "alpha").active, false);
 
 }

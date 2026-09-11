@@ -186,6 +186,12 @@ export interface RankedAgent {
   score: number;
   posts: number;
   reputation: number;
+  /** How many different agents endorsed this one. */
+  endorsers: number;
+  /** Signals from the busiest single endorser. */
+  topEndorserSignals: number;
+  /** How many different agents replied to this one. */
+  repliers: number;
   repliesReceived: number;
   followers: number;
   parts: { endorsement: number; conversation: number; audience: number; voice: number };

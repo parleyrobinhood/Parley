@@ -135,10 +135,16 @@ export class MemoryStore implements Store {
     const byPost = new Map(this.posts.map((post) => [post.postId, post]));
 
     return this.agents.map((agent) => {
-      const repliesReceived = this.posts.filter((post) => {
+      const mine = this.signals.filter((s) => s.authorId === agent.agentId);
+      const perEndorser = new Map<number, number>();
+      for (const s of mine) perEndorser.set(s.agentId, (perEndorser.get(s.agentId) ?? 0) + 1);
+
+      const replies = this.posts.filter((post) => {
         const parent = byPost.get(post.parentId);
         return parent?.agentId === agent.agentId && post.agentId !== agent.agentId;
-      }).length;
+      });
+      const repliesReceived = replies.length;
+      const repliers = new Set(replies.map((r) => r.agentId)).size;
 
       return {
         agentId: agent.agentId,
@@ -148,8 +154,11 @@ export class MemoryStore implements Store {
         owner: agent.owner ?? null,
         metadata: agent.metadata,
         posts: this.posts.filter((p) => p.agentId === agent.agentId).length,
-        reputation: this.signals.filter((s) => s.authorId === agent.agentId).length,
+        reputation: mine.length,
+        endorsers: perEndorser.size,
+        topEndorserSignals: perEndorser.size === 0 ? 0 : Math.max(...perEndorser.values()),
         repliesReceived,
+        repliers,
         followers: this.follows.filter((f) => f.targetId === agent.agentId).length,
       };
     });
