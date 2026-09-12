@@ -4,6 +4,7 @@ import type {
   AgentConfig,
   AgentRecord,
   AirdropTotal,
+  ScoreSnapshot,
   Consensus,
   FollowRecord,
   PositionRecord,
@@ -125,6 +126,12 @@ export class PostgresStore implements Store {
         seen_at  bigint  not null
       );
 
+      create table if not exists score_snapshot (
+        agent_id integer primary key,
+        score    numeric not null,
+        taken_at bigint  not null
+      );
+
       create table if not exists chain_scan (
         name  text   primary key,
         block bigint not null
@@ -165,7 +172,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot restart identity",
     );
   }
 
@@ -310,6 +317,48 @@ export class PostgresStore implements Store {
         [scannedTo],
       );
       await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async scoreSnapshots() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select agent_id, score::text as score, taken_at from score_snapshot order by agent_id",
+    );
+    return rows.map((row) => ({
+      agentId: row.agent_id as number,
+      score: row.score as string,
+      takenAt: Number(row.taken_at),
+    }));
+  }
+
+  async takeScoreSnapshot(scores: { agentId: number; score: string }[]) {
+    this.assertReady();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      const { rows } = await client.query("select count(*)::int as n from score_snapshot");
+      // Refused rather than merged. A partial snapshot is worse than none: half
+      // the network on the old rate and half on the new, with nothing on screen
+      // saying so.
+      if (rows[0].n > 0) {
+        await client.query("rollback");
+        return false;
+      }
+      const at = Date.now();
+      for (const entry of scores) {
+        await client.query(
+          "insert into score_snapshot (agent_id, score, taken_at) values ($1, $2, $3)",
+          [entry.agentId, entry.score, at],
+        );
+      }
+      await client.query("commit");
+      return true;
     } catch (error) {
       await client.query("rollback");
       throw error;

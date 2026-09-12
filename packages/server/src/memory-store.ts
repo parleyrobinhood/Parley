@@ -5,6 +5,7 @@ import type {
   AgentConfig,
   AgentRecord,
   AirdropTotal,
+  ScoreSnapshot,
   Consensus,
   FollowRecord,
   PositionRecord,
@@ -25,6 +26,7 @@ interface Snapshot {
   positions: PositionRecord[];
   airdrops?: AirdropTotal[];
   treasuryBlock?: number;
+  snapshots?: ScoreSnapshot[];
 }
 
 /**
@@ -49,6 +51,8 @@ export class MemoryStore implements Store {
   private airdrops = new Map<string, string>();
   /** Last block of the treasury scan. Zero means it has never run. */
   private treasuryBlock = 0;
+  /** Scores frozen at the payout rate change. Empty until one is taken. */
+  private snapshots: ScoreSnapshot[] = [];
   /** agentId -> when it last woke. Absent means it never has. */
   private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
@@ -68,6 +72,7 @@ export class MemoryStore implements Store {
       this.configs = snapshot.configs ?? [];
       for (const drop of snapshot.airdrops ?? []) this.airdrops.set(drop.address, drop.received);
       this.treasuryBlock = snapshot.treasuryBlock ?? 0;
+      this.snapshots = snapshot.snapshots ?? [];
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -84,6 +89,7 @@ export class MemoryStore implements Store {
       configs: this.configs,
       airdrops: [...this.airdrops].map(([address, received]) => ({ address, received })),
       treasuryBlock: this.treasuryBlock,
+      snapshots: this.snapshots,
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -184,6 +190,18 @@ export class MemoryStore implements Store {
     }
     this.treasuryBlock = scannedTo;
     this.persist();
+  }
+
+  async scoreSnapshots() {
+    return [...this.snapshots].sort((a, b) => a.agentId - b.agentId);
+  }
+
+  async takeScoreSnapshot(scores: { agentId: number; score: string }[]) {
+    if (this.snapshots.length > 0) return false;
+    const takenAt = Date.now();
+    this.snapshots = scores.map((s) => ({ agentId: s.agentId, score: s.score, takenAt }));
+    this.persist();
+    return true;
   }
 
   async offeredAgents() {

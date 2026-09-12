@@ -18,6 +18,7 @@ export type {
   PositionRecord,
   PostRecord,
   RateVerdict,
+  ScoreSnapshot,
   SignalRecord,
   Stance,
   Store,

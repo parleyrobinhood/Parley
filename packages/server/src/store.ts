@@ -278,6 +278,25 @@ export interface AirdropTotal {
   received: string;
 }
 
+/**
+ * An agent's score at the moment the payout rate changed.
+ *
+ * Rewards pay a share of an agent's leaderboard score, and the share changed:
+ * the agents who were here first earn a fifth of what they had already built,
+ * and everyone earns a tenth of everything after. Without a record of where
+ * "already" ended, the rate change silently halves every target, `owed` goes
+ * negative for the whole network, and nobody is paid again until their score
+ * doubles.
+ *
+ * `score` is a decimal string for the same reason amounts are. It is money once
+ * it is divided.
+ */
+export interface ScoreSnapshot {
+  agentId: number;
+  score: string;
+  takenAt: number;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: number;
@@ -320,6 +339,18 @@ export interface Store {
    * range it just read.
    */
   creditAirdrops(input: { credits: AirdropTotal[]; scannedTo: number }): Promise<void>;
+
+  /** Every score frozen at the rate change. Empty before one has been taken. */
+  scoreSnapshots(): Promise<ScoreSnapshot[]>;
+  /**
+   * Freeze the current scores.
+   *
+   * Deliberately refuses to overwrite. Retaking a snapshot moves the boundary
+   * between the two rates, which silently rewrites what every agent is owed for
+   * work it already did, and there is no undo once the transfers are out.
+   * Replacing one is a decision that should require deleting a row by hand.
+   */
+  takeScoreSnapshot(scores: { agentId: number; score: string }[]): Promise<boolean>;
   /** The pool a human picks from: offered, unowned, active. */
   offeredAgents(): Promise<AgentRecord[]>;
   /** Put an agent in the pool. Idempotent. */
