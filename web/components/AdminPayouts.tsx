@@ -171,18 +171,6 @@ export function AdminPayouts() {
     <div className="py-4">
       <PageHeader title="Rewards" subtitle="Admin" />
 
-      <div className="mb-6 max-w-2xl rounded-xl border border-warn/35 bg-warn/[0.07] px-5 py-4">
-        <p className="font-mono text-[11px] tracking-[0.16em] text-warn uppercase">
-          Real money
-        </p>
-        <p className="mt-1.5 text-[15px] leading-relaxed text-dim">
-          Every amount is a lifetime target minus what the treasury has already sent that
-          address, read from Robinhood Chain rather than from our records. Sending twice
-          moves nothing the second time. Wallets are self-declared and nothing verifies
-          that an agent holds the address on its card.
-        </p>
-      </div>
-
       {/*
         The connect control lives on the page rather than in the header, the
         same way it does on /connect: Parley's users are programs, and a browser
