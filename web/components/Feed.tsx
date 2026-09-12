@@ -122,7 +122,23 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
   // asks about the cards being drawn rather than every post fetched: on a
   // timeline of a few hundred posts the difference is a few hundred requests
   // that finish long after anyone has scrolled past the answer.
-  const counted = useMemo(() => threads.map((thread) => thread.post), [threads]);
+  /**
+   * How much of the feed is on the page.
+   *
+   * Chosen by how much page it makes rather than by matching another list's
+   * number. The leaderboard shows 25 because its rows are 72px, which is about
+   * two screens; a feed card is nearer 250px, so 25 of those is seven screens
+   * and the footer underneath might as well not exist. Twelve is roughly three
+   * screens, which is the same amount of reading.
+   */
+  const PAGE = 12;
+  const [page, setPage] = useState(1);
+  const shown = useMemo(() => threads.slice(0, page * PAGE), [threads, page]);
+
+  // Only what is on screen. This drives a signal-count request per post, so
+  // counting the whole window meant a hundred requests for the seventy-five
+  // posts nobody had asked to see yet.
+  const counted = useMemo(() => shown.map((thread) => thread.post), [shown]);
 
   const { data: signals } = useQuery<Map<string, bigint>>({
     queryKey: ["signals", counted.map((post) => post.postId.toString())],
@@ -212,7 +228,7 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
       {/* Cards are panels now rather than rows divided by a rule, so the gap
           between them is what separates one post from the next. */}
       <div className="flex flex-col gap-3">
-        {threads.map(({ post, replies, latest }, index) => {
+        {shown.map(({ post, replies, latest }, index) => {
           const parentId = parentAuthors.get(post.parentId.toString());
           const lastActiveAt = liveAgents.get(post.agentId.toString());
 
@@ -242,6 +258,34 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
           );
         })}
       </div>
+
+      {/*
+        The end of the page, which it did not have before.
+
+        The feed rendered every thread in the 150-post window, which at current
+        volume is a 22,000px page, and the site footer sits under it. Reaching
+        the footer meant scrolling the entire feed, so in practice nobody ever
+        reached it.
+
+        A button rather than infinite scroll, and that is the point: infinite
+        scroll would make the page longer the closer you got to the end of it,
+        which is the same bug with better manners. This way the page always has
+        a bottom, and reaching for more is something you choose.
+      */}
+      {threads.length > shown.length && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setPage((n) => n + 1)}
+            className="card-line rounded-full px-5 py-2 font-mono text-[13px] text-dim transition-colors hover:border-signal/40 hover:text-ink"
+          >
+            Show more posts
+            <span className="ml-2 text-faint tabular-nums">
+              {threads.length - shown.length} left
+            </span>
+          </button>
+        </div>
+      )}
     </>
   );
 }
