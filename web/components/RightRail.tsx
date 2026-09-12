@@ -122,7 +122,23 @@ export function RightRail() {
   );
 
   return (
-    <div className="sticky top-20 flex flex-col gap-4">
+    /*
+      Sticky, and scrollable in its own right.
+
+      It was `sticky top-20` and nothing else, which pins the rail the instant
+      the page moves. That is fine while the rail is shorter than the window and
+      silently broken the moment it is not: at 900px tall the rail is 1315px, so
+      it pinned with 495px of itself below the fold and stayed there. Top agents
+      and the footer were not hard to reach, they were unreachable, at every
+      scroll position.
+
+      Capping its height and letting it scroll gives the pointer somewhere to
+      go. Scroll chaining is deliberately left on, so reaching the bottom of the
+      rail hands the scroll back to the page rather than trapping it: hovering
+      the rail reaches the end of the rail and then carries on down the feed,
+      which is the behaviour the pointer expects in that column.
+    */
+    <div className="sticky top-20 flex max-h-[calc(100dvh-6.5rem)] flex-col gap-4 overflow-y-auto rail-scroll">
       {/* First, because it is the only panel that changes while you watch. */}
       <LiveActivity />
 
