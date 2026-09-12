@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import { erc20Abi } from "viem";
-import { useAccount, useConnect, useDisconnect, useSwitchChain, useWalletClient } from "wagmi";
-import { usePayouts, useTakeSnapshot } from "@/lib/admin-client";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  usePublicClient,
+  useSwitchChain,
+  useWalletClient,
+} from "wagmi";
+import { usePayouts, useRescan, useTakeSnapshot } from "@/lib/admin-client";
 import { formatUsdg, RATES, type PayoutRow } from "@/lib/payouts";
 import { robinhoodChain } from "@/app/providers";
 import { Avatar } from "./Avatar";
@@ -27,20 +34,38 @@ import { PageHeader } from "./PageHeader";
 /** USDG, "Global Dollar", six decimals. Verified on chain, not looked up. */
 const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168" as const;
 
+/**
+ * A transfer has four states worth showing and they are not interchangeable.
+ *
+ * "signing" is waiting on a person. "confirming" is waiting on the chain, and
+ * the money has left by then. "reconciling" is reading it back, which is what
+ * makes the owed column drop. Collapsing these into one spinner would leave an
+ * operator unable to tell "your wallet has not opened" from "your money is
+ * gone and the page has not caught up", which are different problems.
+ */
 type SendState =
   | { status: "idle" }
-  | { status: "sending"; handle: string }
+  | { status: "signing" | "confirming" | "reconciling"; handle: string }
   | { status: "sent"; handle: string; hash: string }
   | { status: "failed"; handle: string; error: string };
+
+const LABEL: Record<string, string> = {
+  signing: "sign in wallet…",
+  confirming: "confirming…",
+  reconciling: "reading back…",
+};
 
 function Row({
   row,
   onSend,
   busy,
+  state,
 }: {
   row: PayoutRow;
   onSend: (row: PayoutRow) => void;
   busy: boolean;
+  /** This row's own progress, or null when the activity is elsewhere. */
+  state: string | null;
 }) {
   const owed = BigInt(row.owed);
 
@@ -98,7 +123,7 @@ function Row({
               onClick={() => onSend(row)}
               className="card-line rounded-full px-3.5 py-1.5 font-mono text-[12px] text-ink transition-colors hover:border-signal/50 hover:bg-signal-soft disabled:opacity-40"
             >
-              {busy ? "sending…" : "send"}
+              {state ? LABEL[state] : busy ? "…" : "send"}
             </button>
           )}
           {row.blocker === null && owed === 0n && (
@@ -120,6 +145,8 @@ export function AdminPayouts() {
   const { data: walletClient } = useWalletClient();
   const { switchChain } = useSwitchChain();
   const { connect, connectors, isPending: connecting, error: connectError } = useConnect();
+  const publicClient = usePublicClient({ chainId: robinhoodChain.id });
+  const rescan = useRescan();
   const { disconnect } = useDisconnect();
   const injected = connectors[0];
   const { data: sheet, isPending, error, refetch } = usePayouts();
@@ -141,7 +168,7 @@ export function AdminPayouts() {
 
   async function transfer(row: PayoutRow) {
     if (!walletClient || !row.wallet) return;
-    setSend({ status: "sending", handle: row.handle });
+    setSend({ status: "signing", handle: row.handle });
 
     try {
       const hash = await walletClient.writeContract({
@@ -153,10 +180,21 @@ export function AdminPayouts() {
         // a display string, which is where rounding gets into a payment.
         args: [row.wallet as `0x${string}`, BigInt(row.owed)],
       });
+
+      // Wait for it to be mined before reading anything back. Rescanning off an
+      // unmined hash finds nothing and would report the row as still owed,
+      // which is the exact confusion this is here to remove. Blocks are 100ms.
+      setSend({ status: "confirming", handle: row.handle });
+      await publicClient?.waitForTransactionReceipt({ hash });
+
+      // Then read it off the chain immediately rather than waiting for the
+      // hourly cron. The owed column is what stops a second click paying twice,
+      // so an hour of staleness there was a stale safeguard, not just a stale
+      // number. This also feeds the public leaderboard's "USDG received".
+      setSend({ status: "reconciling", handle: row.handle });
+      await rescan.mutateAsync().catch(() => undefined);
+
       setSend({ status: "sent", handle: row.handle, hash });
-      // The owed column is derived from the chain, so it only clears once the
-      // hourly scan has seen this. Refetching now keeps the rest of the sheet
-      // honest in the meantime.
       await refetch();
     } catch (cause) {
       setSend({
@@ -304,7 +342,7 @@ export function AdminPayouts() {
 
           {send.status === "sent" && (
             <p className="mb-4 font-mono text-[12px] text-signal">
-              Sent to @{send.handle}.{" "}
+              Paid @{send.handle}.{" "}
               <a
                 href={`${robinhoodChain.blockExplorers.default.url}/tx/${send.hash}`}
                 target="_blank"
@@ -313,7 +351,8 @@ export function AdminPayouts() {
               >
                 {send.hash.slice(0, 10)}…
               </a>{" "}
-              It clears from the owed column once the hourly scan reads it back.
+              Read back off the chain, so the row above is settled and the leaderboard
+              shows it received.
             </p>
           )}
           {send.status === "failed" && (
@@ -328,7 +367,8 @@ export function AdminPayouts() {
                 key={row.agentId}
                 row={row}
                 onSend={transfer}
-                busy={send.status === "sending"}
+                busy={send.status !== "idle" && send.status !== "sent" && send.status !== "failed"}
+                state={send.status !== "idle" && "handle" in send && send.handle === row.handle ? send.status : null}
               />
             ))}
           </ul>

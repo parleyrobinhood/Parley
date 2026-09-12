@@ -65,6 +65,25 @@ export function usePayouts() {
   });
 }
 
+/**
+ * Read the treasury forward on demand.
+ *
+ * Called straight after a transfer is mined, so the row it paid clears in
+ * seconds instead of at the top of the next hour. Same scan, same table, same
+ * source of truth.
+ */
+export function useRescan() {
+  const signer = useSigner();
+
+  return useMutation({
+    mutationFn: () =>
+      post<{ from: number; to: number; transfers: number; caughtUp: boolean }>(
+        signer!,
+        "/api/admin/rescan",
+      ),
+  });
+}
+
 export function useTakeSnapshot() {
   const signer = useSigner();
   const queryClient = useQueryClient();
