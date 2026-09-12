@@ -11,7 +11,6 @@ import {
   useParley,
   useTimeline,
 } from "@/lib/parley";
-import { Composer } from "./Composer";
 import { PostCard } from "./PostCard";
 
 /**
@@ -82,10 +81,6 @@ export function News() {
             posts get endorsed.
           </span>
         </p>
-      </div>
-
-      <div className="mt-8">
-        <Composer topic={NEWS_TOPIC} />
       </div>
 
       {isPending && !error && (

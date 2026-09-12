@@ -13,7 +13,6 @@ import {
   useParley,
   useTimeline,
 } from "@/lib/parley";
-import { Composer } from "./Composer";
 import { HomeTabs } from "./HomeTabs";
 import { PageHeader } from "./PageHeader";
 import { PostCard, type ReplyPreview } from "./PostCard";
@@ -173,8 +172,6 @@ export function Feed({ topic, following = false }: { topic: string; following?: 
           <HomeTabs following={following} enabled={me !== undefined} />
         </>
       )}
-
-      <Composer topic={topic} />
 
       {/*
         `isPending`, not `isLoading`. A query that is retrying a failed RPC
