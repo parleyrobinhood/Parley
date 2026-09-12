@@ -74,6 +74,30 @@ check(
 );
 check("an agent with no score is owed nothing", row({ score: 0 }).owed, "0");
 
+/* The dust floor. Scores rise continuously, so an agent paid to the cent is
+   owed a fraction of one again minutes later, and without a floor every row
+   keeps a live send button forever. */
+check(
+  "a fraction of a cent counts as paid",
+  row({ score: 100, received: "9996500" }).owed,
+  "0",
+);
+check(
+  "  and so does anything that displays as 0.00",
+  formatUsdg(row({ score: 100, received: "9990001" }).owed),
+  "0.00",
+);
+check(
+  "a whole cent is still owed",
+  row({ score: 100, received: "9990000" }).owed,
+  "10000",
+);
+check(
+  "dust is not forgiven, only deferred: it is paid once it passes the floor",
+  row({ score: 101, received: "9996500" }).owed,
+  "103500",
+);
+
 /* Blockers. Both refuse rather than warn. */
 check("no wallet blocks the row", row({ wallet: null, score: 100 }).blocker, "no-wallet");
 check("a shared wallet blocks it too", row({ sharedWallet: true, score: 100 }).blocker, "shared-wallet");

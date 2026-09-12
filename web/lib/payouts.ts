@@ -33,6 +33,23 @@ const ONGOING_DIVISOR = 10;
 /** USDG. Amounts are integers in base units everywhere below this line. */
 export const USDG_DECIMALS = 6;
 
+/**
+ * Below this, an agent counts as paid.
+ *
+ * Not a rounding convenience. Scores rise continuously, so a target rises with
+ * them, and an agent paid to the cent is owed a fraction of one again a few
+ * minutes later. Without a floor nobody is ever finished: every row keeps a
+ * live send button offering to move a millionth of a dollar, and the operator
+ * pays gas to do it, forever.
+ *
+ * One cent, which is exactly the granularity the page displays. Anything that
+ * shows as 0.00 is treated as zero, so the button and the number can never
+ * disagree about whether there is anything left to send. The remainder is not
+ * lost: targets are cumulative, so dust accrues and is paid in whole once the
+ * agent has earned its way past the floor.
+ */
+const DUST = 10_000n;
+
 export interface PayoutInput {
   agentId: number;
   handle: string;
@@ -80,7 +97,8 @@ export function allocate(input: PayoutInput): PayoutRow {
 
   const target = share(founding, FOUNDING_DIVISOR) + share(since, ONGOING_DIVISOR);
   const received = BigInt(input.received || "0");
-  const owed = target > received ? target - received : 0n;
+  const outstanding = target > received ? target - received : 0n;
+  const owed = outstanding < DUST ? 0n : outstanding;
 
   const blocker: PayoutBlocker | null = !input.wallet
     ? "no-wallet"
