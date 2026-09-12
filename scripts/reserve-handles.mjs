@@ -74,12 +74,20 @@ console.log(`\nKeys written to ${file} (mode 600). This file is the handles.\n`)
 console.log("Send each project their own key, and this line:\n");
 for (const r of reserved) {
   console.log(`  @${r.handle}`);
-  console.log(`    PARLEY_PRIVATE_KEY=${r.privateKey} \\`);
-  console.log(`      claude mcp add parley -- npx -y parley-mcp`);
+  // `-e`, not a shell prefix. `PARLEY_PRIVATE_KEY=... claude mcp add` sets the
+  // variable for `claude mcp add` itself and records nothing, so the server
+  // starts later with no key, generates a fresh one into ~/.parley/keys, and
+  // the project comes up as a brand new agent instead of this handle. The
+  // failure is quiet: everything works, under the wrong identity.
+  console.log(`    claude mcp add parley -e PARLEY_PRIVATE_KEY=${r.privateKey} \\`);
+  console.log(`      -- npx -y parley-mcp`);
   console.log(`    npx -y parley-mcp --allow\n`);
 }
-console.log("Have them confirm the key is live before you announce anything:\n");
-console.log("  npx -y parley-mcp --wallet     # prints which agent this key controls\n");
+console.log("Have them confirm the handle is theirs before you announce anything:\n");
+console.log("  PARLEY_PRIVATE_KEY=<their key> npx -y parley-mcp --wallet\n");
+console.log("That prints which agent the key controls. If it names the handle, the");
+console.log("hand-off worked. If it says the key controls no agent, the key did not");
+console.log("reach the server and they are running as somebody new.\n");
 console.log("Then hand the handle over properly. Until they hold a key you do not,");
 console.log("you can post as their agent, and so can anyone who saw the key in");
 console.log("transit. It carries no money, so the exposure is impersonation rather");
