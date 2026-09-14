@@ -29,24 +29,58 @@ export async function POST(request: Request) {
   const paid = new Map((await store.airdropTotals()).map((drop) => [drop.address, drop.received]));
   const snapshots = new Map((await store.scoreSnapshots()).map((s) => [s.agentId, Number(s.score)]));
 
-  // An address claimed by more than one agent, counted before anything is
-  // allocated so both rows can be refused rather than the second one only.
-  const claims = new Map<string, number>();
+  /**
+   * Every address each agent has ever declared, not just the one on its card.
+   *
+   * This is what closes the double-payment hole. `received` is a fact about an
+   * address, and a cumulative target needs a fact about an agent: pay an agent,
+   * let it change its wallet, and the new address has received nothing, so the
+   * entire allocation is owed a second time. Summing across an agent's history
+   * asks the right question and lets an agent rotate a key without either
+   * losing its record or gaining a second payout.
+   *
+   * The current card is folded in because the history only starts from when it
+   * was added, and an agent that has not touched its card since is not in it.
+   */
+  const history = new Map<number, Set<string>>();
+  const owners = new Map<string, Set<number>>();
+
+  const link = (agentId: number, address: string) => {
+    const lower = address.toLowerCase();
+    (history.get(agentId) ?? history.set(agentId, new Set()).get(agentId)!).add(lower);
+    (owners.get(lower) ?? owners.set(lower, new Set()).get(lower)!).add(agentId);
+  };
+
+  for (const claim of await store.walletClaims()) link(claim.agentId, claim.address);
   for (const agent of ranked) {
-    const wallet = readCard(agent.metadata).wallet?.toLowerCase();
-    if (wallet) claims.set(wallet, (claims.get(wallet) ?? 0) + 1);
+    const wallet = readCard(agent.metadata).wallet;
+    if (wallet) link(agent.agentId, wallet);
   }
 
   const inputs: PayoutInput[] = ranked.map((agent) => {
     const wallet = readCard(agent.metadata).wallet?.toLowerCase() ?? null;
+    const mine = history.get(agent.agentId) ?? new Set<string>();
+
+    // An address two agents have both declared is attributable to neither, so
+    // it counts toward nobody's received and blocks both rows. Same rule as the
+    // shared-wallet refusal, applied to history rather than only to today's
+    // card: the chain cannot say which of them earned it either way.
+    const contested = (address: string) => (owners.get(address)?.size ?? 0) > 1;
+
+    let received = 0n;
+    for (const address of mine) {
+      if (contested(address)) continue;
+      received += BigInt(paid.get(address) ?? "0");
+    }
+
     return {
       agentId: agent.agentId,
       handle: agent.handle,
       score: agent.score,
       wallet,
       snapshotScore: snapshots.get(agent.agentId) ?? null,
-      received: wallet ? (paid.get(wallet) ?? "0") : "0",
-      sharedWallet: wallet ? (claims.get(wallet) ?? 0) > 1 : false,
+      received: received.toString(),
+      sharedWallet: wallet ? contested(wallet) : false,
     };
   });
 

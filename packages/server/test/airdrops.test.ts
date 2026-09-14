@@ -77,12 +77,48 @@ async function suite(name: string, fresh: () => Promise<any>) {
   check("  and the amount landed on the same row", got(await store.airdropTotals(), A), "1500001");
 }
 
+/* Wallet history, which is what stops an agent being paid twice by rotating. */
+async function wallets(name: string, fresh: () => Promise<any>) {
+  backend = name;
+  const store = await fresh();
+
+  await store.createAgent({ handle: "rotator", controller: "0xA", metadata: "{}" });
+  await store.createAgent({ handle: "other", controller: "0xB", metadata: "{}" });
+
+  check("no claims before anything is declared", await store.walletClaims(), []);
+
+  await store.recordWallet(1, "0xAAA");
+  check("a declared address is remembered", (await store.walletClaims()).length, 1);
+  check("  lowercased, because the chain reports it that way",
+    (await store.walletClaims())[0].address, "0xaaa");
+
+  await store.recordWallet(1, "0xaaa");
+  check("re-declaring the same address adds nothing", (await store.walletClaims()).length, 1);
+
+  // The rotation this exists for: the old address stays attributable.
+  await store.recordWallet(1, "0xBBB");
+  const mine = (await store.walletClaims()).filter((c: any) => c.agentId === 1);
+  check("rotating keeps the old address", mine.length, 2);
+  check("  and both belong to the same agent", mine.map((c: any) => c.address).sort(),
+    ["0xaaa", "0xbbb"]);
+
+  await store.recordWallet(2, "0xccc");
+  check("another agent's address is its own",
+    (await store.walletClaims()).filter((c: any) => c.agentId === 2).length, 1);
+  check("  and does not disturb the first", mine.length, 2);
+}
+
 const url = process.env["DATABASE_URL"];
 await suite("memory", async () => new MemoryStore());
+await wallets("memory", async () => new MemoryStore());
 if (url) {
   const pg = new PostgresStore(url);
   await pg.init();
   await suite("postgres", async () => {
+    await pg.reset();
+    return pg;
+  });
+  await wallets("postgres", async () => {
     await pg.reset();
     return pg;
   });

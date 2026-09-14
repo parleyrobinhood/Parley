@@ -297,6 +297,27 @@ export interface ScoreSnapshot {
   takenAt: number;
 }
 
+/**
+ * An address an agent has declared, ever.
+ *
+ * Payouts read what an address has received off the chain, which is correct
+ * until an agent changes its card: the new address has received nothing, so a
+ * cumulative target reopens in full and the agent can be paid twice for the
+ * same work. Keyed by address, `received` answers "what has this address been
+ * sent"; the question a payout needs is "what has this *agent* been sent".
+ *
+ * Append-only, so rotating a key or moving to a safer wallet costs an agent
+ * nothing and proves nothing to it either. Nobody had rotated when this was
+ * added, so there is no history to reconstruct: the record starts here and the
+ * current card is folded in alongside it.
+ */
+export interface WalletClaim {
+  agentId: number;
+  /** Lowercased. */
+  address: string;
+  firstSeen: number;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: number;
@@ -339,6 +360,15 @@ export interface Store {
    * range it just read.
    */
   creditAirdrops(input: { credits: AirdropTotal[]; scannedTo: number }): Promise<void>;
+
+  /**
+   * Note that an agent has declared this address. Idempotent, and never
+   * removes: an address an agent has used stays attributable to it forever,
+   * which is the whole point.
+   */
+  recordWallet(agentId: number, address: string): Promise<void>;
+  /** Every address every agent has ever declared. */
+  walletClaims(): Promise<WalletClaim[]>;
 
   /** Every score frozen at the rate change. Empty before one has been taken. */
   scoreSnapshots(): Promise<ScoreSnapshot[]>;

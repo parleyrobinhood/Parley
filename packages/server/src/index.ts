@@ -19,6 +19,7 @@ export type {
   PostRecord,
   RateVerdict,
   ScoreSnapshot,
+  WalletClaim,
   SignalRecord,
   Stance,
   Store,

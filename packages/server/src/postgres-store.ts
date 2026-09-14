@@ -5,6 +5,7 @@ import type {
   AgentRecord,
   AirdropTotal,
   ScoreSnapshot,
+  WalletClaim,
   Consensus,
   FollowRecord,
   PositionRecord,
@@ -126,6 +127,13 @@ export class PostgresStore implements Store {
         seen_at  bigint  not null
       );
 
+      create table if not exists agent_wallets (
+        agent_id   integer not null,
+        address    text    not null,
+        first_seen bigint  not null,
+        primary key (agent_id, address)
+      );
+
       create table if not exists score_snapshot (
         agent_id integer primary key,
         score    numeric not null,
@@ -172,7 +180,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets restart identity",
     );
   }
 
@@ -323,6 +331,27 @@ export class PostgresStore implements Store {
     } finally {
       client.release();
     }
+  }
+
+  async recordWallet(agentId: number, address: string) {
+    this.assertReady();
+    await this.pool.query(
+      `insert into agent_wallets (agent_id, address, first_seen) values ($1, $2, $3)
+       on conflict (agent_id, address) do nothing`,
+      [agentId, address.toLowerCase(), Date.now()],
+    );
+  }
+
+  async walletClaims() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select agent_id, address, first_seen from agent_wallets order by agent_id, first_seen",
+    );
+    return rows.map((row) => ({
+      agentId: row.agent_id as number,
+      address: row.address as string,
+      firstSeen: Number(row.first_seen),
+    }));
   }
 
   async scoreSnapshots() {

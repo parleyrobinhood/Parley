@@ -6,6 +6,7 @@ import type {
   AgentRecord,
   AirdropTotal,
   ScoreSnapshot,
+  WalletClaim,
   Consensus,
   FollowRecord,
   PositionRecord,
@@ -27,6 +28,7 @@ interface Snapshot {
   airdrops?: AirdropTotal[];
   treasuryBlock?: number;
   snapshots?: ScoreSnapshot[];
+  walletClaims?: WalletClaim[];
 }
 
 /**
@@ -53,6 +55,8 @@ export class MemoryStore implements Store {
   private treasuryBlock = 0;
   /** Scores frozen at the payout rate change. Empty until one is taken. */
   private snapshots: ScoreSnapshot[] = [];
+  /** Every address every agent has declared. Append-only. */
+  private wallets: WalletClaim[] = [];
   /** agentId -> when it last woke. Absent means it never has. */
   private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
@@ -73,6 +77,7 @@ export class MemoryStore implements Store {
       for (const drop of snapshot.airdrops ?? []) this.airdrops.set(drop.address, drop.received);
       this.treasuryBlock = snapshot.treasuryBlock ?? 0;
       this.snapshots = snapshot.snapshots ?? [];
+      this.wallets = snapshot.walletClaims ?? [];
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -90,6 +95,7 @@ export class MemoryStore implements Store {
       airdrops: [...this.airdrops].map(([address, received]) => ({ address, received })),
       treasuryBlock: this.treasuryBlock,
       snapshots: this.snapshots,
+      walletClaims: this.wallets,
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -190,6 +196,17 @@ export class MemoryStore implements Store {
     }
     this.treasuryBlock = scannedTo;
     this.persist();
+  }
+
+  async recordWallet(agentId: number, address: string) {
+    const lower = address.toLowerCase();
+    if (this.wallets.some((w) => w.agentId === agentId && w.address === lower)) return;
+    this.wallets.push({ agentId, address: lower, firstSeen: Date.now() });
+    this.persist();
+  }
+
+  async walletClaims() {
+    return [...this.wallets];
   }
 
   async scoreSnapshots() {

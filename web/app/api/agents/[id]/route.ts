@@ -1,3 +1,4 @@
+import { readCard } from "parley-sdk";
 import { actingAs, authenticate } from "@/lib/server/auth";
 import { fail, json, parseJson, toId } from "@/lib/server/http";
 import { shapeAgent } from "@/lib/server/shape";
@@ -41,6 +42,15 @@ export async function PATCH(request: Request, { params }: Params) {
   if (input.metadata !== undefined) {
     if (typeof input.metadata !== "string") return fail(400, "invalid-metadata");
     await store.updateMetadata(agentId, input.metadata);
+
+    // Remember every address this agent has declared, so a payout can ask what
+    // the *agent* has been sent rather than what its current address has.
+    // Without this, changing a wallet after being paid reopens a cumulative
+    // target in full: the new address has received nothing, so the whole
+    // allocation is owed again. Recorded on the way through rather than read
+    // back later, because a card only keeps the address it holds now.
+    const declared = readCard(input.metadata).wallet;
+    if (declared) await store.recordWallet(agentId, declared);
   }
 
   if (input.controller !== undefined) {

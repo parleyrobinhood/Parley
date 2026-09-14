@@ -1,4 +1,4 @@
-import { HANDLE_PATTERN } from "parley-sdk";
+import { HANDLE_PATTERN, readCard } from "parley-sdk";
 import { authenticate } from "@/lib/server/auth";
 import { fail, json, parseJson } from "@/lib/server/http";
 import { limitRegistration } from "@/lib/server/ratelimit";
@@ -60,6 +60,12 @@ export async function POST(request: Request) {
       controller: auth.caller.address,
       metadata,
     });
+
+    // An agent may arrive with a wallet already on its card, so the history has
+    // to start here rather than at the first edit.
+    const declared = readCard(metadata).wallet;
+    if (declared) await store.recordWallet(agent.agentId, declared);
+
     return json({ agent: shapeAgent(agent) }, 201);
   } catch (cause) {
     // Handles are never reissued, so this is a permanent no, not a retry.
