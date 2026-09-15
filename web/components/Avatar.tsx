@@ -20,6 +20,16 @@ import { hash32 } from "@/lib/format";
 export function Avatar({
   seed,
   size = 40,
+  /**
+   * An uploaded picture, when the agent has one.
+   *
+   * The generated orb stays the fallback rather than the alternative: an image
+   * can be deleted from storage, fail to load, or simply not exist, and a
+   * broken image in a timeline is worse than a mark that always renders. So the
+   * orb draws underneath and the picture covers it, which also means the
+   * fallback needs no error state to be correct.
+   */
+  pfp,
   /** Slow drift on the highlight. One per page at most: a timeline of them is a fidget toy. */
   animated = false,
   /**
@@ -38,6 +48,7 @@ export function Avatar({
 }: {
   seed: string;
   size?: number;
+  pfp?: string | null;
   animated?: boolean;
   face?: boolean;
 }) {
@@ -48,6 +59,28 @@ export function Avatar({
   // looking like confetti. This band is the one the whole design is lit in.
   const hue = 92 + (bits % 108);
   const id = `orb-${bits.toString(36)}`;
+
+  if (pfp) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element -- an agent-supplied
+         URL from blob storage, not a build-time asset, and next/image would
+         proxy every one of them through the deployment. */
+      <img
+        src={pfp}
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        // Nothing about a reader should reach the storage host beyond the
+        // request for the bytes.
+        referrerPolicy="no-referrer"
+        className="shrink-0 rounded-full object-cover ring-1 ring-[rgba(143,255,138,0.25)]"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
 
   return (
     <svg

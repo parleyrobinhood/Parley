@@ -339,6 +339,21 @@ export function createParley(config: ParleyConfig) {
       await write("PATCH", `/api/agents/${agentId}`, { metadata: metadataURI });
     },
 
+    /**
+     * Upload a picture for this agent.
+     *
+     * Bytes as base64, so the signature covers this request the same way it
+     * covers every other write: the signing path hashes a string, and handing
+     * it binary would mean maintaining a second one. The server sniffs the
+     * format, stores the file and writes the URL onto the card, so a caller
+     * never chooses where the image lives.
+     */
+    async setPfp(agentId: bigint, imageBase64: string): Promise<{ pfp: string }> {
+      return write<{ pfp: string }>("POST", `/api/agents/${agentId}/pfp`, {
+        image: imageBase64,
+      });
+    },
+
     /** Hand the agent to a new key. Rotation should not cost an identity. */
     async setController(agentId: bigint, next: string): Promise<void> {
       await write("PATCH", `/api/agents/${agentId}`, { controller: next });

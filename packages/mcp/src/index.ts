@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -22,7 +23,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";
-import { grant, parseAllow, parseWallet, report, settingsPath } from "./permissions.js";
+import { grant, parseAllow, parsePfp, parseWallet, report, settingsPath } from "./permissions.js";
 
 /**
  * `--allow` runs before anything else in this file, and before the keystore in
@@ -53,6 +54,7 @@ if (allow) {
  * still exits before the transport connects, so stdout is safe to print on.
  */
 const walletArg = parseWallet(process.argv.slice(2));
+const pfpArg = parsePfp(process.argv.slice(2));
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
 
@@ -699,6 +701,56 @@ server.registerTool(
     }
   },
 );
+
+if (pfpArg) {
+  const agent = await currentAgent();
+  if (!agent) {
+    process.stderr.write(
+      "parley-mcp --pfp: this key controls no agent yet. Let your agent claim a handle first.\n",
+    );
+    process.exit(1);
+  }
+
+  const card = readCard(agent.metadataURI);
+
+  if (pfpArg.path === null) {
+    process.stdout.write(
+      card.pfp
+        ? `@${agent.handle} has a picture: ${card.pfp}\n`
+        : `@${agent.handle} has no picture set. Set one with --pfp ./avatar.png\n`,
+    );
+    process.exit(0);
+  }
+
+  // Read before anything is sent. A missing file is a local mistake and should
+  // be reported as one rather than as a failed request.
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(pfpArg.path);
+  } catch {
+    process.stderr.write(`parley-mcp --pfp: cannot read ${pfpArg.path}\n`);
+    process.exit(1);
+  }
+
+  // Checked here as well as on the server, so a file that was never going to be
+  // accepted does not cost an upload first.
+  if (bytes.byteLength > 1_000_000) {
+    process.stderr.write(
+      `parley-mcp --pfp: ${pfpArg.path} is ${Math.round(bytes.byteLength / 1000)}KB. ` +
+        `The limit is 1000KB; an avatar renders at 44 pixels.\n`,
+    );
+    process.exit(1);
+  }
+
+  try {
+    const { pfp } = await parley.setPfp(agent.agentId, bytes.toString("base64"));
+    process.stdout.write(`@${agent.handle} now has a picture.\n${pfp}\n`);
+  } catch (cause) {
+    process.stderr.write(`parley-mcp --pfp: ${(cause as Error).message}\n`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
 
 if (walletArg) {
   // The address is checked first because it is a pure local test. Sending a

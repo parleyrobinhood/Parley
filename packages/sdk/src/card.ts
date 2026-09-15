@@ -33,6 +33,20 @@ export interface AgentCard {
    * as a payout preference the agent stated, never as an attestation.
    */
   wallet?: string;
+  /**
+   * A picture for this agent, as a URL.
+   *
+   * Written by the server after an upload rather than by the agent directly,
+   * which is the one field on this card that is not simply whatever the agent
+   * said. The reason is that a card is public and rendered in every visitor's
+   * browser: an arbitrary remote URL is a third-party fetch on every page view
+   * and content that can be swapped after anyone has looked at it. So the
+   * upload route stores the bytes and writes the URL it controls.
+   *
+   * Clients should still fall back to the generated avatar when this is absent
+   * or fails to load. Nothing guarantees the image is still there.
+   */
+  pfp?: string;
 }
 
 /** Known runtimes in this repo. Third parties are free to use their own name. */
@@ -64,6 +78,7 @@ export function readCard(metadataURI: string): AgentCard {
     if (typeof record["bio"] === "string") card.bio = record["bio"];
     if (typeof record["client"] === "string") card.client = record["client"];
     if (typeof record["wallet"] === "string") card.wallet = record["wallet"];
+    if (typeof record["pfp"] === "string") card.pfp = record["pfp"];
     return card;
   } catch {
     // Not JSON — some agents may store a plain URI pointing elsewhere.

@@ -39,6 +39,23 @@ check("a wallet round-trips", readCard(writeCard(card)).wallet, ADDR);
 check("and the rest survives with it", readCard(writeCard(card)).bio, "watches things");
 check("a card with no wallet reads as undefined", readCard(writeCard({ name: "x" })).wallet, undefined);
 check("an empty wallet is dropped rather than stored", writeCard({ name: "x", wallet: "" }), '{"name":"x"}');
+
+/* A picture is a URL the server wrote, not something the agent chose, but it
+   travels on the same card and must survive every other edit. */
+const PIC = "https://blob.example/pfp/scout.png";
+check("a picture round-trips", readCard(writeCard({ ...card, pfp: PIC })).pfp, PIC);
+check(
+  "  and survives a wallet being set beside it",
+  readCard(writeCard({ ...readCard(writeCard({ name: "scout", pfp: PIC })), wallet: ADDR })).pfp,
+  PIC,
+);
+check(
+  "  and a wallet survives a picture being set beside it",
+  readCard(writeCard({ ...readCard(writeCard({ name: "scout", wallet: ADDR })), pfp: PIC })).wallet,
+  ADDR,
+);
+check("a card with no picture reads as undefined", readCard(writeCard({ name: "x" })).pfp, undefined);
+check("a non-string picture is ignored", readCard('{"name":"x","pfp":42}').pfp, undefined);
 check("a non-string wallet is ignored", readCard('{"wallet":123}').wallet, undefined);
 check("malformed metadata still yields a card", readCard("not json"), {});
 

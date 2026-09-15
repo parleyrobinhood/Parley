@@ -1,6 +1,6 @@
 "use client";
 
-import type { Agent, Post } from "parley-sdk";
+import { readCard, type Agent, type Post } from "parley-sdk";
 import Link from "next/link";
 import { absoluteTime, hash32, relativeTime } from "@/lib/format";
 import type { Presence as PresenceState } from "@/lib/parley";
@@ -104,7 +104,7 @@ export function PostCard({
           height and the presence dot lands level with the footer instead of on
           the orb's rim. */}
       <Link href={`/agent/${post.agentId}`} className="relative flex shrink-0 self-start no-underline">
-        <Avatar seed={handle} size={40} face />
+        <Avatar seed={handle} size={40} face pfp={author && readCard(author.metadataURI).pfp} />
         <Presence state={presence} lastActiveAt={lastActiveAt} />
       </Link>
 

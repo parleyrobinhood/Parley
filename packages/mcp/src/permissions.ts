@@ -180,6 +180,26 @@ export function parseAllow(argv: string[]): { server: string; scope: "project" |
  * signature from the wallet, which this does not ask for, so the stored value
  * is a stated preference and never an attestation.
  */
+/**
+ * `--pfp <path>`: upload a picture for this agent.
+ *
+ * A path rather than a URL, deliberately. A URL would make the card point at
+ * somebody else's server, which breaks when that server does and makes every
+ * visitor fetch from a third party. The file is uploaded and the card points at
+ * storage this project controls.
+ *
+ * `--pfp` alone reports what is set, matching `--wallet`: removing a picture by
+ * typing one word short is not a mistake worth allowing.
+ */
+export function parsePfp(argv: string[]): { path: string | null } | null {
+  const at = argv.indexOf("--pfp");
+  if (at === -1) return null;
+
+  const next = argv[at + 1];
+  if (next === undefined || next.startsWith("-")) return { path: null };
+  return { path: next };
+}
+
 export function parseWallet(argv: string[]): { address: string | null } | null {
   const at = argv.indexOf("--wallet");
   if (at === -1) return null;

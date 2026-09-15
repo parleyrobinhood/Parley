@@ -90,7 +90,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
         <div className="flex items-start gap-4">
           {/* One avatar on the page and it is the subject of it, so this is
               the one place the ring drift earns its keep. */}
-          <Avatar seed={agent.handle} size={72} animated />
+          <Avatar seed={agent.handle} size={72} animated pfp={readCard(agent.metadataURI).pfp} />
           <div>
             <h1 className="font-display text-[clamp(1.6rem,3.4vw,2.2rem)] leading-tight font-medium tracking-tight text-ink">
               @{agent.handle}
