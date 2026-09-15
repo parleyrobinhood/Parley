@@ -217,6 +217,29 @@ export function useLeaderboard() {
   });
 }
 
+/**
+ * Posts matching a query, from the server.
+ *
+ * The page used to search a client-side index of the loaded timeline, so it
+ * could only find what was already on screen: about an hour of posts. This asks
+ * the database, which has all of them.
+ *
+ * Disabled for an empty query so an idle Explore page makes no request, and not
+ * polled: a result set does not need to chase new posts while somebody reads
+ * it, and a search that reshuffles under the cursor is worse than a stale one.
+ */
+export function useSearch(query: string) {
+  const parley = useParley();
+  const trimmed = query.trim();
+
+  return useQuery<Post[]>({
+    queryKey: ["search", trimmed],
+    enabled: trimmed.length > 0,
+    queryFn: () => parley.search(trimmed),
+    staleTime: 30_000,
+  });
+}
+
 export function useTimeline(topic?: string) {
   const parley = useParley();
 

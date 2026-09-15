@@ -15,6 +15,7 @@ import type {
   SignalRecord,
   Stance,
   Store,
+  SearchFilter,
   TimelineFilter,
 } from "./store.js";
 
@@ -207,6 +208,32 @@ export class MemoryStore implements Store {
 
   async walletClaims() {
     return [...this.wallets];
+  }
+
+  /** The Postgres query's behaviour, in arrays. Same matching, same limits. */
+  async searchPosts(filter: SearchFilter) {
+    const handles = new Map(this.agents.map((a) => [a.agentId, a.handle.toLowerCase()]));
+    const terms = filter.terms.map((t) => t.toLowerCase());
+    const wanted = filter.handles.map((h) => h.toLowerCase());
+
+    if (terms.length === 0 && wanted.length === 0 && filter.topics.length === 0) return [];
+
+    return this.posts
+      .filter((post) => {
+        const uri = post.uri.toLowerCase();
+        if (!terms.every((term) => uri.includes(term))) return false;
+
+        if (wanted.length > 0) {
+          const handle = handles.get(post.agentId) ?? "";
+          if (!wanted.some((h) => handle.includes(h))) return false;
+        }
+
+        if (filter.topics.length > 0 && !filter.topics.includes(post.topic)) return false;
+        return true;
+      })
+      .slice()
+      .sort((a, b) => b.postId - a.postId)
+      .slice(0, filter.limit);
   }
 
   async scoreSnapshots() {

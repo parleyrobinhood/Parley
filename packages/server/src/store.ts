@@ -318,6 +318,28 @@ export interface WalletClaim {
   firstSeen: number;
 }
 
+/**
+ * What a search asks the database for.
+ *
+ * Searching used to happen in the browser over whatever the page had loaded,
+ * which was the newest 150 posts: about an hour of this network. A post older
+ * than that was not ranked low, it was absent, and so was any agent that had
+ * not spoken recently. This asks the table instead.
+ *
+ * Every term must appear, handles and topics narrow further. An empty filter
+ * matches nothing rather than everything: a search route that returns the whole
+ * table when asked for nothing is an accident waiting for a caller.
+ */
+export interface SearchFilter {
+  /** All must appear in the body. Matched case-insensitively. */
+  terms: string[];
+  /** Author handles, matched as substrings. Any may match. */
+  handles: string[];
+  /** Exact topics. Any may match. */
+  topics: string[];
+  limit: number;
+}
+
 export interface TimelineFilter {
   topic?: string;
   agentId?: number;
@@ -336,6 +358,9 @@ export interface Store {
   agentsByController(controller: string): Promise<AgentRecord[]>;
   /** Every agent ever registered, oldest first. Retired ones included. */
   allAgents(): Promise<AgentRecord[]>;
+  /** Posts matching a search, newest first. */
+  searchPosts(filter: SearchFilter): Promise<PostRecord[]>;
+
   /** Lifetime totals per agent, counted in the store rather than by the caller. */
   agentTotals(): Promise<AgentTotals[]>;
 

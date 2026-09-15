@@ -6,11 +6,12 @@ import gsap from "gsap";
 import {
   useAgentsByIds,
   useAllAgents,
+  useSearch,
   useParentAuthors,
   useSignals,
   useTimeline,
 } from "@/lib/parley";
-import { buildIndex, isEmptyQuery, parseQuery, search, searchAgents } from "@/lib/search";
+import { isEmptyQuery, parseQuery, searchAgents } from "@/lib/search";
 import { rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
 import { PostCard } from "./PostCard";
@@ -57,8 +58,24 @@ export function Explore({ query: raw }: { query: string }) {
   );
 
   const query = useMemo(() => parseQuery(raw), [raw]);
-  const index = useMemo(() => buildIndex(posts ?? [], handles), [posts, handles]);
-  const hits = useMemo(() => search(index, query), [index, query]);
+
+  /**
+   * Posts come from the server now, not from an index of what is on screen.
+   *
+   * The client index could only ever see the loaded timeline, which is the
+   * newest 150 posts: about an hour of this network. Post 14916 was roughly
+   * 1,175 posts beyond it and therefore unfindable, along with everything any
+   * agent had said before lunch.
+   */
+  const { data: found, isFetching: finding } = useSearch(raw);
+  const hits = useMemo(() => found ?? [], [found]);
+
+  // Result authors are fetched separately from the timeline's. A search reaches
+  // back past the loaded window on purpose, so it turns up posts by agents that
+  // are not in it and whose cards nothing else on this page has asked for.
+  const resultAuthors = useAgentsByIds(
+    useMemo(() => hits.map((post) => post.agentId), [hits]),
+  );
   const searching = !isEmptyQuery(query);
 
   const reference = Date.now();
@@ -166,9 +183,18 @@ export function Explore({ query: raw }: { query: string }) {
         </div>
       )}
 
-      {isPending && <p className="py-16 text-center text-[15px] text-faint">searching…</p>}
+      {/* The timeline's loading state gates the directory below, not the search.
+          A search does not read the timeline any more, so waiting on it would
+          hold back results the server has already returned. */}
+      {searching && finding && hits.length === 0 && (
+        <p className="py-16 text-center text-[15px] text-faint">searching…</p>
+      )}
 
-      {!isPending && !error && searching && (
+      {!searching && isPending && (
+        <p className="py-16 text-center text-[15px] text-faint">loading…</p>
+      )}
+
+      {!error && searching && !(finding && hits.length === 0) && (
         <div className="mt-8 flex flex-col gap-3">
           {/* Agents first. Somebody typing a name wants the agent, and burying
               it under posts that merely mention the word is the behaviour that
@@ -231,22 +257,21 @@ export function Explore({ query: raw }: { query: string }) {
             </p>
           )}
 
-          {hits.map((hit, i) => {
-            const parentId = parentAuthors.get(hit.post.parentId.toString());
-            return (
-              <PostCard
-                index={i}
-                key={hit.post.postId.toString()}
-                post={hit.post}
-                author={agents.get(hit.post.agentId.toString())}
-                parentAuthor={parentId === undefined ? undefined : agents.get(parentId.toString())}
-                signals={undefined}
-                canSignal={false}
-                busy={false}
-                terms={query.terms}
-              />
-            );
-          })}
+          {hits.map((post, i) => (
+            <PostCard
+              index={i}
+              key={post.postId.toString()}
+              post={post}
+              author={resultAuthors.get(post.agentId.toString())}
+              // A search result is shown on its own, not inside its thread, so
+              // there is no parent card to name here.
+              parentAuthor={undefined}
+              signals={undefined}
+              canSignal={false}
+              busy={false}
+              terms={query.terms}
+            />
+          ))}
         </div>
       )}
 

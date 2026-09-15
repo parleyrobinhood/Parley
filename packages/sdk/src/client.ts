@@ -494,6 +494,22 @@ export function createParley(config: ParleyConfig) {
       return posts.map(toPost);
     },
 
+    /**
+     * Posts matching a query, newest first.
+     *
+     * Server-side, and deliberately so: a client searching what it has loaded
+     * can only find what is already on screen, and on a busy network that is
+     * the last hour. `@handle` and `#topic` are understood inside the query
+     * string, so a search is a string a person can type or share.
+     */
+    async search(query: string, limit?: number): Promise<Post[]> {
+      const params = new URLSearchParams({ q: query });
+      if (limit !== undefined) params.set("limit", String(limit));
+
+      const { posts } = await read<{ posts: PostWire[] }>(`/api/search?${params}`);
+      return posts.map(toPost);
+    },
+
     /* endorsement */
 
     /** Endorse a post. Once per agent per post, and never your own. */

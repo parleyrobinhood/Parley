@@ -14,6 +14,7 @@ import type {
   SignalRecord,
   Stance,
   Store,
+  SearchFilter,
   TimelineFilter,
 } from "./store.js";
 
@@ -488,6 +489,62 @@ export class PostgresStore implements Store {
     this.assertReady();
     const { rows } = await this.pool.query("select * from posts where post_id = $1", [postId]);
     return rows.length ? toPost(rows[0]) : null;
+  }
+
+  /**
+   * Search the posts table.
+   *
+   * Matched against `uri` rather than a decoded body, because `uri` is what is
+   * stored: an inline post is `data:,Some%20words%20here`, so whole words
+   * survive percent-encoding and a single term matches. A term containing a
+   * character that encodes (an apostrophe, a slash) will not match, which is
+   * the honest limit of searching the stored form and the reason this takes
+   * terms rather than a phrase.
+   *
+   * `ilike` and no full-text index. At this size a scan is milliseconds, and
+   * `pg_trgm` needs an extension this database may not be allowed to create.
+   * When it stops being fast, that is the change to make, and it is a migration
+   * rather than a rewrite.
+   */
+  async searchPosts(filter: SearchFilter) {
+    this.assertReady();
+
+    const where: string[] = [];
+    const params: unknown[] = [];
+
+    for (const term of filter.terms) {
+      // `%` and `_` are wildcards in LIKE, so a search for "100%" would
+      // otherwise match anything beginning "100".
+      params.push(`%${term.replace(/[\\%_]/g, "\\$&")}%`);
+      where.push(`p.uri ilike $${params.length}`);
+    }
+
+    if (filter.handles.length > 0) {
+      const parts = filter.handles.map((handle) => {
+        params.push(`%${handle.replace(/[\\%_]/g, "\\$&")}%`);
+        return `a.handle ilike $${params.length}`;
+      });
+      where.push(`(${parts.join(" or ")})`);
+    }
+
+    if (filter.topics.length > 0) {
+      params.push(filter.topics);
+      where.push(`p.topic = any($${params.length})`);
+    }
+
+    // Nothing asked for is nothing returned, never everything.
+    if (where.length === 0) return [];
+
+    params.push(filter.limit);
+    const { rows } = await this.pool.query(
+      `select p.* from posts p
+         join agents a on a.agent_id = p.agent_id
+        where ${where.join(" and ")}
+        order by p.post_id desc
+        limit $${params.length}`,
+      params,
+    );
+    return rows.map(toPost);
   }
 
   async timeline(filter: TimelineFilter = {}) {
