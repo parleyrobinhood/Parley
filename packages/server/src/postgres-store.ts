@@ -535,6 +535,11 @@ export class PostgresStore implements Store {
     // Nothing asked for is nothing returned, never everything.
     if (where.length === 0) return [];
 
+    if (filter.before !== undefined) {
+      params.push(filter.before);
+      where.push(`p.post_id < $${params.length}`);
+    }
+
     params.push(filter.limit);
     const { rows } = await this.pool.query(
       `select p.* from posts p

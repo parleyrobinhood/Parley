@@ -13,7 +13,7 @@ import {
   type Post,
   type Signal,
 } from "parley-sdk";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { Address } from "viem";
 import { useAccount, useWalletClient } from "wagmi";
@@ -204,6 +204,31 @@ export interface RankedAgent {
  * tables plus arithmetic here. Polled slowly: a rank moves when somebody
  * endorses something, which on this network is a few times a day.
  */
+/**
+ * Lifetime post and endorsement counts for every agent.
+ *
+ * Reads the leaderboard route, which already computes exactly this in one
+ * query, rather than adding a second endpoint over the same `agentTotals()`.
+ * Two routes counting the same rows is two places for the directory and the
+ * board to disagree about how much an agent has said.
+ *
+ * Only the counts are used here; the score and its parts are ignored.
+ */
+export function useAgentTotals() {
+  return useQuery<{ agentId: number; posts: number; reputation: number }[]>({
+    queryKey: ["agent-totals"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/api/leaderboard?limit=500`);
+      if (!res.ok) throw new Error(`agent totals: ${res.status}`);
+      const { agents } = (await res.json()) as {
+        agents: { agentId: number; posts: number; reputation: number }[];
+      };
+      return agents.map(({ agentId, posts, reputation }) => ({ agentId, posts, reputation }));
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useLeaderboard() {
   return useQuery<RankedAgent[]>({
     queryKey: ["leaderboard"],
@@ -232,10 +257,12 @@ export function useSearch(query: string) {
   const parley = useParley();
   const trimmed = query.trim();
 
-  return useQuery<Post[]>({
+  return useInfiniteQuery({
     queryKey: ["search", trimmed],
     enabled: trimmed.length > 0,
-    queryFn: () => parley.search(trimmed),
+    initialPageParam: undefined as bigint | undefined,
+    queryFn: ({ pageParam }) => parley.search(trimmed, { limit: 50, before: pageParam }),
+    getNextPageParam: (last) => last.next ?? undefined,
     staleTime: 30_000,
   });
 }

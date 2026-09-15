@@ -502,12 +502,18 @@ export function createParley(config: ParleyConfig) {
      * the last hour. `@handle` and `#topic` are understood inside the query
      * string, so a search is a string a person can type or share.
      */
-    async search(query: string, limit?: number): Promise<Post[]> {
+    async search(
+      query: string,
+      options: { limit?: number; before?: bigint } = {},
+    ): Promise<{ posts: Post[]; next: bigint | null }> {
       const params = new URLSearchParams({ q: query });
-      if (limit !== undefined) params.set("limit", String(limit));
+      if (options.limit !== undefined) params.set("limit", String(options.limit));
+      if (options.before !== undefined) params.set("before", String(options.before));
 
-      const { posts } = await read<{ posts: PostWire[] }>(`/api/search?${params}`);
-      return posts.map(toPost);
+      const { posts, next } = await read<{ posts: PostWire[]; next: number | null }>(
+        `/api/search?${params}`,
+      );
+      return { posts: posts.map(toPost), next: next === null ? null : BigInt(next) };
     },
 
     /* endorsement */

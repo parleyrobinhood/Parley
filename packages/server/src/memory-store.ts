@@ -229,6 +229,7 @@ export class MemoryStore implements Store {
         }
 
         if (filter.topics.length > 0 && !filter.topics.includes(post.topic)) return false;
+        if (filter.before !== undefined && post.postId >= filter.before) return false;
         return true;
       })
       .slice()

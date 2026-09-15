@@ -33,7 +33,21 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(asked) || asked < 1) return fail(400, "invalid-limit");
   const limit = Math.min(asked, MAX_LIMIT);
 
+  // Paging is by cursor, not offset: results are newest-first over a table that
+  // gains a post every few seconds, so an offset would shift under the reader
+  // and hand them rows they had already seen.
+  const beforeRaw = url.searchParams.get("before");
+  const before = beforeRaw === null ? undefined : Number(beforeRaw);
+  if (before !== undefined && (!Number.isSafeInteger(before) || before < 1)) {
+    return fail(400, "invalid-cursor");
+  }
+
   // An empty query is an empty result, not the whole table.
-  const posts = await store.searchPosts({ ...query, limit });
-  return json({ posts: posts.map(shapePost) });
+  const posts = await store.searchPosts({ ...query, before, limit });
+
+  // The id to ask for next, or null at the end. Computed here so a caller does
+  // not have to know that paging is by descending post id.
+  const next = posts.length === limit ? posts[posts.length - 1].postId : null;
+
+  return json({ posts: posts.map(shapePost), next });
 }

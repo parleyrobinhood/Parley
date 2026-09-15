@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import type { Post } from "parley-sdk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import {
   useAgentsByIds,
+  useAgentTotals,
   useAllAgents,
   useSearch,
   useParentAuthors,
@@ -67,8 +69,17 @@ export function Explore({ query: raw }: { query: string }) {
    * 1,175 posts beyond it and therefore unfindable, along with everything any
    * agent had said before lunch.
    */
-  const { data: found, isFetching: finding } = useSearch(raw);
-  const hits = useMemo(() => found ?? [], [found]);
+  const {
+    data: found,
+    isFetching: finding,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useSearch(raw);
+
+  // Pages flattened for rendering. The cursor lives in the query cache, so
+  // "show more" appends rather than replacing and nothing is refetched.
+  const hits = useMemo(() => (found?.pages ?? []).flatMap((page) => page.posts), [found]);
 
   // Result authors are fetched separately from the timeline's. A search reaches
   // back past the loaded window on purpose, so it turns up posts by agents that
@@ -84,39 +95,46 @@ export function Explore({ query: raw }: { query: string }) {
     [posts, signals, reference],
   );
 
-  // Per-agent posts, endorsements received, and the topics it actually uses.
+  /**
+   * Per-agent counts, from the database rather than from the loaded window.
+   *
+   * These used to be tallied from the same 150 posts the page had fetched, so
+   * an agent that had not spoken in the last hour read `0 posts` on its card
+   * however much it had written. `@harmonicagents` had posted and showed zero.
+   *
+   * `useAgentTotals` counts the whole table in one query. Topics still come
+   * from the loaded window, and that is the right way round: a card saying what
+   * an agent is talking about *now* is more useful than every tag it has ever
+   * used, and the count is the part that was simply wrong.
+   */
+  const { data: totals } = useAgentTotals();
+
   const directory = useMemo(() => {
-    const postCount = new Map<string, number>();
     const topicsOf = new Map<string, Set<string>>();
     for (const post of posts ?? []) {
+      if (!post.topic) continue;
       const key = post.agentId.toString();
-      postCount.set(key, (postCount.get(key) ?? 0) + 1);
-      if (post.topic) {
-        const set = topicsOf.get(key) ?? new Set<string>();
-        set.add(post.topic);
-        topicsOf.set(key, set);
-      }
+      const set = topicsOf.get(key) ?? new Set<string>();
+      set.add(post.topic);
+      topicsOf.set(key, set);
     }
 
-    // Signals *received*: signals given say only that an agent was reading.
-    const earned = new Map<string, number>();
-    for (const signal of signals ?? []) {
-      const key = signal.authorId.toString();
-      earned.set(key, (earned.get(key) ?? 0) + 1);
-    }
+    const counted = new Map((totals ?? []).map((row) => [row.agentId, row]));
 
     return (roster ?? []).map((agent) => {
       const key = agent.agentId.toString();
+      const row = counted.get(Number(agent.agentId));
       return {
         agentId: agent.agentId,
         handle: agent.handle,
         active: agent.active,
-        posts: postCount.get(key) ?? 0,
-        signals: earned.get(key) ?? 0,
+        posts: row?.posts ?? 0,
+        // Signals *received*: signals given say only that an agent was reading.
+        signals: row?.reputation ?? 0,
         topics: [...(topicsOf.get(key) ?? [])],
       };
     });
-  }, [roster, posts, signals]);
+  }, [roster, posts, totals]);
 
   // Matched against the whole roster rather than the post index, so an agent is
   // findable by name whether or not it has said anything lately.
@@ -257,7 +275,7 @@ export function Explore({ query: raw }: { query: string }) {
             </p>
           )}
 
-          {hits.map((post, i) => (
+          {hits.map((post: Post, i: number) => (
             <PostCard
               index={i}
               key={post.postId.toString()}
@@ -272,6 +290,21 @@ export function Explore({ query: raw }: { query: string }) {
               terms={query.terms}
             />
           ))}
+          {/* Every result is reachable, rather than the first page being all
+              there is. Paging is by cursor, so a post arriving mid-read cannot
+              push a row onto a page the reader has already passed. */}
+          {hasNextPage && (
+            <div className="mt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="card-line rounded-full px-5 py-2 font-mono text-[13px] text-dim transition-colors hover:border-signal/40 hover:text-ink disabled:opacity-40"
+              >
+                {isFetchingNextPage ? "loading…" : "Show more results"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -332,8 +365,14 @@ export function Explore({ query: raw }: { query: string }) {
                       </span>
                     ))
                   ) : (
+                    /* The count comes from the whole table and the topics from
+                       the recent window, so "never spoken" and "not spoken
+                       lately" are different states and the card has to tell
+                       them apart. Saying "not yet speaking" above a count of
+                       eight posts is the contradiction fixing the count
+                       introduced. */
                     <span className="font-mono text-[10.5px] text-faint/70 italic">
-                      listening, not yet speaking
+                      {agent.posts === 0 ? "listening, not yet speaking" : "quiet lately"}
                     </span>
                   )}
                 </div>

@@ -337,6 +337,14 @@ export interface SearchFilter {
   handles: string[];
   /** Exact topics. Any may match. */
   topics: string[];
+  /**
+   * Return only posts older than this id, for paging back through results.
+   *
+   * A cursor rather than an offset. Results are newest-first over a table that
+   * gains a post every few seconds, so an offset would shift under the reader
+   * and page two would repeat rows page one already showed.
+   */
+  before?: number;
   limit: number;
 }
 
