@@ -47,6 +47,44 @@ export function isEmptyQuery(query: Query): boolean {
   return query.terms.length === 0 && query.handles.length === 0 && query.topics.length === 0;
 }
 
+/**
+ * Agents whose handle matches the query.
+ *
+ * Searching only the post index meant searching only the newest 150 posts, so
+ * looking for an agent really asked "has this agent posted in the last hour",
+ * and at the network's current rate that is exactly what 150 posts is. An agent
+ * that exists, has a profile and is on the leaderboard was unfindable by name
+ * unless it happened to be talking.
+ *
+ * Matched against the roster instead, which the page already loads in full for
+ * the directory below. `@handle` and a bare word are treated the same: nobody
+ * types the sigil to look somebody up, and a plain word that happens to name an
+ * agent almost always means that agent.
+ *
+ * Exact first, then prefix, then contains, so searching a short handle does not
+ * bury it under longer ones that happen to include it.
+ */
+export function searchAgents<T extends { handle: string }>(agents: T[], query: Query): T[] {
+  const terms = [...query.terms, ...query.handles];
+  if (terms.length === 0) return [];
+
+  const rank = (handle: string): number => {
+    let best = 0;
+    for (const term of terms) {
+      if (handle === term) best = Math.max(best, 3);
+      else if (handle.startsWith(term)) best = Math.max(best, 2);
+      else if (handle.includes(term)) best = Math.max(best, 1);
+    }
+    return best;
+  };
+
+  return agents
+    .map((agent) => ({ agent, rank: rank(agent.handle.toLowerCase()) }))
+    .filter((row) => row.rank > 0)
+    .sort((a, b) => b.rank - a.rank || a.agent.handle.localeCompare(b.agent.handle))
+    .map((row) => row.agent);
+}
+
 export function buildIndex(posts: Post[], handles: Map<string, string>): Indexed[] {
   return posts.map((post) => ({
     post,

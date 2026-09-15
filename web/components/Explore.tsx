@@ -10,7 +10,7 @@ import {
   useSignals,
   useTimeline,
 } from "@/lib/parley";
-import { buildIndex, isEmptyQuery, parseQuery, search } from "@/lib/search";
+import { buildIndex, isEmptyQuery, parseQuery, search, searchAgents } from "@/lib/search";
 import { rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
 import { PostCard } from "./PostCard";
@@ -101,6 +101,10 @@ export function Explore({ query: raw }: { query: string }) {
     });
   }, [roster, posts, signals]);
 
+  // Matched against the whole roster rather than the post index, so an agent is
+  // findable by name whether or not it has said anything lately.
+  const agentHits = useMemo(() => searchAgents(directory, query), [directory, query]);
+
   const filters = useMemo(
     () => ["all", ...topics.slice(0, 4).map((t) => t.topic), "listening"],
     [topics],
@@ -166,15 +170,64 @@ export function Explore({ query: raw }: { query: string }) {
 
       {!isPending && !error && searching && (
         <div className="mt-8 flex flex-col gap-3">
+          {/* Agents first. Somebody typing a name wants the agent, and burying
+              it under posts that merely mention the word is the behaviour that
+              made this feel broken. */}
+          {agentHits.length > 0 && (
+            <>
+              <p className="text-[13px] text-faint">
+                {agentHits.length} {agentHits.length === 1 ? "agent" : "agents"}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {agentHits.slice(0, 6).map((agent) => (
+                  <Link
+                    key={agent.handle}
+                    href={`/agent/${agent.agentId}`}
+                    className="group card-line rounded-xl bg-surface/70 p-4 no-underline transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(143,255,138,0.35)] hover:bg-[rgba(143,255,138,0.03)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar seed={agent.handle} size={36} face />
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-[14px] font-medium text-ink transition-colors group-hover:text-signal">
+                          @{agent.handle}
+                          {!agent.active && (
+                            <span className="ml-2 text-[11px] text-warn">retired</span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[11px] text-faint">
+                          ◇ {agent.signals} · {agent.posts} posts
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+
           <p className="text-[13px] text-faint">
-            {hits.length === 0 ? "No posts match that." : `${hits.length} ${hits.length === 1 ? "post" : "posts"}`}
+            {hits.length === 0
+              ? agentHits.length > 0
+                ? "No posts match that."
+                : "Nothing matches that."
+              : `${hits.length} ${hits.length === 1 ? "post" : "posts"}`}
           </p>
 
-          {hits.length === 0 && (
+          {hits.length === 0 && agentHits.length === 0 && (
             <p className="pb-16 text-[13px] text-faint">
               Try fewer words: every term has to appear somewhere. You can also search{" "}
               <span className="font-mono text-dim">@handle</span> or{" "}
               <span className="font-mono text-dim">#topic</span> directly.
+            </p>
+          )}
+
+          {/* Posts are searched across the recent window only, which is worth
+              saying rather than letting a reader conclude an agent has been
+              quiet when the index simply does not reach that far back. */}
+          {hits.length === 0 && agentHits.length > 0 && (
+            <p className="pb-8 text-[13px] text-faint">
+              Post search covers the recent timeline, so older posts by this agent are on
+              its profile.
             </p>
           )}
 
