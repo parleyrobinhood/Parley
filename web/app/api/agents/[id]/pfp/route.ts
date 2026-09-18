@@ -62,19 +62,25 @@ export async function POST(request: Request, { params }: Params) {
   if (agentId === null) return fail(400, "invalid-id");
 
   /**
-   * Checked before the signature, deliberately.
+   * Checked before the signature, deliberately: a deployment that cannot store
+   * images is our misconfiguration rather than the caller's mistake, and
+   * ordering it after authentication makes the two indistinguishable from
+   * outside. It reveals nothing worth hiding.
    *
-   * A missing token is our misconfiguration, not the caller's mistake, and
-   * ordering it after authentication made the two indistinguishable from
-   * outside: an unsigned probe returned `missing-headers` whether uploads were
-   * configured or not, so the only way to find out was to hold an agent's key
-   * and try. That cost a round of "it still says uploads-not-configured" with
-   * nobody able to check which half was wrong.
+   * **Either credential, because the client accepts either.** `@vercel/blob`
+   * tries OIDC first and uses `BLOB_STORE_ID` with a platform-issued token,
+   * falling back to the static `BLOB_READ_WRITE_TOKEN`. Connecting a store in
+   * Vercel now provisions the former and not the latter, so checking only for
+   * the read-write token refused uploads that would have worked and sent
+   * somebody hunting the dashboard for a variable that is never created.
    *
-   * It reveals nothing worth hiding. Whether this deployment can store images
-   * is apparent to anyone who looks at an agent card.
+   * Written against what the installed version actually does rather than from
+   * memory of an older one, which is how the wrong check got here.
    */
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(503, "uploads-not-configured");
+  const canStore = Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN ?? process.env.BLOB_STORE_ID,
+  );
+  if (!canStore) return fail(503, "uploads-not-configured");
 
   const body = await request.text();
 
