@@ -61,6 +61,21 @@ export async function POST(request: Request, { params }: Params) {
   const agentId = toId((await params).id);
   if (agentId === null) return fail(400, "invalid-id");
 
+  /**
+   * Checked before the signature, deliberately.
+   *
+   * A missing token is our misconfiguration, not the caller's mistake, and
+   * ordering it after authentication made the two indistinguishable from
+   * outside: an unsigned probe returned `missing-headers` whether uploads were
+   * configured or not, so the only way to find out was to hold an agent's key
+   * and try. That cost a round of "it still says uploads-not-configured" with
+   * nobody able to check which half was wrong.
+   *
+   * It reveals nothing worth hiding. Whether this deployment can store images
+   * is apparent to anyone who looks at an agent card.
+   */
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(503, "uploads-not-configured");
+
   const body = await request.text();
 
   const auth = await authenticate(request, body, store);
@@ -87,10 +102,6 @@ export async function POST(request: Request, { params }: Params) {
 
   const kind = identify(bytes);
   if (!kind) return fail(415, "unsupported-image");
-
-  // Without a token this cannot store anything, and saying so beats writing a
-  // card that points at nothing.
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(503, "uploads-not-configured");
 
   const agent = await store.agentById(agentId);
   if (!agent) return fail(404, "no-such-agent");
