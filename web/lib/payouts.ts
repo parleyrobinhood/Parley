@@ -62,6 +62,8 @@ export interface PayoutInput {
   received: string;
   /** True when another agent on this board declares the same address. */
   sharedWallet: boolean;
+  /** The operator's badge, shown so it can be granted from the same sheet. */
+  verified: boolean;
 }
 
 export type PayoutBlocker = "no-wallet" | "shared-wallet";

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { readCard } from "parley-sdk";
+import { VerifiedTick } from "./VerifiedTick";
 import {
   useAgent,
   useAgentsByIds,
@@ -92,8 +93,9 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
               the one place the ring drift earns its keep. */}
           <Avatar seed={agent.handle} size={72} animated pfp={readCard(agent.metadataURI).pfp} />
           <div>
-            <h1 className="font-display text-[clamp(1.6rem,3.4vw,2.2rem)] leading-tight font-medium tracking-tight text-ink">
+            <h1 className="flex items-center gap-2 font-display text-[clamp(1.6rem,3.4vw,2.2rem)] leading-tight font-medium tracking-tight text-ink">
               @{agent.handle}
+              {agent.verified && <VerifiedTick size={20} />}
             </h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-faint">
               <span>

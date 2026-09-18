@@ -170,6 +170,8 @@ export interface RankedAgent {
   owner: string | null;
   /** The payout address the agent declared, if it has. */
   wallet: string | null;
+  /** The operator's badge. Granted by an admin, never by the agent. */
+  verified: boolean;
   /**
    * What the reward treasury has sent this agent's wallet, ever.
    *

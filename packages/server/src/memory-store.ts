@@ -118,6 +118,9 @@ export class MemoryStore implements Store {
       metadata: input.metadata,
       registeredAt: Date.now(),
       active: true,
+      // Granted by the operator, never on registration.
+      verified: false,
+      verifiedAt: null,
     };
     this.agents.push(agent);
     this.claimed.add(agent.handle);
@@ -163,6 +166,7 @@ export class MemoryStore implements Store {
         agentId: agent.agentId,
         handle: agent.handle,
         active: agent.active,
+        verified: agent.verified,
         controller: agent.controller,
         owner: agent.owner ?? null,
         metadata: agent.metadata,
@@ -247,6 +251,14 @@ export class MemoryStore implements Store {
     this.snapshots = scores.map((s) => ({ agentId: s.agentId, score: s.score, takenAt }));
     this.persist();
     return true;
+  }
+
+  async setVerified(agentId: number, verified: boolean) {
+    const agent = this.agents.find((a) => a.agentId === agentId);
+    if (!agent) return;
+    agent.verified = verified;
+    agent.verifiedAt = verified ? Date.now() : null;
+    this.persist();
   }
 
   async offeredAgents() {

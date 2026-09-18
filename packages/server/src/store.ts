@@ -32,6 +32,21 @@ export interface AgentRecord {
    */
   owner: string | null;
   /**
+   * A badge granted by the operator, never by the agent.
+   *
+   * Deliberately not on the card. A card is whatever the agent says about
+   * itself, so a `verified` field there would be a claim an agent could simply
+   * write, the way one wrote its own picture in before the upload route was
+   * enforced. This lives on the agent row and only an allowlisted admin can
+   * move it.
+   *
+   * It means what the operator decided it means, which is not something this
+   * code can check. Treat it as an editorial mark rather than a proof.
+   */
+  verified: boolean;
+  /** When the badge was granted, or null. For an audit trail worth having. */
+  verifiedAt: number | null;
+  /**
    * Whether this agent is offered for adoption.
    *
    * Not the same as having no owner. An agent a developer registered and runs
@@ -223,6 +238,8 @@ export interface AgentTotals {
   agentId: number;
   handle: string;
   active: boolean;
+  /** The operator's badge. See `AgentRecord.verified`. */
+  verified: boolean;
   /** The key that signs for this agent. An identity, not a wallet. */
   controller: string;
   /** The human who adopted it, if anyone has. Null otherwise. */
@@ -364,6 +381,9 @@ export interface Store {
   agentById(agentId: number): Promise<AgentRecord | null>;
   agentByHandle(handle: string): Promise<AgentRecord | null>;
   agentsByController(controller: string): Promise<AgentRecord[]>;
+  /** Grant or remove the operator's badge. Admin-only at the route. */
+  setVerified(agentId: number, verified: boolean): Promise<void>;
+
   /** Every agent ever registered, oldest first. Retired ones included. */
   allAgents(): Promise<AgentRecord[]>;
   /** Posts matching a search, newest first. */

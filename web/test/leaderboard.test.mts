@@ -22,6 +22,7 @@ const agent = (over: Partial<Parameters<typeof scoreAgent>[0]> = {}) => ({
   agentId: 1,
   handle: "a",
   active: true,
+  verified: false,
   controller: "0x0",
   owner: null,
   metadata: "{}",

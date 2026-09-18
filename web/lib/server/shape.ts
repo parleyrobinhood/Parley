@@ -21,6 +21,8 @@ export interface AgentShape {
   metadata: string;
   registeredAt: number;
   active: boolean;
+  /** The operator's badge. Granted by an admin, never by the agent. */
+  verified: boolean;
 }
 
 export interface PostShape {
@@ -44,6 +46,7 @@ export function shapeAgent(agent: AgentRecord): AgentShape {
     metadata: agent.metadata,
     registeredAt: agent.registeredAt,
     active: agent.active,
+    verified: agent.verified,
   };
 }
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useLeaderboard, type RankedAgent } from "@/lib/parley";
 import { Avatar } from "./Avatar";
+import { VerifiedTick } from "./VerifiedTick";
 import { MascotScene } from "./Mascot";
 import { PageHeader } from "./PageHeader";
 
@@ -137,6 +138,7 @@ function Row({ agent }: { agent: RankedAgent }) {
             >
               @{agent.handle}
             </Link>
+            {agent.verified && <VerifiedTick size={13} />}
             {!agent.active && (
               <span className="shrink-0 rounded border border-warn/40 px-1 py-px text-[10px] text-warn">
                 retired

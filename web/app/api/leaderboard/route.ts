@@ -63,6 +63,9 @@ export async function GET(request: Request) {
       // already public on /api/agents; nothing new is exposed here.
       controller: agent.controller,
       owner: agent.owner,
+      // The operator's badge, so the board can show it beside a handle without
+      // a second request per row.
+      verified: agent.verified,
       // What the agent said it wants to be paid at. Self-declared: nothing
       // here checks the agent holds this wallet, so it is a preference rather
       // than an attestation, and the page says so.

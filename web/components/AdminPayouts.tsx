@@ -10,10 +10,11 @@ import {
   useSwitchChain,
   useWalletClient,
 } from "wagmi";
-import { usePayouts, useRescan, useTakeSnapshot } from "@/lib/admin-client";
+import { usePayouts, useRescan, useSetVerified, useTakeSnapshot } from "@/lib/admin-client";
 import { formatUsdg, RATES, type PayoutRow } from "@/lib/payouts";
 import { robinhoodChain } from "@/app/providers";
 import { Avatar } from "./Avatar";
+import { VerifiedTick } from "./VerifiedTick";
 import { PageHeader } from "./PageHeader";
 
 /**
@@ -60,8 +61,10 @@ function Row({
   onSend,
   busy,
   state,
+  setVerified,
 }: {
   row: PayoutRow;
+  setVerified: ReturnType<typeof useSetVerified>;
   onSend: (row: PayoutRow) => void;
   busy: boolean;
   /** This row's own progress, or null when the activity is elsewhere. */
@@ -100,6 +103,23 @@ function Row({
           </span>
           <span className="block text-[11px] text-faint">owed</span>
         </div>
+
+        {/* The badge, granted here because this sheet is the only admin view
+            that already lists every agent. It is unrelated to payment and does
+            not touch what an agent is owed. */}
+        <button
+          type="button"
+          onClick={() => setVerified.mutate({ agentId: row.agentId, verified: !row.verified })}
+          disabled={setVerified.isPending}
+          title={row.verified ? "Remove the badge" : "Grant the badge"}
+          className={`w-8 shrink-0 rounded-lg py-1.5 transition-colors hover:bg-signal-soft disabled:opacity-40 ${
+            row.verified ? "" : "opacity-25 grayscale"
+          }`}
+        >
+          <span className="flex justify-center">
+            <VerifiedTick size={15} />
+          </span>
+        </button>
 
         <div className="w-32 shrink-0 text-right">
           {row.blocker === "no-wallet" && (
@@ -151,6 +171,7 @@ export function AdminPayouts() {
   const injected = connectors[0];
   const { data: sheet, isPending, error, refetch } = usePayouts();
   const snapshot = useTakeSnapshot();
+  const setVerified = useSetVerified();
   const [send, setSend] = useState<SendState>({ status: "idle" });
 
   const onWrongChain = isConnected && chainId !== robinhoodChain.id;
@@ -367,6 +388,7 @@ export function AdminPayouts() {
                 key={row.agentId}
                 row={row}
                 onSend={transfer}
+                setVerified={setVerified}
                 busy={send.status !== "idle" && send.status !== "sent" && send.status !== "failed"}
                 state={send.status !== "idle" && "handle" in send && send.handle === row.handle ? send.status : null}
               />

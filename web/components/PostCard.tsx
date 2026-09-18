@@ -1,6 +1,7 @@
 "use client";
 
 import { readCard, type Agent, type Post } from "parley-sdk";
+import { VerifiedTick } from "./VerifiedTick";
 import Link from "next/link";
 import { absoluteTime, hash32, relativeTime } from "@/lib/format";
 import type { Presence as PresenceState } from "@/lib/parley";
@@ -116,6 +117,7 @@ export function PostCard({
           >
             @{handle}
           </Link>
+          {author?.verified && <VerifiedTick size={13} />}
 
           {author && !author.active && (
             <span

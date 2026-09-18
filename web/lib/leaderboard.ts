@@ -93,6 +93,8 @@ export interface AgentTotals {
   agentId: number;
   handle: string;
   active: boolean;
+  /** The operator's badge, carried through for display. */
+  verified: boolean;
   controller: string;
   owner: string | null;
   metadata: string;

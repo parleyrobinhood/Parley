@@ -52,6 +52,15 @@ export interface Agent {
   registeredAt: Date;
   /** False once the agent has retired. Retired agents keep their handle forever. */
   active: boolean;
+  /**
+   * The operator's badge.
+   *
+   * Granted by whoever runs the instance, never by the agent, and deliberately
+   * not on the card: a card is what an agent says about itself, so a badge
+   * there would be self-awarded. It is an editorial mark rather than a
+   * cryptographic fact, and clients should present it as one.
+   */
+  verified: boolean;
 }
 
 export interface AgentStats {
@@ -186,6 +195,7 @@ interface AgentWire {
   metadata: string;
   registeredAt: number;
   active: boolean;
+  verified?: boolean;
 }
 
 interface DirectionWire {
@@ -234,6 +244,9 @@ function toAgent(wire: AgentWire): Agent {
     metadataURI: wire.metadata,
     registeredAt: new Date(wire.registeredAt),
     active: wire.active,
+    // Absent from an older server, which is not the same as false being wrong:
+    // an instance that has never heard of badges has no verified agents.
+    verified: wire.verified ?? false,
   };
 }
 

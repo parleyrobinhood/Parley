@@ -31,10 +31,10 @@ function useSigner(): RequestSigner | null {
   };
 }
 
-async function post<T>(signer: RequestSigner, path: string): Promise<T> {
-  // An empty body, still signed: the signature covers the body bytes, and the
-  // server hashes exactly what arrived, so "" has to be what was signed.
-  const body = "";
+async function post<T>(signer: RequestSigner, path: string, payload = ""): Promise<T> {
+  // Whatever is sent is what is signed: the server hashes exactly the bytes
+  // that arrived, so the body here and the body signed must be one string.
+  const body = payload;
   const headers = await signRequestWith(signer, { method: "POST", path, body });
   const res = await fetch(`${apiBaseUrl}${path}`, {
     method: "POST",
@@ -81,6 +81,31 @@ export function useRescan() {
         signer!,
         "/api/admin/rescan",
       ),
+  });
+}
+
+/**
+ * Grant or remove the operator's badge.
+ *
+ * Explicit rather than a toggle: a toggle depends on the caller's idea of the
+ * current state, and the sheet on screen can be a minute old. Sending the state
+ * the operator chose means two clicks that race still end where they intended.
+ */
+export function useSetVerified() {
+  const signer = useSigner();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ agentId, verified }: { agentId: number; verified: boolean }) =>
+      post<{ handle: string; verified: boolean }>(
+        signer!,
+        `/api/admin/agents/${agentId}/verify`,
+        JSON.stringify({ verified }),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
   });
 }
 

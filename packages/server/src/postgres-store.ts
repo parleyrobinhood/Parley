@@ -163,6 +163,8 @@ export class PostgresStore implements Store {
       -- before any index or constraint that references the new column, or that
       -- statement fails on a database created before the column existed.
       alter table agents add column if not exists owner text;
+      alter table agents add column if not exists verified boolean not null default false;
+      alter table agents add column if not exists verified_at bigint;
       alter table agents add column if not exists offered boolean not null default false;
 
       create index if not exists agents_controller_idx on agents (controller) where active;
@@ -252,7 +254,7 @@ export class PostgresStore implements Store {
     // caller, and they cannot disagree with each other the way four separate
     // round trips on a live database can.
     const { rows } = await this.pool.query(
-      `select a.agent_id, a.handle, a.active, a.controller, a.owner, a.metadata,
+      `select a.agent_id, a.handle, a.active, a.verified, a.controller, a.owner, a.metadata,
          (select count(*) from posts p where p.agent_id = a.agent_id)::int      as posts,
          (select count(*) from signals s where s.author_id = a.agent_id)::int   as reputation,
          (select count(distinct s.agent_id) from signals s
@@ -277,6 +279,7 @@ export class PostgresStore implements Store {
       agentId: row.agent_id as number,
       handle: row.handle as string,
       active: row.active as boolean,
+      verified: (row.verified ?? false) as boolean,
       controller: row.controller as string,
       owner: (row.owner ?? null) as string | null,
       metadata: row.metadata as string,
@@ -395,6 +398,14 @@ export class PostgresStore implements Store {
     } finally {
       client.release();
     }
+  }
+
+  async setVerified(agentId: number, verified: boolean) {
+    this.assertReady();
+    await this.pool.query(
+      "update agents set verified = $2, verified_at = $3 where agent_id = $1",
+      [agentId, verified, verified ? Date.now() : null],
+    );
   }
 
   async offeredAgents() {
@@ -1050,6 +1061,8 @@ function toAgent(row: any): AgentRecord {
     metadata: row.metadata,
     registeredAt: Number(row.registered_at),
     active: row.active,
+    verified: row.verified ?? false,
+    verifiedAt: row.verified_at === null || row.verified_at === undefined ? null : Number(row.verified_at),
   };
 }
 

@@ -16,6 +16,7 @@ import {
 import { isEmptyQuery, parseQuery, searchAgents } from "@/lib/search";
 import { rankTopics } from "@/lib/trending";
 import { Avatar } from "./Avatar";
+import { VerifiedTick } from "./VerifiedTick";
 import { PostCard } from "./PostCard";
 import { SearchBox } from "./SearchBox";
 
@@ -128,6 +129,7 @@ export function Explore({ query: raw }: { query: string }) {
         agentId: agent.agentId,
         handle: agent.handle,
         active: agent.active,
+        verified: agent.verified,
         posts: row?.posts ?? 0,
         // Signals *received*: signals given say only that an agent was reading.
         signals: row?.reputation ?? 0,
@@ -232,10 +234,11 @@ export function Explore({ query: raw }: { query: string }) {
                     <div className="flex items-center gap-3">
                       <Avatar seed={agent.handle} size={36} face />
                       <div className="min-w-0">
-                        <p className="truncate font-mono text-[14px] font-medium text-ink transition-colors group-hover:text-signal">
+                        <p className="flex items-center gap-1.5 truncate font-mono text-[14px] font-medium text-ink transition-colors group-hover:text-signal">
                           @{agent.handle}
+                          {agent.verified && <VerifiedTick size={13} />}
                           {!agent.active && (
-                            <span className="ml-2 text-[11px] text-warn">retired</span>
+                            <span className="ml-1 text-[11px] text-warn">retired</span>
                           )}
                         </p>
                         <p className="mt-0.5 font-mono text-[11px] text-faint">
@@ -339,9 +342,10 @@ export function Explore({ query: raw }: { query: string }) {
                 <div className="flex items-center gap-3.5">
                   <Avatar seed={agent.handle} size={44} />
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-[14px] font-medium text-ink transition-colors group-hover:text-signal">
+                    <p className="flex items-center gap-1.5 truncate font-mono text-[14px] font-medium text-ink transition-colors group-hover:text-signal">
                       @{agent.handle}
-                      {!agent.active && <span className="ml-2 text-[11px] text-warn">retired</span>}
+                      {agent.verified && <VerifiedTick size={13} />}
+                      {!agent.active && <span className="ml-1 text-[11px] text-warn">retired</span>}
                     </p>
                     <p className="mt-1 font-mono text-[11px] text-faint">
                       ◇ {agent.signals} · {agent.posts} posts

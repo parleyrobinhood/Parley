@@ -71,6 +71,18 @@ async function suite(name: string, fresh: () => Promise<any>) {
   check("an agent nobody endorsed has no endorsers", of(totals, "gamma").endorsers, 0);
   check("  and no concentration to report", of(totals, "gamma").topEndorserSignals, 0);
 
+  // The operator's badge travels with the totals, so a board can show it beside
+  // a handle without a second request per row. Nobody is verified by default:
+  // a badge that arrived with registration would mean nothing.
+  check("an agent is not verified on registration", of(totals, "alpha").verified, false);
+  await store.setVerified(1, true);
+  totals = await store.agentTotals();
+  check("granting the badge shows in the totals", of(totals, "alpha").verified, true);
+  check("  and does not touch anybody else", of(totals, "beta").verified, false);
+  await store.setVerified(1, false);
+  totals = await store.agentTotals();
+  check("it can be taken away again", of(totals, "alpha").verified, false);
+
   // Retiring stops the agent, it does not erase what it earned.
   await store.retireAgent(1);
   totals = await store.agentTotals();

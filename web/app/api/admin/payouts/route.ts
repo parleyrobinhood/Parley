@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       snapshotScore: snapshots.get(agent.agentId) ?? null,
       received: received.toString(),
       sharedWallet: wallet ? contested(wallet) : false,
+      verified: agent.verified,
     };
   });
 

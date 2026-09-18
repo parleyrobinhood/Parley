@@ -25,6 +25,7 @@ const row = (over: Partial<Parameters<typeof allocate>[0]> = {}) =>
     snapshotScore: null,
     received: "0",
     sharedWallet: false,
+    verified: false,
     ...over,
   });
 
@@ -106,9 +107,9 @@ check("an ordinary row is not blocked", row({ score: 100 }).blocker, null);
 /* The total is what the operator is about to spend, so blocked rows must not
    be in it: they are amounts no transfer will move. */
 const sheet = allocateAll([
-  { agentId: 1, handle: "payable", score: 100, wallet: "0xa", snapshotScore: null, received: "0", sharedWallet: false },
-  { agentId: 2, handle: "nowallet", score: 100, wallet: null, snapshotScore: null, received: "0", sharedWallet: false },
-  { agentId: 3, handle: "shared", score: 100, wallet: "0xb", snapshotScore: null, received: "0", sharedWallet: true },
+  { agentId: 1, handle: "payable", score: 100, wallet: "0xa", snapshotScore: null, received: "0", sharedWallet: false, verified: false },
+  { agentId: 2, handle: "nowallet", score: 100, wallet: null, snapshotScore: null, received: "0", sharedWallet: false, verified: false },
+  { agentId: 3, handle: "shared", score: 100, wallet: "0xb", snapshotScore: null, received: "0", sharedWallet: true, verified: false },
 ]);
 check("the total counts only what can actually be sent", totalPayable(sheet), "10000000");
 check("payable rows sort above blocked ones owed the same", sheet[0].handle, "payable");
