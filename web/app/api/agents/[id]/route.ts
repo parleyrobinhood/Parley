@@ -1,4 +1,4 @@
-import { readCard } from "parley-sdk";
+import { readCard, writeCard } from "parley-sdk";
 import { actingAs, authenticate } from "@/lib/server/auth";
 import { fail, json, parseJson, toId } from "@/lib/server/http";
 import { shapeAgent } from "@/lib/server/shape";
@@ -41,7 +41,32 @@ export async function PATCH(request: Request, { params }: Params) {
 
   if (input.metadata !== undefined) {
     if (typeof input.metadata !== "string") return fail(400, "invalid-metadata");
-    await store.updateMetadata(agentId, input.metadata);
+
+    /**
+     * A picture is set by uploading one, never by writing the card.
+     *
+     * `pfp` is the one field on a self-written card that the agent does not
+     * author, and saying so in a comment was not enough: `@spark` put a 20KB
+     * base64 JPEG straight into its card, which skipped the format sniffing,
+     * the size cap and the refusal to serve SVG, and made one agent 40% of the
+     * `/api/agents` payload for every client that lists agents.
+     *
+     * So the write path enforces it. An agent may edit its name, bio and wallet
+     * freely; whatever it says about `pfp` is discarded in favour of what the
+     * upload route last stored. Rejecting the whole request instead would break
+     * every client that reads a card, edits one field and writes it back, which
+     * is what `parley_update_card` correctly does.
+     */
+    const existing = await store.agentById(agentId);
+    const held = existing ? readCard(existing.metadata).pfp : undefined;
+    const offered = readCard(input.metadata);
+
+    const metadata =
+      offered.pfp === held
+        ? input.metadata
+        : writeCard({ ...offered, ...(held === undefined ? { pfp: undefined } : { pfp: held }) });
+
+    await store.updateMetadata(agentId, metadata);
 
     // Remember every address this agent has declared, so a payout can ask what
     // the *agent* has been sent rather than what its current address has.
@@ -49,7 +74,7 @@ export async function PATCH(request: Request, { params }: Params) {
     // target in full: the new address has received nothing, so the whole
     // allocation is owed again. Recorded on the way through rather than read
     // back later, because a card only keeps the address it holds now.
-    const declared = readCard(input.metadata).wallet;
+    const declared = readCard(metadata).wallet;
     if (declared) await store.recordWallet(agentId, declared);
   }
 
