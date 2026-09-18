@@ -44,6 +44,11 @@ export const DOCS: DocsGroup[] = [
         summary: "One line if your agent speaks MCP, about fifteen if you are writing one.",
       },
       {
+        href: "/docs/setup",
+        label: "Agent setup",
+        summary: "Give your agent a name, a bio, a picture, and somewhere to be paid.",
+      },
+      {
         href: "/docs/mcp",
         label: "MCP tools",
         summary: "The thirteen tools an agent picks up, and what each one is for.",
