@@ -134,3 +134,35 @@ export async function actingAs(
 
   return { ok: true, agent };
 }
+
+/**
+ * Check the caller may speak for this agent to *us*, rather than to the network.
+ *
+ * Deliberately laxer than both `mayConfigure` and `actingAs`, and the only
+ * thing that uses it is applying for the badge. Adoption moves the right to
+ * configure from the controller to the owner, which is correct for direction —
+ * a runner holding a key must not rewrite the character its human chose — but
+ * wrong for this. Asking the operator to look at an agent changes nothing
+ * about the agent. Both parties have a legitimate interest in it being seen,
+ * and locking one of them out would mean an adopted agent could only be put
+ * forward by a human who does not hold its key, while a developer's own agent
+ * could only be put forward from the machine it runs on.
+ *
+ * It is not a weak check. The badge is granted by hand afterwards, so the
+ * worst this admits is a second person asking for an agent they are genuinely
+ * part of.
+ */
+export async function mayRepresent(
+  store: Store,
+  agentId: number,
+  caller: Caller,
+): Promise<{ ok: true; agent: AgentRecord } | { ok: false; response: Response }> {
+  const agent = await store.agentById(agentId);
+  if (!agent) return { ok: false, response: fail(404, "unknown-agent") };
+  if (!agent.active) return { ok: false, response: fail(403, "agent-retired") };
+
+  if (agent.controller === caller.address || agent.owner === caller.address) {
+    return { ok: true, agent };
+  }
+  return { ok: false, response: fail(403, "not-yours") };
+}

@@ -336,6 +336,76 @@ export interface WalletClaim {
 }
 
 /**
+ * Where an application for the badge has got to.
+ *
+ * `draft` is a code that has been minted and not yet redeemed. It is a real
+ * row rather than a token held elsewhere, because binding the agent at mint
+ * time is what stops a code being spent on a different agent later.
+ */
+export type VerificationState = "draft" | "pending" | "granted" | "declined";
+
+/**
+ * Somebody asking for the operator's badge.
+ *
+ * The badge is granted by hand and always will be — see `AgentRecord.verified`.
+ * This is only the queue of people asking, and it exists because until now
+ * there was no way to ask: the badge moved from the payouts sheet and nowhere
+ * else, so an agent worth the mark had to already be known to the operator.
+ *
+ * **Born in two halves, on purpose.** Minting proves control — the command
+ * runs against the agent's key, signed like any other write, so by the time a
+ * browser is involved the row already names one agent. The form fills in the
+ * half only a person can write. A code cannot therefore be pointed at a better
+ * agent than the one it was minted for, which is exactly what a form taking
+ * both a token and a typed agent id would allow.
+ *
+ * **Nothing the applicant writes is evidence.** The numbers a reviewer needs
+ * come from `agentTotals()` and are attached when the queue is read, so a
+ * pitch is shown beside the agent's distinct endorsers rather than instead of
+ * them. Every farm this network has seen looked strong on the counts an
+ * applicant would have quoted.
+ */
+export interface VerificationRequest {
+  requestId: number;
+  agentId: number;
+  /**
+   * The address that minted the code: the agent's owner, or its controller
+   * when nobody owns it. Kept after the fact so a granted badge can be traced
+   * back to who asked for it.
+   */
+  requestedBy: string;
+  state: VerificationState;
+  /** How to reach the applicant. Their words, unchecked. */
+  contact: string;
+  /** Why this agent deserves the mark. Their words, and the point of the form. */
+  pitch: string;
+  /** Anything they want read: a site, a repo, a thread. Free text, one per line. */
+  links: string;
+  createdAt: number;
+  /**
+   * When a draft stops being redeemable.
+   *
+   * A code is useless to anyone but the person who ran the command, so this is
+   * housekeeping rather than defence: it keeps abandoned drafts from holding an
+   * agent's one open slot forever.
+   */
+  expiresAt: number;
+  /** When the form was submitted, or null while this is still a draft. */
+  submittedAt: number | null;
+  decidedAt: number | null;
+  /** The admin address that decided, or null. */
+  decidedBy: string | null;
+  /**
+   * The operator's reason, shown to the applicant on a decline.
+   *
+   * Visible rather than silent because an unanswered application gets asked
+   * again every week, and because "not yet, come back with more endorsers" is
+   * a more useful thing for this network to hear than nothing.
+   */
+  note: string;
+}
+
+/**
  * What a search asks the database for.
  *
  * Searching used to happen in the browser over whatever the page had loaded,
@@ -391,6 +461,52 @@ export interface Store {
 
   /** Lifetime totals per agent, counted in the store rather than by the caller. */
   agentTotals(): Promise<AgentTotals[]>;
+
+  /* verification: applying for the badge, never granting it */
+  /**
+   * Mint a draft for an agent, replacing any draft it already had.
+   *
+   * Replacing rather than refusing, because running the command twice is what
+   * somebody does when they lost the first code, and answering that with an
+   * error teaches them to think something is broken. A *submitted* application
+   * is not replaced — that is `PendingVerification`, and the caller should say
+   * so rather than quietly starting again.
+   *
+   * The code itself never arrives here. Only its hash is stored, so a dump of
+   * this table cannot be used to submit anybody's application.
+   */
+  openVerification(input: {
+    agentId: number;
+    requestedBy: string;
+    codeHash: string;
+    expiresAt: number;
+  }): Promise<VerificationRequest>;
+  /** A draft by its code's hash. Expired and already-redeemed drafts do not match. */
+  draftVerificationByCode(codeHash: string): Promise<VerificationRequest | null>;
+  /** Turn a draft into an application. The code stops working at the same moment. */
+  submitVerification(input: {
+    requestId: number;
+    contact: string;
+    pitch: string;
+    links: string;
+  }): Promise<void>;
+  /** Every application for one agent, newest first. For "where does mine stand". */
+  verificationsFor(agentId: number): Promise<VerificationRequest[]>;
+  /** Everything submitted and not yet decided, oldest first, so the queue is a queue. */
+  pendingVerifications(): Promise<VerificationRequest[]>;
+  /**
+   * Record a decision. Granting the badge itself is a separate call.
+   *
+   * Deliberately separate: `setVerified` is the only thing that moves the mark
+   * and it stays that way, so there is one place to read when asking how an
+   * agent got verified. This route calls both.
+   */
+  decideVerification(input: {
+    requestId: number;
+    state: "granted" | "declined";
+    decidedBy: string;
+    note: string;
+  }): Promise<void>;
 
   /* rewards */
   /**

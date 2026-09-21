@@ -14,6 +14,7 @@ import type {
   SignalRecord,
   Stance,
   Store,
+  VerificationRequest,
   SearchFilter,
   TimelineFilter,
 } from "./store.js";
@@ -152,6 +153,23 @@ export class PostgresStore implements Store {
         at      bigint not null
       );
 
+      create table if not exists verification_requests (
+        request_id   serial primary key,
+        agent_id     integer not null,
+        requested_by text    not null,
+        state        text    not null,
+        code_hash    text    not null,
+        contact      text    not null default '',
+        pitch        text    not null default '',
+        links        text    not null default '',
+        created_at   bigint  not null,
+        expires_at   bigint  not null,
+        submitted_at bigint,
+        decided_at   bigint,
+        decided_by   text,
+        note         text    not null default ''
+      );
+
       create table if not exists nonces (
         address    text   not null,
         nonce      text   not null,
@@ -176,6 +194,9 @@ export class PostgresStore implements Store {
       create index if not exists posts_parent_idx        on posts (parent_id);
       create index if not exists nonces_expiry_idx      on nonces (expires_at);
       create index if not exists rate_attempts_idx       on rate_attempts (bucket, subject, at);
+      create index if not exists verification_agent_idx   on verification_requests (agent_id);
+      -- A code is looked up on every form submission and nowhere else.
+      create index if not exists verification_code_idx    on verification_requests (code_hash) where state = 'draft';
     `);
     this.ready = true;
   }
@@ -183,7 +204,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets, verification_requests restart identity",
     );
   }
 
@@ -405,6 +426,99 @@ export class PostgresStore implements Store {
     await this.pool.query(
       "update agents set verified = $2, verified_at = $3 where agent_id = $1",
       [agentId, verified, verified ? Date.now() : null],
+    );
+  }
+
+  /* verification */
+
+  async openVerification(input: {
+    agentId: number;
+    requestedBy: string;
+    codeHash: string;
+    expiresAt: number;
+  }) {
+    this.assertReady();
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      // Replacing the previous draft rather than refusing: running the command
+      // again is what somebody does when they lost the first code.
+      await client.query("delete from verification_requests where agent_id = $1 and state = 'draft'", [
+        input.agentId,
+      ]);
+      const { rows } = await client.query(
+        `insert into verification_requests
+           (agent_id, requested_by, state, code_hash, created_at, expires_at)
+         values ($1, $2, 'draft', $3, $4, $5)
+         returning *`,
+        [input.agentId, input.requestedBy.toLowerCase(), input.codeHash, Date.now(), input.expiresAt],
+      );
+      await client.query("commit");
+      return toVerification(rows[0]);
+    } catch (cause) {
+      await client.query("rollback");
+      throw cause;
+    } finally {
+      client.release();
+    }
+  }
+
+  async draftVerificationByCode(codeHash: string) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from verification_requests where code_hash = $1 and state = 'draft' and expires_at > $2",
+      [codeHash, Date.now()],
+    );
+    return rows.length ? toVerification(rows[0]) : null;
+  }
+
+  async submitVerification(input: {
+    requestId: number;
+    contact: string;
+    pitch: string;
+    links: string;
+  }) {
+    this.assertReady();
+    // `state = 'draft'` in the where clause, not just the id: two submissions
+    // racing on one code must not both land, and this is what settles it.
+    await this.pool.query(
+      `update verification_requests
+          set state = 'pending', contact = $2, pitch = $3, links = $4,
+              submitted_at = $5, code_hash = ''
+        where request_id = $1 and state = 'draft'`,
+      [input.requestId, input.contact, input.pitch, input.links, Date.now()],
+    );
+  }
+
+  async verificationsFor(agentId: number) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from verification_requests where agent_id = $1 order by request_id desc",
+      [agentId],
+    );
+    return rows.map(toVerification);
+  }
+
+  async pendingVerifications() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from verification_requests where state = 'pending' order by request_id",
+    );
+    return rows.map(toVerification);
+  }
+
+  async decideVerification(input: {
+    requestId: number;
+    state: "granted" | "declined";
+    decidedBy: string;
+    note: string;
+  }) {
+    this.assertReady();
+    await this.pool.query(
+      `update verification_requests
+          set state = $2, decided_by = $3, decided_at = $4, note = $5
+        where request_id = $1 and state = 'pending'`,
+      [input.requestId, input.state, input.decidedBy.toLowerCase(), Date.now(), input.note],
     );
   }
 
@@ -1063,6 +1177,24 @@ function toAgent(row: any): AgentRecord {
     active: row.active,
     verified: row.verified ?? false,
     verifiedAt: row.verified_at === null || row.verified_at === undefined ? null : Number(row.verified_at),
+  };
+}
+
+function toVerification(row: any): VerificationRequest {
+  return {
+    requestId: row.request_id,
+    agentId: row.agent_id,
+    requestedBy: row.requested_by,
+    state: row.state,
+    contact: row.contact,
+    pitch: row.pitch,
+    links: row.links,
+    createdAt: Number(row.created_at),
+    expiresAt: Number(row.expires_at),
+    submittedAt: row.submitted_at === null ? null : Number(row.submitted_at),
+    decidedAt: row.decided_at === null ? null : Number(row.decided_at),
+    decidedBy: row.decided_by,
+    note: row.note,
   };
 }
 

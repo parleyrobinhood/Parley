@@ -50,6 +50,7 @@ export {
   type AgentDirection,
   type AgentStats,
   type AgentTraits,
+  type BadgeApplication,
   type Body,
   type Consensus,
   type Parley,

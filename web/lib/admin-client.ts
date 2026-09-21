@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount, useWalletClient } from "wagmi";
 import { apiBaseUrl } from "./config";
 import type { PayoutRow } from "./payouts";
+import type { VerificationApplication } from "./verification";
 
 /**
  * The admin side of the API, signed by whichever wallet is connected.
@@ -116,5 +117,45 @@ export function useTakeSnapshot() {
   return useMutation({
     mutationFn: () => post<{ taken: boolean; agents: number }>(signer!, "/api/admin/snapshot"),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-payouts"] }),
+  });
+}
+
+/**
+ * The badge queue, and answering it.
+ *
+ * A POST to read, like the payouts sheet: every admin request is signed, and
+ * the signature covers the method and path, so there is no session to hold and
+ * no GET whose headers would have to carry one.
+ */
+export function useVerificationQueue() {
+  const signer = useSigner();
+  const { address } = useAccount();
+
+  return useQuery<{ rows: VerificationApplication[] }>({
+    // Keyed by address for the same reason the payouts sheet is: switching
+    // wallets must not show one admin what was fetched for another.
+    queryKey: ["admin-verification", address ?? "none"],
+    enabled: signer !== null,
+    queryFn: () => post<{ rows: VerificationApplication[] }>(signer!, "/api/admin/verification"),
+  });
+}
+
+export function useDecideVerification() {
+  const signer = useSigner();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ requestId, approve, note }: { requestId: number; approve: boolean; note: string }) =>
+      post<{ handle: string; state: string }>(
+        signer!,
+        `/api/admin/verification/${requestId}/decide`,
+        JSON.stringify({ approve, note }),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-verification"] });
+      // Approving grants the badge, so anything that renders one is now stale.
+      queryClient.invalidateQueries({ queryKey: ["admin-payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+    },
   });
 }

@@ -353,6 +353,23 @@ export function createParley(config: ParleyConfig) {
     },
 
     /**
+     * Ask for the operator's badge, or find out where a previous ask got to.
+     *
+     * One call for both, because they are one question: somebody running this
+     * again has either lost their code or is wondering what happened, and
+     * handing them a fresh code for an application already in the queue would
+     * be wrong in both cases.
+     *
+     * It never grants anything. The badge is decided by a person, afterwards.
+     * What this proves is control — the request is signed by the agent's key
+     * or its owner's — so that the form on the website can take a code and
+     * nothing else, with no agent id anybody could point somewhere better.
+     */
+    async applyForBadge(agentId: bigint): Promise<BadgeApplication> {
+      return write<BadgeApplication>("POST", `/api/agents/${agentId}/verification`, {});
+    },
+
+    /**
      * Upload a picture for this agent.
      *
      * Bytes as base64, so the signature covers this request the same way it
@@ -749,5 +766,18 @@ export function createParley(config: ParleyConfig) {
     },
   };
 }
+
+/**
+ * Where an application for the badge stands, as the server reports it.
+ *
+ * `draft` is the only state that carries a code, and it is carried exactly
+ * once: the code is shown when it is minted and never again, because only its
+ * hash is stored.
+ */
+export type BadgeApplication =
+  | { state: "draft"; handle: string; code: string; expiresAt: number }
+  | { state: "pending"; handle: string; submittedAt: number | null }
+  | { state: "granted"; handle: string; verifiedAt: number | null }
+  | { state: "declined"; handle: string; note: string; mayReapplyAt: number };
 
 export type Parley = ReturnType<typeof createParley>;

@@ -15,6 +15,7 @@ import type {
   SignalRecord,
   Stance,
   Store,
+  VerificationRequest,
   SearchFilter,
   TimelineFilter,
 } from "./store.js";
@@ -30,6 +31,25 @@ interface Snapshot {
   treasuryBlock?: number;
   snapshots?: ScoreSnapshot[];
   walletClaims?: WalletClaim[];
+  verifications?: StoredVerification[];
+}
+
+/**
+ * A verification row as it is kept, which is the record plus the one field
+ * that must never leave the store.
+ *
+ * Only the hash of a code is held. A dump of this table therefore cannot be
+ * used to submit anybody's application, and the code exists in exactly one
+ * place: the terminal that printed it.
+ */
+interface StoredVerification extends VerificationRequest {
+  codeHash: string;
+}
+
+/** Drop the hash on the way out. Every read goes through this. */
+function shed(row: StoredVerification): VerificationRequest {
+  const { codeHash: _codeHash, ...rest } = row;
+  return rest;
 }
 
 /**
@@ -58,6 +78,8 @@ export class MemoryStore implements Store {
   private snapshots: ScoreSnapshot[] = [];
   /** Every address every agent has declared. Append-only. */
   private wallets: WalletClaim[] = [];
+  /** Applications for the badge, in the order they were opened. */
+  private verifications: StoredVerification[] = [];
   /** agentId -> when it last woke. Absent means it never has. */
   private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
@@ -79,6 +101,7 @@ export class MemoryStore implements Store {
       this.treasuryBlock = snapshot.treasuryBlock ?? 0;
       this.snapshots = snapshot.snapshots ?? [];
       this.wallets = snapshot.walletClaims ?? [];
+      this.verifications = snapshot.verifications ?? [];
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -97,6 +120,7 @@ export class MemoryStore implements Store {
       treasuryBlock: this.treasuryBlock,
       snapshots: this.snapshots,
       walletClaims: this.wallets,
+      verifications: this.verifications,
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -258,6 +282,102 @@ export class MemoryStore implements Store {
     if (!agent) return;
     agent.verified = verified;
     agent.verifiedAt = verified ? Date.now() : null;
+    this.persist();
+  }
+
+  /* verification */
+
+  async openVerification(input: {
+    agentId: number;
+    requestedBy: string;
+    codeHash: string;
+    expiresAt: number;
+  }) {
+    // A second run of the command replaces the draft rather than failing.
+    // Somebody running it twice has lost the first code, and an error teaches
+    // them that something is broken when nothing is.
+    this.verifications = this.verifications.filter(
+      (v) => !(v.agentId === input.agentId && v.state === "draft"),
+    );
+
+    const row: StoredVerification = {
+      // Highest so far plus one, not the array length. Opening a draft deletes
+      // the previous one, so a length-based id starts reusing numbers that
+      // still belong to submitted applications: delete agent one's draft while
+      // agent two has a pending row and the count says "1", handing the new
+      // draft the id of a live application. Postgres uses a sequence and never
+      // had this; the memory store is the reference, so it must not either.
+      requestId: this.verifications.reduce((top, v) => Math.max(top, v.requestId), 0) + 1,
+      agentId: input.agentId,
+      requestedBy: input.requestedBy.toLowerCase(),
+      state: "draft",
+      contact: "",
+      pitch: "",
+      links: "",
+      createdAt: Date.now(),
+      expiresAt: input.expiresAt,
+      submittedAt: null,
+      decidedAt: null,
+      decidedBy: null,
+      note: "",
+      codeHash: input.codeHash,
+    };
+    this.verifications.push(row);
+    this.persist();
+    return shed(row);
+  }
+
+  async draftVerificationByCode(codeHash: string) {
+    const row = this.verifications.find(
+      (v) => v.codeHash === codeHash && v.state === "draft" && v.expiresAt > Date.now(),
+    );
+    return row ? shed(row) : null;
+  }
+
+  async submitVerification(input: {
+    requestId: number;
+    contact: string;
+    pitch: string;
+    links: string;
+  }) {
+    const row = this.verifications.find((v) => v.requestId === input.requestId);
+    if (!row || row.state !== "draft") return;
+    row.state = "pending";
+    row.contact = input.contact;
+    row.pitch = input.pitch;
+    row.links = input.links;
+    row.submittedAt = Date.now();
+    // The code dies with the draft: one code, one application.
+    row.codeHash = "";
+    this.persist();
+  }
+
+  async verificationsFor(agentId: number) {
+    return this.verifications
+      .filter((v) => v.agentId === agentId)
+      .sort((a, b) => b.requestId - a.requestId)
+      .map(shed);
+  }
+
+  async pendingVerifications() {
+    return this.verifications
+      .filter((v) => v.state === "pending")
+      .sort((a, b) => a.requestId - b.requestId)
+      .map(shed);
+  }
+
+  async decideVerification(input: {
+    requestId: number;
+    state: "granted" | "declined";
+    decidedBy: string;
+    note: string;
+  }) {
+    const row = this.verifications.find((v) => v.requestId === input.requestId);
+    if (!row || row.state !== "pending") return;
+    row.state = input.state;
+    row.decidedBy = input.decidedBy.toLowerCase();
+    row.decidedAt = Date.now();
+    row.note = input.note;
     this.persist();
   }
 

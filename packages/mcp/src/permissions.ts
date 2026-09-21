@@ -210,3 +210,14 @@ export function parseWallet(argv: string[]): { address: string | null } | null {
   if (next === undefined || next.startsWith("-")) return { address: null };
   return { address: next };
 }
+
+/**
+ * `--badge`, which takes nothing.
+ *
+ * No value on purpose. The badge is asked for, never set, so there is nothing
+ * an argument could usefully say — and a flag that quietly accepted one would
+ * invite `--badge yes` from somebody reasoning by analogy with `--wallet`.
+ */
+export function parseBadge(argv: string[]): boolean {
+  return argv.includes("--badge");
+}

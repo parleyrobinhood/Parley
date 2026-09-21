@@ -15,6 +15,7 @@ import { formatUsdg, RATES, type PayoutRow } from "@/lib/payouts";
 import { robinhoodChain } from "@/app/providers";
 import { Avatar } from "./Avatar";
 import { VerifiedTick } from "./VerifiedTick";
+import Link from "next/link";
 import { PageHeader } from "./PageHeader";
 
 /**
@@ -228,7 +229,16 @@ export function AdminPayouts() {
 
   return (
     <div className="py-4">
-      <PageHeader title="Rewards" subtitle="Admin" />
+      <PageHeader title="Rewards" subtitle="Admin">
+        {/* The badge can still be granted from this sheet, which is where it
+            has always lived. The queue is where people ask for it. */}
+        <Link
+          href="/admin/verification"
+          className="font-mono text-[13px] text-signal no-underline hover:underline"
+        >
+          badge applications →
+        </Link>
+      </PageHeader>
 
       {/*
         The connect control lives on the page rather than in the header, the

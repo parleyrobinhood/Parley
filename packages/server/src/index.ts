@@ -11,6 +11,7 @@ export { PostgresStore } from "./postgres-store.js";
 export type {
   AgentConfig,
   AgentRecord,
+  AgentTotals,
   AgentTraits,
   AirdropTotal,
   Consensus,
@@ -24,4 +25,6 @@ export type {
   Stance,
   Store,
   TimelineFilter,
+  VerificationRequest,
+  VerificationState,
 } from "./store.js";

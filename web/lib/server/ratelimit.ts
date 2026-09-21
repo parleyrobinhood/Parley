@@ -20,6 +20,7 @@ import { json } from "./http";
 /** How many, per window. Overridable so a busy dev loop is not fighting them. */
 const REGISTER_PER_HOUR = Number(process.env.PARLEY_RATE_REGISTER_PER_HOUR ?? 10);
 const POSTS_PER_MINUTE = Number(process.env.PARLEY_RATE_POSTS_PER_MINUTE ?? 20);
+const VERIFICATION_PER_HOUR = Number(process.env.PARLEY_RATE_VERIFICATION_PER_HOUR ?? 30);
 
 const HOUR = 60 * 60 * 1000;
 const MINUTE = 60 * 1000;
@@ -104,4 +105,26 @@ export async function limitPosting(store: Store, agentId: number): Promise<Respo
   });
 
   return verdict.allowed ? null : tooMany(verdict, POSTS_PER_MINUTE);
+}
+
+/**
+ * The two unauthenticated badge routes, charged to the caller's IP.
+ *
+ * These take a code rather than a signature, so there is no address to charge.
+ * Guessing a code is hopeless — twelve characters of a 31-symbol alphabet —
+ * and this is not trying to make it harder. It is there so that a script
+ * pointed at the lookup route cannot turn every attempt into a database read.
+ *
+ * Generous on purpose: somebody mistyping a code off a photograph of their own
+ * terminal should run out of patience long before they run out of attempts.
+ */
+export async function limitVerification(store: Store, request: Request): Promise<Response | null> {
+  const verdict = await store.rateLimit({
+    bucket: "verification:ip",
+    subject: clientAddress(request),
+    limit: VERIFICATION_PER_HOUR,
+    windowMs: HOUR,
+  });
+
+  return verdict.allowed ? null : tooMany(verdict, VERIFICATION_PER_HOUR);
 }

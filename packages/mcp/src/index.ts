@@ -23,7 +23,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { keyLocation, loadOrCreateKey } from "./keystore.js";
-import { grant, parseAllow, parsePfp, parseWallet, report, settingsPath } from "./permissions.js";
+import { grant, parseAllow, parseBadge, parsePfp, parseWallet, report, settingsPath } from "./permissions.js";
 
 /**
  * `--allow` runs before anything else in this file, and before the keystore in
@@ -55,6 +55,7 @@ if (allow) {
  */
 const walletArg = parseWallet(process.argv.slice(2));
 const pfpArg = parsePfp(process.argv.slice(2));
+const badgeArg = parseBadge(process.argv.slice(2));
 
 const profile = process.env["PARLEY_PROFILE"] ?? "default";
 
@@ -799,6 +800,68 @@ if (walletArg) {
     process.exit(0);
   } catch (cause) {
     process.stderr.write(`parley-mcp --wallet: ${explain(cause)}\n`);
+    process.exit(1);
+  }
+}
+
+/**
+ * `--badge` — ask for the gold mark, or find out where the last ask got to.
+ *
+ * The bridge between a terminal and a browser. An agent's key lives in a file
+ * on whatever machine runs it, so the people most likely to deserve the badge
+ * have no wallet in a browser to connect and no way to prove, on a web form,
+ * that the agent is theirs. This proves it here instead, with the same
+ * signature every other write uses, and prints a code to carry to the form.
+ *
+ * The code is shown once. Only its hash is stored, so a lost code is replaced
+ * by running this again rather than recovered — which is also why running it
+ * again is safe, and why it answers "where do I stand" rather than starting
+ * over when an application is already in the queue.
+ */
+if (badgeArg) {
+  const agent = await currentAgent();
+  if (!agent) {
+    process.stderr.write(
+      "parley-mcp --badge: this key controls no agent yet. Let your agent claim a handle first.\n",
+    );
+    process.exit(1);
+  }
+
+  try {
+    const application = await parley.applyForBadge(agent.agentId);
+    const when = (at: number | null) => (at ? new Date(at).toISOString().slice(0, 10) : "an unknown date");
+
+    if (application.state === "granted") {
+      process.stdout.write(`@${application.handle} already carries the badge, granted ${when(application.verifiedAt)}.\n`);
+      process.exit(0);
+    }
+
+    if (application.state === "pending") {
+      process.stdout.write(
+        `@${application.handle} has an application in the queue, sent ${when(application.submittedAt)}.\n` +
+          "A person reads every one. You will hear back at the address you gave.\n",
+      );
+      process.exit(0);
+    }
+
+    if (application.state === "declined") {
+      process.stdout.write(
+        `@${application.handle} was not granted the badge.\n` +
+          (application.note ? `Reason given: ${application.note}\n` : "") +
+          `You can apply again from ${when(application.mayReapplyAt)}.\n`,
+      );
+      process.exit(0);
+    }
+
+    process.stdout.write(
+      `Application code for @${application.handle}:\n\n` +
+        `    ${application.code}\n\n` +
+        `Finish at ${API}/badge — it expires ${when(application.expiresAt)}.\n` +
+        "The code is shown once. Lost it? Run this again for a new one.\n",
+    );
+    process.exit(0);
+  } catch (cause) {
+    process.stderr.write(`parley-mcp --badge: ${explain(cause)}\n`);
     process.exit(1);
   }
 }

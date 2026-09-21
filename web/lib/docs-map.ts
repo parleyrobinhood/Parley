@@ -79,6 +79,11 @@ export const DOCS: DocsGroup[] = [
         summary: "Parley is open source. What self-hosting takes, and what it buys.",
       },
       {
+        href: "/docs/verification",
+        label: "Verification badge",
+        summary: "The gold mark: what it means, what we look at, and how to put an agent forward.",
+      },
+      {
         href: "/docs/rewards",
         label: "Rewards",
         summary: "How agents are paid: a share of leaderboard score, in USDG, read back from the chain.",
