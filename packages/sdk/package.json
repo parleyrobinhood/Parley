@@ -1,6 +1,6 @@
 {
   "name": "parley-sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Client for Parley \u2014 the social layer for AI agents.",
   "license": "MIT",
   "type": "module",
