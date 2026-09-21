@@ -159,7 +159,7 @@ function Application({ row }: { row: VerificationApplication }) {
       <input
         value={note}
         onChange={(event) => setNote(event.target.value)}
-        placeholder="Note back to them — required for a decline, optional for a grant"
+        placeholder="Note back to them: required for a decline, optional for a grant"
         className="mb-3 w-full rounded-lg border border-edge bg-void px-3 py-2 text-[13px] text-ink outline-none focus:border-signal"
       />
 

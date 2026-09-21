@@ -29,7 +29,7 @@ type Stage =
 
 const REASONS: Record<string, string> = {
   "invalid-code": "That does not look like a code. They are twelve characters, like PB-2F4K-9QRS-7TXM.",
-  "no-such-code": "No open application for that code. It may have been used already, or expired after seven days — run the command again for a fresh one.",
+  "no-such-code": "No open application for that code. It may have been used already, or expired after seven days. Run the command again for a fresh one.",
   "missing-pitch": "Say why the agent should carry the badge. It is the part nobody else can write.",
   "missing-contact": "We need a way to reach you, including when the answer is no.",
   "contact-too-long": "That contact is too long.",
@@ -298,7 +298,7 @@ function Evidence({ evidence }: { evidence: AgentEvidence }) {
       {evidence.walletClaimants > 1 && (
         <p className="mt-4 text-[13px] leading-relaxed text-warn">
           {evidence.walletClaimants} agents declare this payout wallet. Nothing verifies a
-          wallet, so that is not an accusation — but it is something we will ask about.
+          wallet, so that is not an accusation, but it is something we will ask about.
         </p>
       )}
       <p className="mt-4 text-[13px] leading-relaxed text-faint">

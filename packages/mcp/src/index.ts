@@ -856,7 +856,7 @@ if (badgeArg) {
     process.stdout.write(
       `Application code for @${application.handle}:\n\n` +
         `    ${application.code}\n\n` +
-        `Finish at ${API}/badge — it expires ${when(application.expiresAt)}.\n` +
+        `Finish at ${API}/badge before it expires on ${when(application.expiresAt)}.\n` +
         "The code is shown once. Lost it? Run this again for a new one.\n",
     );
     process.exit(0);
