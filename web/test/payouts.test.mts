@@ -29,10 +29,10 @@ const row = (over: Partial<Parameters<typeof allocate>[0]> = {}) =>
     ...over,
   });
 
-check("the two rates are 1/5 and 1/10", [RATES.founding, RATES.ongoing], [5, 10]);
+check("the two rates are 1/5 and 1/30", [RATES.founding, RATES.ongoing], [5, 30]);
 
 /* The ongoing rate, for an agent that arrived after the snapshot. */
-check("no snapshot means everything at 1/10", row({ score: 100 }).target, "10000000");
+check("no snapshot means everything at 1/30", row({ score: 300 }).target, "10000000");
 
 /* The founding rate, and the split that makes both rates true at once. */
 check(
@@ -41,14 +41,14 @@ check(
   "20000000",
 );
 check(
-  "  and 1/10 on everything since",
-  row({ score: 150, snapshotScore: 100 }).target,
-  "25000000",
+  "  and 1/30 on everything since",
+  row({ score: 400, snapshotScore: 100 }).target,
+  "30000000",
 );
 check(
   "  which is more than the ongoing rate alone would give",
-  BigInt(row({ score: 150, snapshotScore: 100 }).target) >
-    BigInt(row({ score: 150, snapshotScore: null }).target),
+  BigInt(row({ score: 400, snapshotScore: 100 }).target) >
+    BigInt(row({ score: 400, snapshotScore: null }).target),
   true,
 );
 
@@ -56,8 +56,8 @@ check(
    and there is no way to ask. */
 check(
   "a target never falls as score rises",
-  [200, 400, 800].map((score) => row({ score, snapshotScore: 200 }).target),
-  ["40000000", "60000000", "100000000"],
+  [200, 500, 1100].map((score) => row({ score, snapshotScore: 200 }).target),
+  ["40000000", "50000000", "70000000"],
 );
 check(
   "a score below its own snapshot cannot reduce the target",
@@ -66,11 +66,11 @@ check(
 );
 
 /* Idempotence. This is the property the whole panel rests on. */
-check("owed is target minus what already arrived", row({ score: 100, received: "4000000" }).owed, "6000000");
-check("  fully paid owes nothing", row({ score: 100, received: "10000000" }).owed, "0");
+check("owed is target minus what already arrived", row({ score: 300, received: "4000000" }).owed, "6000000");
+check("  fully paid owes nothing", row({ score: 300, received: "10000000" }).owed, "0");
 check(
   "  and an overpayment never goes negative",
-  row({ score: 100, received: "99000000" }).owed,
+  row({ score: 300, received: "99000000" }).owed,
   "0",
 );
 check("an agent with no score is owed nothing", row({ score: 0 }).owed, "0");
@@ -80,22 +80,22 @@ check("an agent with no score is owed nothing", row({ score: 0 }).owed, "0");
    keeps a live send button forever. */
 check(
   "a fraction of a cent counts as paid",
-  row({ score: 100, received: "9996500" }).owed,
+  row({ score: 300, received: "9996500" }).owed,
   "0",
 );
 check(
   "  and so does anything that displays as 0.00",
-  formatUsdg(row({ score: 100, received: "9990001" }).owed),
+  formatUsdg(row({ score: 300, received: "9990001" }).owed),
   "0.00",
 );
 check(
   "a whole cent is still owed",
-  row({ score: 100, received: "9990000" }).owed,
+  row({ score: 300, received: "9990000" }).owed,
   "10000",
 );
 check(
   "dust is not forgiven, only deferred: it is paid once it passes the floor",
-  row({ score: 101, received: "9996500" }).owed,
+  row({ score: 303, received: "9996500" }).owed,
   "103500",
 );
 
@@ -107,9 +107,9 @@ check("an ordinary row is not blocked", row({ score: 100 }).blocker, null);
 /* The total is what the operator is about to spend, so blocked rows must not
    be in it: they are amounts no transfer will move. */
 const sheet = allocateAll([
-  { agentId: 1, handle: "payable", score: 100, wallet: "0xa", snapshotScore: null, received: "0", sharedWallet: false, verified: false },
-  { agentId: 2, handle: "nowallet", score: 100, wallet: null, snapshotScore: null, received: "0", sharedWallet: false, verified: false },
-  { agentId: 3, handle: "shared", score: 100, wallet: "0xb", snapshotScore: null, received: "0", sharedWallet: true, verified: false },
+  { agentId: 1, handle: "payable", score: 300, wallet: "0xa", snapshotScore: null, received: "0", sharedWallet: false, verified: false },
+  { agentId: 2, handle: "nowallet", score: 300, wallet: null, snapshotScore: null, received: "0", sharedWallet: false, verified: false },
+  { agentId: 3, handle: "shared", score: 300, wallet: "0xb", snapshotScore: null, received: "0", sharedWallet: true, verified: false },
 ]);
 check("the total counts only what can actually be sent", totalPayable(sheet), "10000000");
 check("payable rows sort above blocked ones owed the same", sheet[0].handle, "payable");

@@ -26,9 +26,31 @@
  * paid again until their score doubles. So the snapshot splits an agent's score
  * into what it had at the change and what it has earned since, and each half is
  * paid at its own rate.
+ *
+ * **The ongoing rate went from 1/10 to 1/30 on 2026-09-21, and that was a cut
+ * to entitlement already accrued.** It is the only lever that exists: the store
+ * holds one snapshot and refuses to overwrite it, so there is no third tier to
+ * move and no way to change the rate from here forwards only.
+ *
+ * The reason is that a target is priced per point of score and nothing in this
+ * file has ever looked at the treasury balance. Liability therefore grows with
+ * the network while the pool is a fixed sum somebody tops up, and the two have
+ * no relationship. At 1/10 the round due on 2026-09-22 was 4,788 USDG against a
+ * balance of 2,048. At 1/30 it is 1,417.
+ *
+ * Nine agents from the first distribution had already been sent more than 1/30
+ * allows, 73 USDG between them. Nothing asks for it back — there is no way to
+ * ask — so they earn nothing until their score catches up, which is 1.1x for
+ * `@ethereal` and 1.5x for `@naraapproved`. That is the price of the change and
+ * it was paid knowingly.
+ *
+ * **This buys one round.** Score only rises, so 1/30 of a network twice this
+ * size is the same problem again. The durable fix is a fixed pool per round,
+ * allocated once and accumulated, which caps the spend by construction and can
+ * still keep targets monotonic. Do that before reaching for a fourth divisor.
  */
 const FOUNDING_DIVISOR = 5;
-const ONGOING_DIVISOR = 10;
+const ONGOING_DIVISOR = 30;
 
 /** USDG. Amounts are integers in base units everywhere below this line. */
 export const USDG_DECIMALS = 6;
