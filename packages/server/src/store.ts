@@ -293,6 +293,16 @@ export interface AirdropTotal {
   /** Lowercased, because a card can declare any casing and both must match. */
   address: string;
   received: string;
+  /**
+   * When this address was last credited, epoch ms, or 0 for a row written
+   * before this was recorded.
+   *
+   * Not when the payment was made — when the scan noticed it, which is within
+   * seconds because the payout panel rescans as soon as a transfer is mined.
+   * Close enough for the only question it answers: did I already deal with
+   * this row today? Ignored on the way in, since `creditAirdrops` stamps it.
+   */
+  seenAt?: number;
 }
 
 /**

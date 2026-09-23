@@ -26,7 +26,12 @@ export async function POST(request: Request) {
   if (!admin.ok) return admin.response;
 
   const ranked = rankAgents(await store.agentTotals());
-  const paid = new Map((await store.airdropTotals()).map((drop) => [drop.address, drop.received]));
+  const drops = await store.airdropTotals();
+  const paid = new Map(drops.map((drop) => [drop.address, drop.received]));
+  // When each address was last credited, so the sheet can say which rows were
+  // dealt with today. Keyed the same way `received` is, and folded across an
+  // agent's addresses below for the same reason.
+  const creditedAt = new Map(drops.map((drop) => [drop.address, drop.seenAt ?? 0]));
   const snapshots = new Map((await store.scoreSnapshots()).map((s) => [s.agentId, Number(s.score)]));
 
   /**
@@ -68,9 +73,13 @@ export async function POST(request: Request) {
     const contested = (address: string) => (owners.get(address)?.size ?? 0) > 1;
 
     let received = 0n;
+    // The most recent credit across every address this agent has held. An
+    // agent that rotated its wallet after being paid was still paid then.
+    let lastPaidAt = 0;
     for (const address of mine) {
       if (contested(address)) continue;
       received += BigInt(paid.get(address) ?? "0");
+      lastPaidAt = Math.max(lastPaidAt, creditedAt.get(address) ?? 0);
     }
 
     return {
@@ -82,6 +91,7 @@ export async function POST(request: Request) {
       received: received.toString(),
       sharedWallet: wallet ? contested(wallet) : false,
       verified: agent.verified,
+      lastPaidAt: lastPaidAt || null,
     };
   });
 

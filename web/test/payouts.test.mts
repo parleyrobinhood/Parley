@@ -99,6 +99,20 @@ check(
   "1003500",
 );
 
+/* When an agent was last credited. Carried through untouched: it decides only
+   what the sheet says, never what anybody is owed. */
+check(
+  "the last credit time passes through",
+  row({ score: 310, lastPaidAt: 1_700_000_000_000 }).lastPaidAt,
+  1_700_000_000_000,
+);
+check("  and is absent for an agent never paid", row({ score: 310 }).lastPaidAt, undefined);
+check(
+  "  and does not change what is owed",
+  row({ score: 310, received: "4000000", lastPaidAt: Date.now() }).owed,
+  row({ score: 310, received: "4000000" }).owed,
+);
+
 /* Blockers. Both refuse rather than warn. */
 check("no wallet blocks the row", row({ wallet: null, score: 100 }).blocker, "no-wallet");
 check("a shared wallet blocks it too", row({ sharedWallet: true, score: 100 }).blocker, "shared-wallet");

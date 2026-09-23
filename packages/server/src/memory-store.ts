@@ -71,7 +71,8 @@ export class MemoryStore implements Store {
   private positions: PositionRecord[] = [];
   private configs: AgentConfig[] = [];
   /** Lowercased address -> total received from the treasury, as a decimal string. */
-  private airdrops = new Map<string, string>();
+  /** address -> what it has received, and when that last changed. */
+  private airdrops = new Map<string, { received: string; seenAt: number }>();
   /** Last block of the treasury scan. Zero means it has never run. */
   private treasuryBlock = 0;
   /** Scores frozen at the payout rate change. Empty until one is taken. */
@@ -97,7 +98,8 @@ export class MemoryStore implements Store {
       this.follows = snapshot.follows ?? [];
       this.positions = snapshot.positions ?? [];
       this.configs = snapshot.configs ?? [];
-      for (const drop of snapshot.airdrops ?? []) this.airdrops.set(drop.address, drop.received);
+      for (const drop of snapshot.airdrops ?? [])
+        this.airdrops.set(drop.address, { received: drop.received, seenAt: drop.seenAt ?? 0 });
       this.treasuryBlock = snapshot.treasuryBlock ?? 0;
       this.snapshots = snapshot.snapshots ?? [];
       this.wallets = snapshot.walletClaims ?? [];
@@ -116,7 +118,7 @@ export class MemoryStore implements Store {
       follows: this.follows,
       positions: this.positions,
       configs: this.configs,
-      airdrops: [...this.airdrops].map(([address, received]) => ({ address, received })),
+      airdrops: [...this.airdrops].map(([address, v]) => ({ address, received: v.received, seenAt: v.seenAt })),
       treasuryBlock: this.treasuryBlock,
       snapshots: this.snapshots,
       walletClaims: this.wallets,
@@ -207,7 +209,7 @@ export class MemoryStore implements Store {
 
   async airdropTotals() {
     return [...this.airdrops]
-      .map(([address, received]) => ({ address, received }))
+      .map(([address, v]) => ({ address, received: v.received, seenAt: v.seenAt }))
       .sort((a, b) => a.address.localeCompare(b.address));
   }
 
@@ -220,8 +222,8 @@ export class MemoryStore implements Store {
       const address = credit.address.toLowerCase();
       // BigInt rather than Number, matching the numeric column in Postgres:
       // six decimals puts a plausible payout past what a double holds exactly.
-      const running = BigInt(this.airdrops.get(address) ?? "0") + BigInt(credit.received);
-      this.airdrops.set(address, running.toString());
+      const running = BigInt(this.airdrops.get(address)?.received ?? "0") + BigInt(credit.received);
+      this.airdrops.set(address, { received: running.toString(), seenAt: Date.now() });
     }
     this.treasuryBlock = scannedTo;
     this.persist();

@@ -94,6 +94,20 @@ export interface PayoutInput {
   sharedWallet: boolean;
   /** The operator's badge, shown so it can be granted from the same sheet. */
   verified: boolean;
+  /**
+   * When this agent was last credited, epoch ms, or null if never.
+   *
+   * Answers the only question the owed column cannot: "did I already deal with
+   * this row today?" A paid agent reappears owing a few cents within minutes,
+   * because score rises continuously and a target rises with it, so a small
+   * amount is not evidence of anything. It is new work, not an unpaid debt,
+   * and it is indistinguishable from one without this.
+   *
+   * It is not a double-payment guard. Nothing needs to be: `owed` is target
+   * minus what the chain says arrived, so a second send moves the increment
+   * and never the original amount.
+   */
+  lastPaidAt?: number | null;
 }
 
 export type PayoutBlocker = "no-wallet" | "shared-wallet";

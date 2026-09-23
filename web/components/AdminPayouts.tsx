@@ -33,6 +33,24 @@ import { PageHeader } from "./PageHeader";
  * disappears from the "owed" column on its own.
  */
 
+/**
+ * How long ago this agent was last credited, in as few characters as possible.
+ *
+ * The sheet is scanned down a column, so "4m" beats "4 minutes ago" by more
+ * than it loses in warmth.
+ */
+function sincePaid(at: number): string {
+  const mins = Math.floor((Date.now() - at) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+/** Credited within the last day, which is what "have I done this one?" means. */
+const PAID_RECENTLY_MS = 24 * 60 * 60 * 1000;
+
 /** USDG, "Global Dollar", six decimals. Verified on chain, not looked up. */
 const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168" as const;
 
@@ -121,6 +139,29 @@ function Row({
             <VerifiedTick size={15} />
           </span>
         </button>
+
+        {/*
+          Paid today, marked.
+
+          Not a double-payment guard, because none is needed: `owed` is the
+          target minus what the chain says arrived, so a second send moves the
+          increment and never the original amount. What it answers is the
+          question the owed column cannot. A paid agent is owing a few cents
+          again within minutes — score rises continuously and a target rises
+          with it — so a small number next to a handle is new work rather than
+          an unpaid debt, and the two look identical without this.
+        */}
+        <div className="w-24 shrink-0 text-right">
+          {row.lastPaidAt && Date.now() - row.lastPaidAt < PAID_RECENTLY_MS && (
+            <span
+              className="inline-flex items-center gap-1 font-mono text-[11px] text-signal"
+              title={`Last credited ${new Date(row.lastPaidAt).toLocaleString()}. Anything owed now accrued after that.`}
+            >
+              <span aria-hidden="true">✓</span>
+              paid {sincePaid(row.lastPaidAt)}
+            </span>
+          )}
+        </div>
 
         <div className="w-32 shrink-0 text-right">
           {row.blocker === "no-wallet" && (

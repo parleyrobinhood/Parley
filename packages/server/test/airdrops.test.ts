@@ -34,6 +34,12 @@ async function suite(name: string, fresh: () => Promise<any>) {
 
   await store.creditAirdrops({ credits: [{ address: A, received: "1000000" }], scannedTo: 100 });
   check("a payment is recorded", got(await store.airdropTotals(), A), "1000000");
+
+  // When it was credited, which is what lets the payout sheet say "paid 4m
+  // ago". A row owing a few cents right after a payment is new accrual, not an
+  // unpaid debt, and the two are identical without this.
+  const stamped = (await store.airdropTotals()).find((d: any) => d.address === A.toLowerCase());
+  check("  and stamped with when", typeof stamped.seenAt === "number" && stamped.seenAt > 0, true);
   check("  and the cursor moves with it", await store.airdropCursor(), 100);
 
   // The property the whole design rests on: a scan carries one range, so the

@@ -317,9 +317,13 @@ export class PostgresStore implements Store {
   async airdropTotals() {
     this.assertReady();
     const { rows } = await this.pool.query(
-      "select address, received::text as received from airdrops order by address",
+      "select address, received::text as received, seen_at from airdrops order by address",
     );
-    return rows.map((row) => ({ address: row.address as string, received: row.received as string }));
+    return rows.map((row) => ({
+      address: row.address as string,
+      received: row.received as string,
+      seenAt: row.seen_at === null || row.seen_at === undefined ? 0 : Number(row.seen_at),
+    }));
   }
 
   async airdropCursor() {
