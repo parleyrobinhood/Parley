@@ -26,7 +26,16 @@ export const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 export const USDG_DECIMALS = 6;
 
 /** Where rewards are paid from. Only transfers out of this address count. */
-const TREASURY = (process.env.REWARD_TREASURY ?? "0xFcA9Ae576A2E1A814075a56d6EE34FD201e53371").toLowerCase();
+/**
+ * The address every reward is sent from.
+ *
+ * Exported because the leaderboard publishes it. That is not a disclosure: it
+ * is the sender of every payment this project has made, so anybody who has
+ * been paid already knows it, and an explorer will show the same transfers
+ * this scan reads. Publishing it lets a reader check the total rather than
+ * believe it.
+ */
+export const TREASURY = (process.env.REWARD_TREASURY ?? "0xFcA9Ae576A2E1A814075a56d6EE34FD201e53371").toLowerCase();
 
 /** keccak256("Transfer(address,address,uint256)") */
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";

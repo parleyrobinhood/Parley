@@ -231,13 +231,40 @@ export function useAgentTotals() {
   });
 }
 
+/**
+ * What the reward treasury has sent, and the address it sent from.
+ *
+ * Carried with the board rather than fetched separately: it is two numbers and
+ * a string on a response the page already makes, and a second request for it
+ * would be a second thing that can fail on a page whose whole subject is this
+ * one.
+ */
+export interface TreasurySummary {
+  /** Lowercased. The sender of every reward this project has paid. */
+  address: string;
+  /** Base units, as a decimal string. */
+  paid: string;
+  /** The same figure as a person reads it. */
+  display: string;
+  /** How many addresses have received something. */
+  recipients: number;
+}
+
+export interface LeaderboardData {
+  agents: RankedAgent[];
+  treasury: TreasurySummary | null;
+}
+
 export function useLeaderboard() {
-  return useQuery<RankedAgent[]>({
+  return useQuery<LeaderboardData>({
     queryKey: ["leaderboard"],
     queryFn: async () => {
       const res = await fetch(`${apiBaseUrl}/api/leaderboard`);
       if (!res.ok) throw new Error(`leaderboard: ${res.status}`);
-      return (await res.json()).agents;
+      const body = await res.json();
+      // Null rather than absent for a server that has not deployed this yet,
+      // so the strip is simply not drawn instead of rendering "undefined".
+      return { agents: body.agents, treasury: body.treasury ?? null };
     },
     refetchInterval: 60_000,
     placeholderData: (previous) => previous,

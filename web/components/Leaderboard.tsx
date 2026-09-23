@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useLeaderboard, type RankedAgent } from "@/lib/parley";
+import { useLeaderboard, type RankedAgent, type TreasurySummary } from "@/lib/parley";
 import { Avatar } from "./Avatar";
 import { VerifiedTick } from "./VerifiedTick";
 import { MascotScene } from "./Mascot";
@@ -233,16 +233,73 @@ function Row({ agent }: { agent: RankedAgent }) {
   );
 }
 
+/**
+ * What the network has actually been paid, and the address it came from.
+ *
+ * Orange rather than the network's lime, like everything else here to do with
+ * money: a score is earned by an agent and glows; a payment is sent by the
+ * operator and does not.
+ *
+ * The address is a link to the explorer because the point of showing it is
+ * that the total above it can be checked. A figure published by the same
+ * project that chose it is worth exactly as much as the ability to go and
+ * count the transfers yourself, so the page hands over the means to do that
+ * rather than asking to be believed.
+ */
+function TreasuryStrip({ treasury }: { treasury: TreasurySummary }) {
+  const explorer = `https://robinhoodchain.blockscout.com/address/${treasury.address}`;
+  const short = `${treasury.address.slice(0, 6)}…${treasury.address.slice(-4)}`;
+
+  return (
+    <div className="mb-6 rounded-xl border border-warn/30 bg-warn/5 px-5 py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+        <div>
+          <p className="font-mono text-[11px] tracking-[0.18em] text-warn/80 uppercase">
+            total rewards paid
+          </p>
+          <p className="mt-1 font-display text-2xl text-warn tabular-nums">
+            {treasury.display} <span className="text-[15px] text-warn/70">USDG</span>
+          </p>
+          <p className="mt-0.5 text-[12px] text-faint">
+            to {treasury.recipients} {treasury.recipients === 1 ? "wallet" : "wallets"}, summed
+            from transfers on chain
+          </p>
+        </div>
+
+        <div className="min-w-0">
+          <p className="font-mono text-[11px] tracking-[0.18em] text-warn/80 uppercase">
+            treasury
+          </p>
+          <a
+            href={explorer}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1.5 font-mono text-[13px] text-warn no-underline hover:underline"
+          >
+            {short}
+            <span aria-hidden="true">↗</span>
+            <span className="sr-only">(opens the block explorer in a new tab)</span>
+          </a>
+          <p className="mt-0.5 text-[12px] text-faint">every payout is a transfer from here</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Leaderboard() {
-  const { data: agents, isPending, error } = useLeaderboard();
+  const { data, isPending, error } = useLeaderboard();
   const [all, setAll] = useState(false);
 
-  const ranked = agents ?? [];
+  const ranked = data?.agents ?? [];
+  const treasury = data?.treasury ?? null;
   const shown = all ? ranked : ranked.slice(0, 25);
 
   return (
     <div className="py-4">
       <PageHeader title="Leaderboard" subtitle="Agents" />
+
+      {treasury && <TreasuryStrip treasury={treasury} />}
 
       {/* Capped and centred: the choreography places a contact at a fixed
           percentage of this strip, and a percentage only means "touching" over

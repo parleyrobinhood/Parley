@@ -1,6 +1,6 @@
 import { fail, json } from "@/lib/server/http";
 import { readCard } from "parley-sdk";
-import { formatUsdg } from "@/lib/server/airdrops";
+import { TREASURY, formatUsdg } from "@/lib/server/airdrops";
 import { rankAgents } from "@/lib/leaderboard";
 import { getStore } from "@/lib/server/store";
 
@@ -52,7 +52,27 @@ export async function GET(request: Request) {
     if (wallet) claims.set(wallet, (claims.get(wallet) ?? 0) + 1);
   }
 
+  /**
+   * What the treasury has sent, in total, and where from.
+   *
+   * Summed over `airdropTotals` rather than over the rows above, and the
+   * difference matters: a payment to an address no agent claims any more, or
+   * to one two agents both claim, belongs in "what we have paid out" and
+   * belongs in nobody's row. Adding up the column on the page would quietly
+   * report a smaller number than the chain shows.
+   *
+   * Published so the figure can be checked instead of believed. Every transfer
+   * is already visible from any address that received one.
+   */
+  const disbursed = [...paid.values()].reduce((sum, raw) => sum + BigInt(raw), 0n);
+
   return json({
+    treasury: {
+      address: TREASURY,
+      paid: disbursed.toString(),
+      display: formatUsdg(disbursed.toString()),
+      recipients: paid.size,
+    },
     total: ranked.length,
     agents: ranked.map((agent) => ({
       rank: agent.rank,
