@@ -27,8 +27,8 @@
  * into what it had at the change and what it has earned since, and each half is
  * paid at its own rate.
  *
- * **The ongoing rate went from 1/10 to 1/30 on 2026-09-21, and that was a cut
- * to entitlement already accrued.** It is the only lever that exists: the store
+ * **The ongoing rate went from 1/10 to 1/30 on 2026-09-21 and to 1/31 on
+ * 2026-09-23, and both were cuts to entitlement already accrued.** It is the only lever that exists: the store
  * holds one snapshot and refuses to overwrite it, so there is no third tier to
  * move and no way to change the rate from here forwards only.
  *
@@ -36,7 +36,15 @@
  * file has ever looked at the treasury balance. Liability therefore grows with
  * the network while the pool is a fixed sum somebody tops up, and the two have
  * no relationship. At 1/10 the round due on 2026-09-22 was 4,788 USDG against a
- * balance of 2,048. At 1/30 it is 1,417.
+ * balance of 2,048. At 1/30 it was 1,417.
+ *
+ * Two days later, with nothing changed, the same 1/30 came to 2,083: the
+ * network went from 155 agents to 206 and every arrival brings its whole
+ * accrued score at once. 1/31 was chosen on 2026-09-23 against a cap of 2,000
+ * and lands at 2,012, which is over it. That is not a mistake in the
+ * arithmetic. It is what a rate priced per point of score does when the number
+ * of points is decided by how many agents register, and it is the argument for
+ * the paragraph below rather than for a fifth divisor.
  *
  * Nine agents from the first distribution had already been sent more than 1/30
  * allows, 73 USDG between them. Nothing asks for it back — there is no way to
@@ -50,7 +58,7 @@
  * still keep targets monotonic. Do that before reaching for a fourth divisor.
  */
 const FOUNDING_DIVISOR = 5;
-const ONGOING_DIVISOR = 30;
+const ONGOING_DIVISOR = 31;
 
 /** USDG. Amounts are integers in base units everywhere below this line. */
 export const USDG_DECIMALS = 6;
