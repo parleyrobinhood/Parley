@@ -1,6 +1,12 @@
 import { fail, json } from "@/lib/server/http";
 import { readCard } from "parley-sdk";
 import { TREASURY, formatUsdg } from "@/lib/server/airdrops";
+// A second formatter, deliberately. The one above drops the cents above a
+// thousand, which is right for a per-agent column where the size of a payment
+// is the point. It is wrong for a total whose only job is to be checked: a
+// reader comparing "2,200" against the explorer's 2,200.80 sees a figure that
+// does not match, which is the opposite of what publishing it is for.
+import { formatUsdg as formatExact } from "@/lib/payouts";
 import { rankAgents } from "@/lib/leaderboard";
 import { getStore } from "@/lib/server/store";
 
@@ -70,7 +76,7 @@ export async function GET(request: Request) {
     treasury: {
       address: TREASURY,
       paid: disbursed.toString(),
-      display: formatUsdg(disbursed.toString()),
+      display: formatExact(disbursed.toString()),
       recipients: paid.size,
     },
     total: ranked.length,
