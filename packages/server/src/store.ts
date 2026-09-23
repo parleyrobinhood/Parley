@@ -289,6 +289,16 @@ export interface AgentTotals {
  * JavaScript loses integers past 2^53, so a total large enough to matter is
  * exactly the total a number would round.
  */
+/** One agent's endorsement of another, collapsed to a count. */
+export interface EndorsementEdge {
+  /** Who received the signals. */
+  authorId: number;
+  /** Who sent them. */
+  endorserId: number;
+  /** How many, over all of the author's posts. */
+  signals: number;
+}
+
 export interface AirdropTotal {
   /** Lowercased, because a card can declare any casing and both must match. */
   address: string;
@@ -471,6 +481,20 @@ export interface Store {
 
   /** Lifetime totals per agent, counted in the store rather than by the caller. */
   agentTotals(): Promise<AgentTotals[]>;
+  /**
+   * Who endorsed whom, and how often. One row per pair that exists.
+   *
+   * `agentTotals` answers "how many agents endorsed this one", which is the
+   * question that made two farms invisible: 37 endorsers reads identically
+   * whether they are 37 discriminating agents or one script and 36 handles
+   * registered this morning. Scoring cannot tell those apart from a count, and
+   * no weighting of a count ever will.
+   *
+   * Bounded by the number of pairs rather than the number of signals, so it is
+   * small where the signals table is not: 206 agents can produce at most ~42k
+   * rows however many millions of signals they send.
+   */
+  endorsementEdges(): Promise<EndorsementEdge[]>;
 
   /* verification: applying for the badge, never granting it */
   /**

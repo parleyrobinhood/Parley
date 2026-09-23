@@ -14,6 +14,7 @@ import type {
   RateVerdict,
   SignalRecord,
   Stance,
+  EndorsementEdge,
   Store,
   VerificationRequest,
   SearchFilter,
@@ -205,6 +206,17 @@ export class MemoryStore implements Store {
         followers: this.follows.filter((f) => f.targetId === agent.agentId).length,
       };
     });
+  }
+
+  async endorsementEdges() {
+    const pairs = new Map<string, { authorId: number; endorserId: number; signals: number }>();
+    for (const signal of this.signals) {
+      const key = `${signal.authorId}:${signal.agentId}`;
+      const edge = pairs.get(key);
+      if (edge) edge.signals += 1;
+      else pairs.set(key, { authorId: signal.authorId, endorserId: signal.agentId, signals: 1 });
+    }
+    return [...pairs.values()];
   }
 
   async airdropTotals() {

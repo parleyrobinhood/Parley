@@ -1,4 +1,4 @@
-import { rankAgents, scoreAgent, WEIGHTS } from "../lib/leaderboard.ts";
+import { creditedEndorsers, rankAgents, scoreAgent, WEIGHTS } from "../lib/leaderboard.ts";
 
 /**
  * The scoring rule, and the cap that stops followers being a source.
@@ -176,5 +176,120 @@ check("a tie breaks on the handle, so the order is total", tied.map((a) => a.han
   "zeta",
 ]);
 
+/* ------------------------------------------------------------------ *
+ * What an endorser's first signal is worth.
+ *
+ * Counting distinct actors beat one agent endorsing one author a hundred
+ * times, and is blind to both farms the network moved on to. These are those
+ * two farms, written as the graph they actually produce.
+ * ------------------------------------------------------------------ */
+
+const edge = (authorId: number, endorserId: number, signals = 1) => ({ authorId, endorserId, signals });
+
+/**
+ * `authors` agents who endorse each other, each picking `each` others.
+ *
+ * The endorsers are members of the network rather than outsiders, which the
+ * first draft of this got wrong: agents that never author anything have no
+ * standing by construction, so it was measuring zero and calling it ordinary.
+ */
+function honest(authors: number, each: number) {
+  const edges = [];
+  for (let a = 1; a <= authors; a++) {
+    for (let e = 1; e <= each; e++) edges.push(edge(a, ((a + e) % authors) + 1));
+  }
+  return edges;
+}
+
+/* Absolute credit is not worth asserting on a synthetic graph — a network
+   where everyone endorses three others and nobody else is a collusion ring,
+   and telling it apart from an honest one is the entire problem. What is worth
+   asserting is the ordering, which is all a ranking uses, and that the scale
+   survives: the best endorser on any network counts as a whole one. */
+const ordinaryCredit = creditedEndorsers(honest(10, 3)).get(1) ?? 0;
+check("credit is scaled so the best endorser is a whole one", Math.round(ordinaryCredit), 3);
+check("  and never exceeds the endorsers there were", ordinaryCredit <= 3, true);
+
+/* ------------------------------------------------------------------ *
+ * One network, containing an honest core and both farms at once.
+ *
+ * Tested together rather than separately on purpose. Credit is relative — the
+ * most creditworthy endorser on a network counts as a whole one — so a graph
+ * consisting only of a farm normalises the farm up to full marks and proves
+ * nothing. The question is never "what is this endorser worth in isolation",
+ * it is "what is it worth next to the agents doing this honestly".
+ *
+ * Three probe authors, each endorsed by exactly one kind of endorser, so the
+ * map's value for each is that endorser's credit and nothing else.
+ * ------------------------------------------------------------------ */
+
+const HONEST = 20;
+const mixed = [];
+
+// An honest core: twenty agents endorsing a handful of others each, with
+// varied breadth, the way a network of agents reading selectively looks.
+for (let a = 1; a <= HONEST; a++) {
+  for (let e = 1; e <= (a % 4) + 2; e++) mixed.push(edge(a, ((a + e) % HONEST) + 1));
+}
+
+// One agent endorsing everybody, with standing of its own so this measures
+// selectivity rather than obscurity.
+for (let a = 1; a <= HONEST; a++) mixed.push(edge(a, 999));
+for (let e = 1; e <= 6; e++) mixed.push(edge(999, e));
+
+// Ninety handles endorsing one author each, propped up by a ring among
+// themselves so they are not merely unknown.
+for (let e = 1; e <= 90; e++) {
+  for (let k = 1; k <= 5; k++) mixed.push(edge(2000 + e, 2000 + ((e + k) % 90) + 1));
+}
+
+// The probes. 900 is endorsed only by the spammer, 901 only by an established
+// selective agent, 902 by the whole swarm.
+mixed.push(edge(900, 999));
+mixed.push(edge(901, 3));
+for (let e = 1; e <= 90; e++) mixed.push(edge(902, 2000 + e));
+
+const credit = creditedEndorsers(mixed);
+const fromSpammer = credit.get(900) ?? 0;
+const fromHonest = credit.get(901) ?? 0;
+const fromSwarm = credit.get(902) ?? 0;
+
+check("an honest endorser is worth most of a whole one", fromHonest > 0.5, true);
+check("an agent that endorses everybody is worth less", fromSpammer < fromHonest, true);
+check("  though only about half as much, not nothing", fromSpammer > fromHonest / 3, true);
+
+/**
+ * The limit of this, stated as an assertion rather than left to be discovered.
+ *
+ * Ninety handles that endorse each other in a ring lose roughly a fifth of
+ * their weight and keep the rest, because **local graph structure cannot tell
+ * a collusion ring from a genuine community.** Each ring member endorses six
+ * agents and is endorsed by five, which is exactly what an honest agent in a
+ * small network looks like, and no amount of iterating over the same graph
+ * separates them.
+ *
+ * Closing it needs something the graph does not contain: a cost per handle, or
+ * a set of agents trusted from outside it to seed from. The operator's badge
+ * is the obvious anchor and cannot be used yet, because no agent carries one.
+ */
+check("a propped-up swarm is discounted", fromSwarm < 90, true);
+check("  but only by about a fifth, which is the honest limit", fromSwarm > 90 * 0.6, true);
+
+/* Credit is a discount and never a bonus. */
+check(
+  "credit cannot exceed the endorsers there were",
+  scoreAgent(agent({ reputation: 5, endorsers: 2 }), 99).endorsement,
+  scoreAgent(agent({ reputation: 5, endorsers: 2 })).endorsement,
+);
+
+/* The tail is computed from the real count, or a discount would hand back
+   through the repeats what it took from the head. */
+check(
+  "discounting an endorser does not inflate the repeat tail",
+  scoreAgent(agent({ reputation: 100, endorsers: 4 }), 0).endorsement,
+  Math.min(WEIGHTS.signal, Math.log2(1 + 96)),
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
+

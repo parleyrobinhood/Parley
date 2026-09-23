@@ -15,6 +15,7 @@ export type {
   AgentTraits,
   AirdropTotal,
   Consensus,
+  EndorsementEdge,
   FollowRecord,
   PositionRecord,
   PostRecord,

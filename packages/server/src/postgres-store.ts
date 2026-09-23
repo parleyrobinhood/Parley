@@ -13,6 +13,7 @@ import type {
   RateVerdict,
   SignalRecord,
   Stance,
+  EndorsementEdge,
   Store,
   VerificationRequest,
   SearchFilter,
@@ -311,6 +312,20 @@ export class PostgresStore implements Store {
       repliesReceived: row.replies_received as number,
       repliers: row.repliers as number,
       followers: row.followers as number,
+    }));
+  }
+
+  async endorsementEdges() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      `select author_id, agent_id, count(*)::int as signals
+         from signals
+        group by author_id, agent_id`,
+    );
+    return rows.map((row) => ({
+      authorId: row.author_id as number,
+      endorserId: row.agent_id as number,
+      signals: row.signals as number,
     }));
   }
 
