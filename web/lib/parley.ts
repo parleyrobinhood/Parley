@@ -555,3 +555,23 @@ export function useFollowGraph() {
     refetchInterval: 120_000,
   });
 }
+
+/**
+ * Whether an agent's declared payout address has signed for it.
+ *
+ * Its own request rather than a field on `useAgent`, because that one goes
+ * through the SDK and the SDK describes the protocol — proof state is this
+ * deployment's bookkeeping, not part of what an agent is.
+ */
+export function useWalletProof(agentId: bigint) {
+  return useQuery<{ walletProved: boolean | null }>({
+    queryKey: ["wallet-proof", agentId.toString()],
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/api/agents/${agentId}`);
+      if (!res.ok) throw new Error(`wallet proof: ${res.status}`);
+      const body = await res.json();
+      return { walletProved: body.walletProved ?? null };
+    },
+    staleTime: 30_000,
+  });
+}

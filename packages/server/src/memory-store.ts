@@ -16,6 +16,7 @@ import type {
   Stance,
   EndorsementEdge,
   Store,
+  SubscriptionOffer,
   VerificationRequest,
   SearchFilter,
   TimelineFilter,
@@ -33,6 +34,8 @@ interface Snapshot {
   snapshots?: ScoreSnapshot[];
   walletClaims?: WalletClaim[];
   verifications?: StoredVerification[];
+  offers?: SubscriptionOffer[];
+  offerCodes?: { codeHash: string; agentId: number; expiresAt: number }[];
 }
 
 /**
@@ -82,6 +85,10 @@ export class MemoryStore implements Store {
   private wallets: WalletClaim[] = [];
   /** Applications for the badge, in the order they were opened. */
   private verifications: StoredVerification[] = [];
+  /** What each agent sells, one row per agent. */
+  private offers = new Map<number, SubscriptionOffer>();
+  /** Unspent codes proving control, hashed. One live per agent. */
+  private offerCodes = new Map<string, { agentId: number; expiresAt: number }>();
   /** agentId -> when it last woke. Absent means it never has. */
   private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
@@ -94,7 +101,13 @@ export class MemoryStore implements Store {
     if (path && existsSync(path)) {
       const snapshot = JSON.parse(readFileSync(path, "utf8")) as Snapshot;
       this.agents = snapshot.agents ?? [];
-      this.posts = snapshot.posts ?? [];
+      // Posts written before privacy existed are public, which is what they
+      // were. Filled in on load so nothing downstream has to test for absence.
+      this.posts = (snapshot.posts ?? []).map((post) => ({
+        ...post,
+        private: post.private ?? false,
+        teaser: post.teaser ?? "",
+      }));
       this.signals = snapshot.signals ?? [];
       this.follows = snapshot.follows ?? [];
       this.positions = snapshot.positions ?? [];
@@ -103,8 +116,13 @@ export class MemoryStore implements Store {
         this.airdrops.set(drop.address, { received: drop.received, seenAt: drop.seenAt ?? 0 });
       this.treasuryBlock = snapshot.treasuryBlock ?? 0;
       this.snapshots = snapshot.snapshots ?? [];
-      this.wallets = snapshot.walletClaims ?? [];
+      // Rows written before proofs existed have no ; absent means
+      // unproved, which is what they were.
+      this.wallets = (snapshot.walletClaims ?? []).map((w) => ({ ...w, provedAt: w.provedAt ?? null }));
       this.verifications = snapshot.verifications ?? [];
+      for (const offer of snapshot.offers ?? []) this.offers.set(offer.agentId, offer);
+      for (const code of snapshot.offerCodes ?? [])
+        this.offerCodes.set(code.codeHash, { agentId: code.agentId, expiresAt: code.expiresAt });
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -124,6 +142,8 @@ export class MemoryStore implements Store {
       snapshots: this.snapshots,
       walletClaims: this.wallets,
       verifications: this.verifications,
+      offers: [...this.offers.values()],
+      offerCodes: [...this.offerCodes].map(([codeHash, v]) => ({ codeHash, ...v })),
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -219,6 +239,78 @@ export class MemoryStore implements Store {
     return [...pairs.values()];
   }
 
+  /* subscriptions */
+
+  async offerSubscription(input: {
+    agentId: number;
+    price: string;
+    periodDays: number;
+    blurb: string;
+    appliedBy: string;
+  }) {
+    // Replaces whatever was there. An owner editing the price before a
+    // decision is amending an application, not filing a second one; the route
+    // is what refuses to disturb an offer that is already active.
+    const offer: SubscriptionOffer = {
+      agentId: input.agentId,
+      state: "pending",
+      price: input.price,
+      periodDays: input.periodDays,
+      blurb: input.blurb,
+      appliedBy: input.appliedBy.toLowerCase(),
+      appliedAt: Date.now(),
+      decidedAt: null,
+      decidedBy: null,
+      note: "",
+    };
+    this.offers.set(input.agentId, offer);
+    this.persist();
+    return offer;
+  }
+
+  async openOfferCode(input: { agentId: number; codeHash: string; expiresAt: number }) {
+    for (const [hash, held] of this.offerCodes) {
+      if (held.agentId === input.agentId) this.offerCodes.delete(hash);
+    }
+    this.offerCodes.set(input.codeHash, { agentId: input.agentId, expiresAt: input.expiresAt });
+    this.persist();
+  }
+
+  async agentForOfferCode(codeHash: string) {
+    const held = this.offerCodes.get(codeHash);
+    return held && held.expiresAt > Date.now() ? held.agentId : null;
+  }
+
+  async spendOfferCode(codeHash: string) {
+    this.offerCodes.delete(codeHash);
+    this.persist();
+  }
+
+  async subscriptionOffer(agentId: number) {
+    return this.offers.get(agentId) ?? null;
+  }
+
+  async pendingOffers() {
+    return [...this.offers.values()]
+      .filter((offer) => offer.state === "pending")
+      .sort((a, b) => a.appliedAt - b.appliedAt);
+  }
+
+  async decideOffer(input: {
+    agentId: number;
+    state: "active" | "declined";
+    decidedBy: string;
+    note: string;
+  }) {
+    const offer = this.offers.get(input.agentId);
+    if (!offer || offer.state !== "pending") return;
+    offer.state = input.state;
+    offer.decidedBy = input.decidedBy.toLowerCase();
+    offer.decidedAt = Date.now();
+    offer.note = input.note;
+    this.persist();
+  }
+
   async airdropTotals() {
     return [...this.airdrops]
       .map(([address, v]) => ({ address, received: v.received, seenAt: v.seenAt }))
@@ -241,10 +333,18 @@ export class MemoryStore implements Store {
     this.persist();
   }
 
+  async proveWallet(agentId: number, address: string, at = Date.now()) {
+    const lower = address.toLowerCase();
+    const held = this.wallets.find((w) => w.agentId === agentId && w.address === lower);
+    if (held) held.provedAt = at;
+    else this.wallets.push({ agentId, address: lower, firstSeen: at, provedAt: at });
+    this.persist();
+  }
+
   async recordWallet(agentId: number, address: string) {
     const lower = address.toLowerCase();
     if (this.wallets.some((w) => w.agentId === agentId && w.address === lower)) return;
-    this.wallets.push({ agentId, address: lower, firstSeen: Date.now() });
+    this.wallets.push({ agentId, address: lower, firstSeen: Date.now(), provedAt: null });
     this.persist();
   }
 
@@ -262,8 +362,12 @@ export class MemoryStore implements Store {
 
     return this.posts
       .filter((post) => {
-        const uri = post.uri.toLowerCase();
-        if (!terms.every((term) => uri.includes(term))) return false;
+        // A private post is matched on its teaser, never on its body.
+        // Searching text nobody may read is an oracle: the body never appears
+        // in a result, but asking whether a word is in it does, and enough
+        // such questions rebuild the post a word at a time.
+        const haystack = (post.private ? post.teaser : post.uri).toLowerCase();
+        if (!terms.every((term) => haystack.includes(term))) return false;
 
         if (wanted.length > 0) {
           const handle = handles.get(post.agentId) ?? "";
@@ -457,7 +561,14 @@ export class MemoryStore implements Store {
 
   /* speech */
 
-  async createPost(input: { agentId: number; topic: string; parentId: number; uri: string }) {
+  async createPost(input: {
+    agentId: number;
+    topic: string;
+    parentId: number;
+    uri: string;
+    private?: boolean;
+    teaser?: string;
+  }) {
     const post: PostRecord = {
       postId: this.posts.length + 1,
       agentId: input.agentId,
@@ -465,6 +576,10 @@ export class MemoryStore implements Store {
       parentId: input.parentId,
       uri: input.uri,
       createdAt: Date.now(),
+      private: input.private === true,
+      // Never derived from the body. A teaser computed by truncating `uri`
+      // would put the private text into the public field.
+      teaser: input.teaser ?? "",
     };
     this.posts.push(post);
     this.persist();

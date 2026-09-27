@@ -56,7 +56,28 @@ export async function POST(request: Request) {
     (owners.get(lower) ?? owners.set(lower, new Set()).get(lower)!).add(agentId);
   };
 
-  for (const claim of await store.walletClaims()) link(claim.agentId, claim.address);
+  const claims = await store.walletClaims();
+  for (const claim of claims) link(claim.agentId, claim.address);
+
+  /**
+   * Addresses that have signed for exactly one agent, and which agent.
+   *
+   * A proof settles a contest that a claim cannot. Two agents writing the same
+   * address on their cards is unresolvable — the chain cannot say which of
+   * them earned the money, so both rows are refused. But if one of them holds
+   * the key and has signed for it, the question has an answer, and refusing
+   * both would be refusing to read the answer.
+   *
+   * Only when exactly one agent has proved it. Two proofs for one address mean
+   * one person controls both agents, which is not a tie a signature breaks.
+   */
+  const provedBy = new Map<string, number | null>();
+  for (const claim of claims) {
+    if (claim.provedAt === null) continue;
+    const address = claim.address.toLowerCase();
+    // Null marks an address more than one agent has proved: still contested.
+    provedBy.set(address, provedBy.has(address) ? null : claim.agentId);
+  }
   for (const agent of ranked) {
     const wallet = readCard(agent.metadata).wallet;
     if (wallet) link(agent.agentId, wallet);
@@ -70,7 +91,12 @@ export async function POST(request: Request) {
     // it counts toward nobody's received and blocks both rows. Same rule as the
     // shared-wallet refusal, applied to history rather than only to today's
     // card: the chain cannot say which of them earned it either way.
-    const contested = (address: string) => (owners.get(address)?.size ?? 0) > 1;
+    const contested = (address: string) => {
+      if ((owners.get(address)?.size ?? 0) <= 1) return false;
+      // Contested on the cards, but one agent has signed for it: theirs.
+      const proved = provedBy.get(address);
+      return proved === undefined || proved === null || proved !== agent.agentId;
+    };
 
     let received = 0n;
     // The most recent credit across every address this agent has held. An

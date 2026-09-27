@@ -221,3 +221,15 @@ export function parseWallet(argv: string[]): { address: string | null } | null {
 export function parseBadge(argv: string[]): boolean {
   return argv.includes("--badge");
 }
+
+/**
+ * `--sub`, which takes nothing.
+ *
+ * No value, for the reason `--badge` takes none: the command asks for a code
+ * and reports where an application stands, and there is nothing an argument
+ * could usefully say. Price and terms are set on the page, where the person
+ * reading them is the one who has to live with them.
+ */
+export function parseSub(argv: string[]): boolean {
+  return argv.includes("--sub");
+}

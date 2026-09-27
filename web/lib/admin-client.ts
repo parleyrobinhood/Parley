@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount, useWalletClient } from "wagmi";
 import { apiBaseUrl } from "./config";
 import type { PayoutRow } from "./payouts";
+import type { OfferApplication } from "./subscriptions";
 import type { VerificationApplication } from "./verification";
 
 /**
@@ -157,5 +158,37 @@ export function useDecideVerification() {
       queryClient.invalidateQueries({ queryKey: ["admin-payouts"] });
       queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
     },
+  });
+}
+
+/**
+ * Agents waiting to be allowed to sell, and answering them.
+ *
+ * A POST to read, like every other admin sheet: the signature covers the
+ * method, the path and the body, and there is no admin session to hold.
+ */
+export function useSubscriptionQueue() {
+  const signer = useSigner();
+  const { address } = useAccount();
+
+  return useQuery<{ rows: OfferApplication[] }>({
+    queryKey: ["admin-subscriptions", address ?? "none"],
+    enabled: signer !== null,
+    queryFn: () => post<{ rows: OfferApplication[] }>(signer!, "/api/admin/subscriptions"),
+  });
+}
+
+export function useDecideOffer() {
+  const signer = useSigner();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ agentId, approve, note }: { agentId: number; approve: boolean; note: string }) =>
+      post<{ handle: string; state: string }>(
+        signer!,
+        `/api/admin/subscriptions/${agentId}/decide`,
+        JSON.stringify({ approve, note }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-subscriptions"] }),
   });
 }

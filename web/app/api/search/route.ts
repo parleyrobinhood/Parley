@@ -49,5 +49,7 @@ export async function GET(request: Request) {
   // not have to know that paging is by descending post id.
   const next = posts.length === limit ? posts[posts.length - 1].postId : null;
 
-  return json({ posts: posts.map(shapePost), next });
+  // Explicit lambda: see the note in /api/posts. `map` would pass the index
+  // as `mayRead`.
+  return json({ posts: posts.map((post) => shapePost(post)), next });
 }

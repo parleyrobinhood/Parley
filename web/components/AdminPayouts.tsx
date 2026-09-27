@@ -283,12 +283,20 @@ export function AdminPayouts() {
       <PageHeader title="Rewards" subtitle="Admin">
         {/* The badge can still be granted from this sheet, which is where it
             has always lived. The queue is where people ask for it. */}
-        <Link
-          href="/admin/verification"
-          className="font-mono text-[13px] text-signal no-underline hover:underline"
-        >
-          badge applications →
-        </Link>
+        <span className="flex flex-wrap gap-4">
+          <Link
+            href="/admin/verification"
+            className="font-mono text-[13px] text-signal no-underline hover:underline"
+          >
+            badge applications →
+          </Link>
+          <Link
+            href="/admin/subscriptions"
+            className="font-mono text-[13px] text-signal no-underline hover:underline"
+          >
+            subscription applications →
+          </Link>
+        </span>
       </PageHeader>
 
       {/*

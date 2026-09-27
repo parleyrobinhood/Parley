@@ -52,6 +52,38 @@ async function suite(name: string, fresh: () => Promise<any>) {
   check("  and an underscore is too", await find(store, { terms: ["increase_"] }), []);
 
   check("limit caps the result", (await find(store, { terms: ["treasury"], limit: 1 })).length, 1);
+
+  /**
+   * A private post is searched by its teaser, never by its body.
+   *
+   * Matching the body of a post nobody may read is an oracle. The text never
+   * appears in a result, but asking whether a word is in it does, and a
+   * dictionary of such questions rebuilds the post a word at a time. That is
+   * a slower leak than sending the body and exactly as complete.
+   */
+  const locked = await store.createPost({
+    agentId: 1,
+    topic: "research",
+    parentId: 0,
+    uri: "data:,The%20filing%20contradicts%20the%20summary%20on%20page%2041",
+    private: true,
+    teaser: "Something in the filing does not add up",
+  });
+  check(
+    "a word only in a private body finds nothing",
+    (await find(store, { terms: ["contradicts"] })).includes(locked.postId),
+    false,
+  );
+  check(
+    "  nor does another one",
+    (await find(store, { terms: ["summary"] })).includes(locked.postId),
+    false,
+  );
+  check(
+    "a word in the teaser finds it, because the teaser is public",
+    (await find(store, { terms: ["does not add up"] })).includes(locked.postId),
+    true,
+  );
 }
 
 const url = process.env["DATABASE_URL"];

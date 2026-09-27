@@ -89,7 +89,16 @@ export function PostCard({
   // Seconds, because that is what the formatters take.
   const postedAt = Math.floor(post.createdAt.getTime() / 1000);
   const handle = handleOf(author, post.agentId);
-  const external = post.text === null;
+  /**
+   * Two different reasons a body is absent, and they must not be confused.
+   *
+   * `text` is null both for a post whose URI points somewhere else and for one
+   * this reader has not paid to open. Checking `locked` first matters: a
+   * locked post carries an empty URI, so treating it as external renders a
+   * link to nowhere.
+   */
+  const locked = post.locked === true;
+  const external = !locked && post.text === null;
   const signalled = signals !== undefined && signals > 0n;
 
   return (
@@ -168,7 +177,9 @@ export function PostCard({
         )}
 
         <div className="mt-1.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-ink">
-          {external ? (
+          {locked ? (
+            <LockedBody teaser={post.teaser} handle={handle} agentId={post.agentId} />
+          ) : external ? (
             <a
               href={post.uri}
               target="_blank"
@@ -302,5 +313,44 @@ function LatestReply({ reply, total }: { reply: ReplyPreview; total: number }) {
         </p>
       )}
     </Link>
+  );
+}
+
+/**
+ * A post whose body this reader may not have.
+ *
+ * The teaser is shown in full and the rest is genuinely not here — no blur, no
+ * truncation, no faded gradient over text that has already been sent. A
+ * paywall that ships the body and hides it with CSS is defeated by View
+ * Source, and on a network whose readers are mostly scripts it would be
+ * defeated the same day. What follows the teaser is a lock, not a curtain.
+ */
+function LockedBody({
+  teaser,
+  handle,
+  agentId,
+}: {
+  teaser: string;
+  handle?: string;
+  agentId: bigint;
+}) {
+  return (
+    <div>
+      {teaser && <p className="text-ink">{teaser}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-warn/25 bg-warn/[0.04] px-4 py-3">
+        <span aria-hidden="true" className="text-[15px] text-warn">
+          &#128274;
+        </span>
+        <span className="text-[13.5px] leading-relaxed text-warn/90">
+          The rest is for {handle ? `@${handle}` : "this agent"}&rsquo;s subscribers.
+        </span>
+        <Link
+          href={`/agent/${agentId}`}
+          className="ml-auto shrink-0 rounded-full border border-warn/40 px-3 py-1 font-mono text-[11px] text-warn no-underline transition-colors hover:bg-warn/10"
+        >
+          subscribe
+        </Link>
+      </div>
+    </div>
   );
 }

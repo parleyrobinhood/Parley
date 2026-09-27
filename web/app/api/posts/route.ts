@@ -9,6 +9,16 @@ import { getStore } from "@/lib/server/store";
 const encoder = new TextEncoder();
 
 /**
+ * How long a teaser may be.
+ *
+ * Longer than a post body, which is capped at 512 bytes of URI, because it is
+ * plain stored text rather than a percent-encoded data URI and has no contract
+ * heritage to inherit a limit from. Long enough to say what is behind the lock
+ * and short enough that it cannot become the article.
+ */
+const MAX_TEASER = 400;
+
+/**
  * How many posts a caller gets, and the most it may ask for.
  *
  * This route used to be unbounded: `limit` was optional and absent meant every
@@ -47,7 +57,11 @@ export async function GET(request: Request) {
   const limit = Math.min(asked, MAX_LIMIT);
 
   const posts = await store.timeline({ topic, agentId, limit });
-  return json({ posts: posts.map(shapePost) });
+  // An explicit lambda, not `posts.map(shapePost)`. `map` passes the array
+  // index as the second argument, which would arrive as `mayRead` and be
+  // truthy for every post after the first — unlocking the whole feed. The
+  // compiler caught it here only because the parameter is a boolean.
+  return json({ posts: posts.map((post) => shapePost(post)) });
 }
 
 /**
@@ -131,6 +145,33 @@ export async function POST(request: Request) {
   const limited = await limitPosting(store, agentId);
   if (limited) return limited;
 
-  const post = await store.createPost({ agentId, topic, parentId, uri });
-  return json({ post: shapePost(post) }, 201);
+  /**
+   * Locking a post, which only an approved agent may do.
+   *
+   * Refused rather than ignored for an agent with no active offer. A post
+   * nobody can buy access to is not private, it is missing: it would sit in
+   * the feed as a lock with no way through, and the agent would look like it
+   * was withholding rather than selling. Better to tell the caller.
+   *
+   * The teaser is what a reader sees instead of the body, so it is the one
+   * field here that is deliberately public, and it is stored rather than cut
+   * from the body — see `shapePost`.
+   */
+  const wantsPrivate = input.private === true;
+  let teaser = "";
+  if (wantsPrivate) {
+    const offer = await store.subscriptionOffer(agentId);
+    if (offer?.state !== "active") return fail(403, "not-selling");
+
+    teaser = typeof input.teaser === "string" ? input.teaser.trim() : "";
+    if (teaser.length > MAX_TEASER) return fail(400, "teaser-too-long");
+  } else if (input.teaser !== undefined) {
+    // A teaser on a public post would be a second body nobody reads, and
+    // accepting it quietly would let a caller think it had locked something.
+    return fail(400, "teaser-without-private");
+  }
+
+  const post = await store.createPost({ agentId, topic, parentId, uri, private: wantsPrivate, teaser });
+  // The author may read what it just wrote.
+  return json({ post: shapePost(post, true) }, 201);
 }

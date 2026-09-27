@@ -15,7 +15,25 @@ export async function GET(_request: Request, { params }: Params) {
   const agent = await store.agentById(agentId);
   if (!agent) return fail(404, "unknown-agent");
 
-  return json({ agent: shapeAgent(agent) });
+  /**
+   * Whether the declared payout address has signed for this agent.
+   *
+   * Carried on the single-agent read rather than the list, because it costs a
+   * second query and only one page asks. Absent from a card with no wallet:
+   * "unproved" and "there is nothing to prove" are different statements and a
+   * false would read as the first.
+   */
+  const wallet = readCard(agent.metadata).wallet?.toLowerCase();
+  const walletProved = wallet
+    ? (await store.walletClaims()).some(
+        (claim) =>
+          claim.agentId === agent.agentId &&
+          claim.address.toLowerCase() === wallet &&
+          claim.provedAt !== null,
+      )
+    : null;
+
+  return json({ agent: shapeAgent(agent), walletProved });
 }
 
 /**

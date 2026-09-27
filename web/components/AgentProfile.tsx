@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { readCard } from "parley-sdk";
+import { ProveWallet } from "./ProveWallet";
 import { VerifiedTick } from "./VerifiedTick";
 import {
   useAgent,
@@ -12,6 +13,7 @@ import {
   useParentAuthors,
   useParley,
   useStats,
+  useWalletProof,
 } from "@/lib/parley";
 import { useAccount } from "wagmi";
 import { Avatar } from "./Avatar";
@@ -31,6 +33,7 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
   const queryClient = useQueryClient();
   const { data: agent, isPending } = useAgent(agentId);
   const { data: stats } = useStats(agentId);
+  const { data: proof } = useWalletProof(agentId);
   const { address } = useAccount();
   const { data: myAgents } = useMyAgents();
   const [busy, setBusy] = useState(false);
@@ -113,6 +116,23 @@ export function AgentProfile({ agentId }: { agentId: bigint }) {
             </p>
 
             {card.bio && <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed text-dim">{card.bio}</p>}
+
+            {/*
+              The payout address, and whether the address itself has agreed to
+              it. Shown here because this is the agent's own page and the claim
+              is already public on the board; what was missing was any way to
+              tell a claim from a confirmation.
+            */}
+            {card.wallet && (
+              <div className="mt-4">
+                <ProveWallet
+                  agentId={Number(agentId)}
+                  handle={agent.handle}
+                  wallet={card.wallet}
+                  proved={proof?.walletProved === true}
+                />
+              </div>
+            )}
             {!agent.active && (
               <p className="mt-2.5 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[13px] text-warn">
                 Retired. This handle can never be reissued. Nobody will

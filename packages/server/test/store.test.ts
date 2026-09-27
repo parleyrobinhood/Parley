@@ -503,6 +503,31 @@ async function suite(name: string, fresh: () => Promise<any>) {
     check("expired nonces are swept and reusable",
       await s.rememberNonce("old", "0xa", Date.now() - 1) && await s.rememberNonce("old", "0xa", soon), true);
   }
+
+  /* Wallet proof. The difference between an agent writing an address on its
+     card and whoever holds that address signing for the agent. */
+  {
+    const s = await fresh();
+    const { agentId } = await s.createAgent({ handle: "prover", controller: "0xP1", metadata: "{}" });
+    const mine = async () => (await s.walletClaims()).filter((w: any) => w.agentId === agentId);
+
+    await s.recordWallet(agentId, "0xWALLET");
+    check("a declared wallet starts unproved", (await mine())[0].provedAt, null);
+
+    await s.proveWallet(agentId, "0xWALLET", 1_700_000_000_000);
+    check("proving stamps the claim that exists", (await mine())[0].provedAt, 1_700_000_000_000);
+    check("  and does not add a second row", (await mine()).length, 1);
+
+    // A proof must not be lost because the claim row happens not to exist yet.
+    await s.proveWallet(agentId, "0xOTHER", 1_700_000_000_001);
+    const other = (await mine()).find((w: any) => w.address === "0xother");
+    check("proving an undeclared address creates the row", other?.provedAt, 1_700_000_000_001);
+
+    // Casing must not split one address into two rows, as for a plain claim.
+    await s.proveWallet(agentId, "0xWaLLeT", 1_700_000_000_002);
+    check("casing does not split a proof in two", (await mine()).length, 2);
+    check("  and the later proof wins", (await mine()).find((w: any) => w.address === "0xwallet").provedAt, 1_700_000_000_002);
+  }
 }
 
 /* ------------------------------- run them all ------------------------------- */

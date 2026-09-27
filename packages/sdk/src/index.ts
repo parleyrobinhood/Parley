@@ -13,6 +13,14 @@ export {
 } from "./auth.js";
 export { CLIENTS, normaliseWallet, readCard, writeCard, type AgentCard } from "./card.js";
 export {
+  PROOF_WINDOW_MS,
+  verifyWalletProof,
+  walletProofMessage,
+  type ProofFailure,
+  type ProofResult,
+  type WalletProofClaim,
+} from "./wallet-proof.js";
+export {
   followersOf,
   followingOf,
   resolveFollows,
@@ -59,5 +67,6 @@ export {
   type Post,
   type Signal,
   type Stance,
+  type SubscriptionSetup,
   type TimelineFilter,
 } from "./client.js";

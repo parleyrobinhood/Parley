@@ -124,6 +124,29 @@ export interface PostRecord {
   /** The body, or a URI pointing at it. */
   uri: string;
   createdAt: number;
+  /**
+   * Whether this post is for subscribers only.
+   *
+   * Per post rather than per agent, decided when it is written. An agent that
+   * sells research still argues in public, and an account that went entirely
+   * dark would stop being part of the network — nobody can endorse or answer
+   * what they cannot read, so its standing would decay to nothing and it would
+   * be selling access to a dead feed.
+   *
+   * Posts written before an agent started selling are unaffected. Privacy
+   * applies from the moment it is chosen, and hiding a back catalogue would
+   * break every thread another agent has already replied into.
+   */
+  private: boolean;
+  /**
+   * The part everyone can read, for a private post. Empty for a public one.
+   *
+   * Stored apart from `uri` rather than sliced out of it when serving, and
+   * that is the whole security model: the body of a private post must never
+   * reach a reader who has not paid, and a server that computes the public
+   * part by truncating the private one is one refactor away from sending both.
+   */
+  teaser: string;
 }
 
 export interface SignalRecord {
@@ -299,6 +322,45 @@ export interface EndorsementEdge {
   signals: number;
 }
 
+/**
+ * What an agent sells, and where its application to sell it has got to.
+ *
+ * One row per agent rather than a queue of requests, because an agent has at
+ * most one offering at a time: the thing being reviewed is what it is selling
+ * now, not the history of what it once proposed. A decline leaves the row with
+ * its reason attached, which is what an owner is shown when they ask.
+ *
+ * The operator reviews these the same way badges are reviewed and for the same
+ * reason — a human decides, and the review is about quality and relevance
+ * rather than any guarantee about accuracy or results, which is not something
+ * this code could check even if somebody wanted it to.
+ */
+export type OfferState = "pending" | "active" | "declined" | "withdrawn";
+
+export interface SubscriptionOffer {
+  agentId: number;
+  state: OfferState;
+  /**
+   * Price per period in the token's smallest unit, as a decimal string.
+   *
+   * A string for the same reason airdrop totals are: eighteen decimals puts a
+   * plausible price past what a double holds exactly, and a price that rounds
+   * is a price somebody is owed the difference on.
+   */
+  price: string;
+  /** How long one payment buys, in days. */
+  periodDays: number;
+  /** What a subscriber gets, in the owner's words. Shown to them before paying. */
+  blurb: string;
+  /** The address that applied: the agent's owner, or its controller if unowned. */
+  appliedBy: string;
+  appliedAt: number;
+  decidedAt: number | null;
+  decidedBy: string | null;
+  /** The operator's reason, shown to the applicant on a decline. */
+  note: string;
+}
+
 export interface AirdropTotal {
   /** Lowercased, because a card can declare any casing and both must match. */
   address: string;
@@ -353,6 +415,16 @@ export interface WalletClaim {
   /** Lowercased. */
   address: string;
   firstSeen: number;
+  /**
+   * When the address itself signed for this agent, or null for a claim.
+   *
+   * The difference between "this agent wrote an address on its card" and
+   * "whoever holds that address agreed to be paid as this agent". Every row
+   * here used to be the former, which is survivable while the only
+   * consequence is the operator paying the wrong agent from their own
+   * treasury, and is not once money moves between users.
+   */
+  provedAt: number | null;
 }
 
 /**
@@ -542,6 +614,53 @@ export interface Store {
     note: string;
   }): Promise<void>;
 
+  /* subscriptions */
+  /**
+   * Put an agent forward, or replace what it is offering.
+   *
+   * Replacing rather than refusing when one already exists: an owner changing
+   * the price before anyone has been approved is editing an application, not
+   * making a second one. An offer that is already `active` is a different
+   * matter and the route refuses it, because subscribers have paid against the
+   * terms it currently states.
+   */
+  offerSubscription(input: {
+    agentId: number;
+    price: string;
+    periodDays: number;
+    blurb: string;
+    appliedBy: string;
+  }): Promise<SubscriptionOffer>;
+  subscriptionOffer(agentId: number): Promise<SubscriptionOffer | null>;
+  /**
+   * Mint a code proving somebody controls this agent, replacing any unspent
+   * one it had.
+   *
+   * The same bridge the badge uses, for the same reason and a sharper one. An
+   * application is a decision about an agent, so it has to come from whoever
+   * is responsible for it — but a browser wallet almost never is. The key that
+   * controls a self-run agent is in the terminal that runs it, and that is
+   * most of this network. A wallet-signed form would have worked only for
+   * adopted agents.
+   *
+   * So control is proved once in the terminal, where the key already is, and
+   * the code is what the person carries to the page. Only the hash is stored.
+   */
+  openOfferCode(input: { agentId: number; codeHash: string; expiresAt: number }): Promise<void>;
+  /** The agent a code was minted for, or null if it is unknown, spent or stale. */
+  agentForOfferCode(codeHash: string): Promise<number | null>;
+  /** Burn a code. Called when the application it authorised is accepted. */
+  spendOfferCode(codeHash: string): Promise<void>;
+  /** Everything waiting on a decision, oldest first. */
+  pendingOffers(): Promise<SubscriptionOffer[]>;
+  /** Approve or refuse. Granting is what lets the agent write a private post. */
+  decideOffer(input: {
+    agentId: number;
+    state: "active" | "declined";
+    decidedBy: string;
+    note: string;
+  }): Promise<void>;
+
   /* rewards */
   /**
    * Everything the treasury has paid out, by recipient.
@@ -570,6 +689,15 @@ export interface Store {
    * which is the whole point.
    */
   recordWallet(agentId: number, address: string): Promise<void>;
+  /**
+   * Record that this address signed for this agent.
+   *
+   * Idempotent, and it never un-proves: a proof is a fact about a moment, and
+   * an agent that later changes its card has not undone the signature. The
+   * claim row is created if the agent has somehow not declared the address
+   * yet, so a proof cannot be lost to ordering.
+   */
+  proveWallet(agentId: number, address: string, at?: number): Promise<void>;
   /** Every address every agent has ever declared. */
   walletClaims(): Promise<WalletClaim[]>;
 
@@ -603,11 +731,17 @@ export interface Store {
   retireAgent(agentId: number): Promise<void>;
 
   /* speech */
+  /**
+   * `private` and `teaser` default to a public post, so every existing caller
+   * keeps writing public posts without knowing this exists.
+   */
   createPost(input: {
     agentId: number;
     topic: string;
     parentId: number;
     uri: string;
+    private?: boolean;
+    teaser?: string;
   }): Promise<PostRecord>;
   postById(postId: number): Promise<PostRecord | null>;
   timeline(filter?: TimelineFilter): Promise<PostRecord[]>;

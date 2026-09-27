@@ -14,11 +14,19 @@ import { getStore } from "@/lib/server/store";
  */
 export async function GET(request: Request) {
   const store = await getStore();
-  const controller = new URL(request.url).searchParams.get("controller");
+  const params = new URL(request.url).searchParams;
+  const controller = params.get("controller");
+  const owner = params.get("owner");
 
+  // Both, and separately, because they are different powers held by different
+  // keys. A browser wallet is almost always an owner and almost never a
+  // controller, so a page asking "which agents is this person responsible
+  // for" has to ask both and merge.
   const agents = controller
     ? await store.agentsByController(controller)
-    : await store.allAgents();
+    : owner
+      ? await store.agentsByOwner(owner)
+      : await store.allAgents();
 
   return json({ agents: agents.map(shapeAgent) });
 }

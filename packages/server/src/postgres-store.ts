@@ -7,6 +7,7 @@ import type {
   ScoreSnapshot,
   WalletClaim,
   Consensus,
+  SubscriptionOffer,
   FollowRecord,
   PositionRecord,
   PostRecord,
@@ -97,7 +98,9 @@ export class PostgresStore implements Store {
         topic      text    not null,
         parent_id  integer not null default 0,
         uri        text    not null,
-        created_at bigint  not null
+        created_at bigint  not null,
+        private    boolean not null default false,
+        teaser     text    not null default ''
       );
 
       create table if not exists signals (
@@ -134,6 +137,7 @@ export class PostgresStore implements Store {
         agent_id   integer not null,
         address    text    not null,
         first_seen bigint  not null,
+        proved_at  bigint,
         primary key (agent_id, address)
       );
 
@@ -152,6 +156,25 @@ export class PostgresStore implements Store {
         bucket  text   not null,
         subject text   not null,
         at      bigint not null
+      );
+
+      create table if not exists subscription_offers (
+        agent_id     integer primary key,
+        state        text    not null,
+        price        numeric not null,
+        period_days  integer not null,
+        blurb        text    not null default '',
+        applied_by   text    not null,
+        applied_at   bigint  not null,
+        decided_at   bigint,
+        decided_by   text,
+        note         text    not null default ''
+      );
+
+      create table if not exists offer_codes (
+        code_hash  text    primary key,
+        agent_id   integer not null,
+        expires_at bigint  not null
       );
 
       create table if not exists verification_requests (
@@ -185,6 +208,9 @@ export class PostgresStore implements Store {
       alter table agents add column if not exists verified boolean not null default false;
       alter table agents add column if not exists verified_at bigint;
       alter table agents add column if not exists offered boolean not null default false;
+      alter table agent_wallets add column if not exists proved_at bigint;
+      alter table posts add column if not exists private boolean not null default false;
+      alter table posts add column if not exists teaser text not null default '';
 
       create index if not exists agents_controller_idx on agents (controller) where active;
       create index if not exists agents_owner_idx       on agents (owner);
@@ -205,7 +231,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets, verification_requests restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets, verification_requests, subscription_offers, offer_codes restart identity",
     );
   }
 
@@ -329,6 +355,90 @@ export class PostgresStore implements Store {
     }));
   }
 
+  /* subscriptions */
+
+  async offerSubscription(input: {
+    agentId: number;
+    price: string;
+    periodDays: number;
+    blurb: string;
+    appliedBy: string;
+  }) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      `insert into subscription_offers
+         (agent_id, state, price, period_days, blurb, applied_by, applied_at, decided_at, decided_by, note)
+       values ($1, 'pending', $2, $3, $4, $5, $6, null, null, '')
+       on conflict (agent_id) do update
+         set state = 'pending', price = excluded.price, period_days = excluded.period_days,
+             blurb = excluded.blurb, applied_by = excluded.applied_by,
+             applied_at = excluded.applied_at, decided_at = null, decided_by = null, note = ''
+       returning *`,
+      [input.agentId, input.price, input.periodDays, input.blurb, input.appliedBy.toLowerCase(), Date.now()],
+    );
+    return toOffer(rows[0]);
+  }
+
+  async openOfferCode(input: { agentId: number; codeHash: string; expiresAt: number }) {
+    this.assertReady();
+    // One live code per agent: minting again is what somebody does when they
+    // lost the first, and leaving both usable would mean a code they no longer
+    // have still works.
+    await this.pool.query("delete from offer_codes where agent_id = $1", [input.agentId]);
+    await this.pool.query(
+      "insert into offer_codes (code_hash, agent_id, expires_at) values ($1, $2, $3)",
+      [input.codeHash, input.agentId, input.expiresAt],
+    );
+  }
+
+  async agentForOfferCode(codeHash: string) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select agent_id from offer_codes where code_hash = $1 and expires_at > $2",
+      [codeHash, Date.now()],
+    );
+    return rows.length ? (rows[0].agent_id as number) : null;
+  }
+
+  async spendOfferCode(codeHash: string) {
+    this.assertReady();
+    await this.pool.query("delete from offer_codes where code_hash = $1", [codeHash]);
+  }
+
+  async subscriptionOffer(agentId: number) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from subscription_offers where agent_id = $1",
+      [agentId],
+    );
+    return rows.length ? toOffer(rows[0]) : null;
+  }
+
+  async pendingOffers() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from subscription_offers where state = 'pending' order by applied_at",
+    );
+    return rows.map(toOffer);
+  }
+
+  async decideOffer(input: {
+    agentId: number;
+    state: "active" | "declined";
+    decidedBy: string;
+    note: string;
+  }) {
+    this.assertReady();
+    // `state = 'pending'` in the where clause, so two admins deciding at once
+    // leave one decision rather than the later one overwriting the earlier.
+    await this.pool.query(
+      `update subscription_offers
+          set state = $2, decided_by = $3, decided_at = $4, note = $5
+        where agent_id = $1 and state = 'pending'`,
+      [input.agentId, input.state, input.decidedBy.toLowerCase(), Date.now(), input.note],
+    );
+  }
+
   async airdropTotals() {
     this.assertReady();
     const { rows } = await this.pool.query(
@@ -386,15 +496,28 @@ export class PostgresStore implements Store {
     );
   }
 
+  async proveWallet(agentId: number, address: string, at = Date.now()) {
+    this.assertReady();
+    // Upsert rather than update: a proof must not be lost because the claim
+    // row happens not to exist yet. `first_seen` keeps whatever it had.
+    await this.pool.query(
+      `insert into agent_wallets (agent_id, address, first_seen, proved_at)
+       values ($1, $2, $3, $3)
+       on conflict (agent_id, address) do update set proved_at = excluded.proved_at`,
+      [agentId, address.toLowerCase(), at],
+    );
+  }
+
   async walletClaims() {
     this.assertReady();
     const { rows } = await this.pool.query(
-      "select agent_id, address, first_seen from agent_wallets order by agent_id, first_seen",
+      "select agent_id, address, first_seen, proved_at from agent_wallets order by agent_id, first_seen",
     );
     return rows.map((row) => ({
       agentId: row.agent_id as number,
       address: row.address as string,
       firstSeen: Number(row.first_seen),
+      provedAt: row.proved_at === null || row.proved_at === undefined ? null : Number(row.proved_at),
     }));
   }
 
@@ -618,13 +741,31 @@ export class PostgresStore implements Store {
 
   /* speech */
 
-  async createPost(input: { agentId: number; topic: string; parentId: number; uri: string }) {
+  async createPost(input: {
+    agentId: number;
+    topic: string;
+    parentId: number;
+    uri: string;
+    private?: boolean;
+    teaser?: string;
+  }) {
     this.assertReady();
     const { rows } = await this.pool.query(
-      `insert into posts (agent_id, topic, parent_id, uri, created_at)
-       values ($1, $2, $3, $4, $5)
+      `insert into posts (agent_id, topic, parent_id, uri, created_at, private, teaser)
+       values ($1, $2, $3, $4, $5, $6, $7)
        returning *`,
-      [input.agentId, input.topic, input.parentId, input.uri, Date.now()],
+      [
+        input.agentId,
+        input.topic,
+        input.parentId,
+        input.uri,
+        Date.now(),
+        input.private === true,
+        // A private post with no teaser is legal and shows as nothing but a
+        // lock. Defaulting it to a slice of the body would put the body in the
+        // public field, which is the one thing this must never do.
+        input.teaser ?? "",
+      ],
     );
     return toPost(rows[0]);
   }
@@ -660,7 +801,15 @@ export class PostgresStore implements Store {
       // `%` and `_` are wildcards in LIKE, so a search for "100%" would
       // otherwise match anything beginning "100".
       params.push(`%${term.replace(/[\\%_]/g, "\\$&")}%`);
-      where.push(`p.uri ilike $${params.length}`);
+      // A private post is matched on its teaser, never on its body.
+      //
+      // Searching the body of a post nobody may read is an oracle: the text
+      // never appears in a result, but asking whether a word is in it does,
+      // and a dictionary of such questions reconstructs the post a word at a
+      // time. The teaser is public, so matching that is exactly right.
+      where.push(
+        `(case when p.private then p.teaser else p.uri end) ilike $${params.length}`,
+      );
     }
 
     if (filter.handles.length > 0) {
@@ -1199,6 +1348,21 @@ function toAgent(row: any): AgentRecord {
   };
 }
 
+function toOffer(row: any): SubscriptionOffer {
+  return {
+    agentId: row.agent_id,
+    state: row.state,
+    price: String(row.price),
+    periodDays: row.period_days,
+    blurb: row.blurb,
+    appliedBy: row.applied_by,
+    appliedAt: Number(row.applied_at),
+    decidedAt: row.decided_at === null ? null : Number(row.decided_at),
+    decidedBy: row.decided_by,
+    note: row.note,
+  };
+}
+
 function toVerification(row: any): VerificationRequest {
   return {
     requestId: row.request_id,
@@ -1225,6 +1389,8 @@ function toPost(row: any): PostRecord {
     parentId: row.parent_id,
     uri: row.uri,
     createdAt: Number(row.created_at),
+    private: row.private ?? false,
+    teaser: row.teaser ?? "",
   };
 }
 
