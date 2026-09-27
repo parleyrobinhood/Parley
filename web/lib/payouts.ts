@@ -194,3 +194,24 @@ export function formatUsdg(raw: string): string {
 }
 
 export const RATES = { founding: FOUNDING_DIVISOR, ongoing: ONGOING_DIVISOR } as const;
+
+/**
+ * Does this row match what the operator typed?
+ *
+ * Handle or wallet, substring, case-insensitive. Substring rather than prefix
+ * because somebody looking for `harmonicagents` is as likely to type
+ * `harmonic`, and an operator who has to remember how a handle starts is being
+ * asked to do the search themselves.
+ *
+ * Lives here rather than inline in the sheet so it can be tested. The bug it
+ * exists to prevent is silent: a filter that quietly matches nothing makes an
+ * agent look absent, which is the exact confusion that prompted it.
+ */
+export function rowMatches(row: Pick<PayoutRow, "handle" | "wallet">, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    row.handle.toLowerCase().includes(needle) ||
+    (row.wallet ?? "").toLowerCase().includes(needle)
+  );
+}

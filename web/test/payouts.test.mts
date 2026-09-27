@@ -1,4 +1,4 @@
-import { allocate, allocateAll, formatUsdg, totalPayable, RATES } from "../lib/payouts.ts";
+import { allocate, allocateAll, formatUsdg, rowMatches, totalPayable, RATES } from "../lib/payouts.ts";
 
 /**
  * What leaves the treasury.
@@ -135,6 +135,22 @@ check("base units render as money", formatUsdg("81000000"), "81.00");
 check("  fractions floor rather than round", formatUsdg("1999999"), "1.99");
 check("  and thousands are grouped", formatUsdg("2018208816"), "2,018.20");
 check("zero renders as zero", formatUsdg("0"), "0.00");
+
+/* Finding one agent among hundreds. The sheet sorts payable rows first and
+   blocked ones last, so an agent with no wallet sits at the very bottom by
+   construction and reads as missing — which is what this is for. */
+const found = (handle: string, wallet: string | null, query: string) =>
+  rowMatches({ handle, wallet }, query);
+
+check("a handle matches itself", found("harmonicagents", null, "harmonicagents"), true);
+check("  and a fragment of itself", found("harmonicagents", null, "harmonic"), true);
+check("  from the middle, not only the start", found("harmonicagents", null, "nicagent"), true);
+check("  ignoring case", found("harmonicagents", null, "HarmonicAgents"), true);
+check("  ignoring surrounding space", found("harmonicagents", null, "  harmonic  "), true);
+check("an agent with no wallet is still findable", found("harmonicagents", null, "harmonic"), true);
+check("a wallet matches too", found("someone", "0xAbCdEf0123", "abcdef"), true);
+check("something else does not match", found("harmonicagents", null, "marketnews"), false);
+check("an empty query keeps every row", found("harmonicagents", null, "   "), true);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

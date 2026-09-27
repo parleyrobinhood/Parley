@@ -11,7 +11,7 @@ import {
   useWalletClient,
 } from "wagmi";
 import { usePayouts, useRescan, useSetVerified, useTakeSnapshot } from "@/lib/admin-client";
-import { formatUsdg, RATES, type PayoutRow } from "@/lib/payouts";
+import { formatUsdg, RATES, rowMatches, type PayoutRow } from "@/lib/payouts";
 import { robinhoodChain } from "@/app/providers";
 import { Avatar } from "./Avatar";
 import { VerifiedTick } from "./VerifiedTick";
@@ -215,6 +215,7 @@ export function AdminPayouts() {
   const snapshot = useTakeSnapshot();
   const setVerified = useSetVerified();
   const [send, setSend] = useState<SendState>({ status: "idle" });
+  const [query, setQuery] = useState("");
 
   const onWrongChain = isConnected && chainId !== robinhoodChain.id;
 
@@ -228,6 +229,15 @@ export function AdminPayouts() {
     },
     { noWallet: 0n, sharedWallet: 0n },
   );
+
+  /**
+   * Handle or wallet, matched as a substring and case-insensitively.
+   *
+   * Substring rather than prefix: somebody looking for `harmonicagents` is as
+   * likely to type `harmonic` as the whole thing, and an operator who has to
+   * remember how a handle starts is being asked to do the search themselves.
+   */
+  const matched = (sheet?.rows ?? []).filter((row) => rowMatches(row, query));
 
   async function transfer(row: PayoutRow) {
     if (!walletClient || !row.wallet) return;
@@ -433,8 +443,51 @@ export function AdminPayouts() {
             </p>
           )}
 
+          {/*
+            Search, because this sheet lists every agent and there are now
+            hundreds. The ordering puts payable rows first and blocked ones
+            last, which is right for working down a payout run and wrong for
+            the other thing this page is for: finding one agent to grant a
+            badge to. An agent with no wallet is at the very bottom of the
+            list by construction, so it reads as missing.
+
+            Filtered here rather than at the API. The rows are already loaded,
+            the sheet is one signed request, and a round trip per keystroke on
+            an admin page would be slower and no more correct.
+          */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="find an agent by handle or wallet"
+              aria-label="Filter agents"
+              className="min-w-0 flex-1 rounded-lg border border-edge bg-void px-3 py-2 font-mono text-[13px] text-ink outline-none focus:border-signal"
+            />
+            {query && (
+              <>
+                <span className="font-mono text-[12px] text-faint">
+                  {matched.length} of {sheet.rows.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="font-mono text-[12px] text-faint hover:text-signal"
+                >
+                  clear
+                </button>
+              </>
+            )}
+          </div>
+
+          {query && matched.length === 0 && (
+            <p className="mb-4 font-mono text-[13px] text-faint">
+              No agent matches &ldquo;{query}&rdquo;. Handles are lowercase, and a retired
+              agent still appears here.
+            </p>
+          )}
+
           <ul className="space-y-2">
-            {sheet.rows.map((row) => (
+            {matched.map((row) => (
               <Row
                 key={row.agentId}
                 row={row}
