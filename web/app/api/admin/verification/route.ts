@@ -53,6 +53,7 @@ export async function POST(request: Request) {
         repliers: 0,
         followers: 0,
         walletClaimants: 0,
+        topEndorser: null,
       },
     });
   }

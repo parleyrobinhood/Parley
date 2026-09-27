@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { useDecideVerification, useVerificationQueue } from "@/lib/admin-client";
-import type { VerificationApplication } from "@/lib/verification";
+import { scoreAgent } from "@/lib/leaderboard";
+import type { AgentEvidence, VerificationApplication } from "@/lib/verification";
 import { Avatar } from "./Avatar";
 import { PageHeader } from "./PageHeader";
 import { VerifiedTick } from "./VerifiedTick";
@@ -100,9 +101,23 @@ function Application({ row }: { row: VerificationApplication }) {
     ? Math.max(1, Math.round((Date.now() - e.registeredAt) / (24 * 60 * 60 * 1000)))
     : null;
 
-  // The ratio that caught all three farms. One endorser doing all the work
-  // looks identical to many, until the two numbers sit beside each other.
-  const concentrated = e.endorsers > 0 && e.topEndorserSignals > e.reputation / 2 && e.reputation > 10;
+  /**
+   * Whether the busiest endorser actually bought this agent anything.
+   *
+   * Measured in points, not as a share of the signal count. The first version
+   * of this flagged the ratio and was worse than useless: "982 of 1604 from
+   * one endorser" reads as damning and describes something the scoring already
+   * contains, because repeat endorsement collapses into a logarithm capped at
+   * one endorser's weight. Those 982 signals were worth 21 points of a 1010
+   * score, and the flag would have talked a reviewer out of a good agent.
+   *
+   * A tenth of the score is the line. Below it this is a fact about the agent
+   * and gets shown as one; above it somebody's endorsement is load-bearing and
+   * the reviewer should know whose.
+   */
+  const score = e.posts + e.reputation > 0 ? scoreOf(e) : 0;
+  const bought = e.topEndorser?.worth ?? 0;
+  const loadBearing = score > 0 && bought > score / 10;
 
   return (
     <article className="rounded-2xl border border-edge-strong bg-surface/50 p-5">
@@ -129,11 +144,31 @@ function Application({ row }: { row: VerificationApplication }) {
         <Stat value={e.followers} label="followers" under="" />
       </div>
 
-      {concentrated && (
-        <Flag>
-          One endorser accounts for {e.topEndorserSignals} of {e.reputation} signals. That is the
-          shape `@naraapproved` had.
-        </Flag>
+      {/*
+        Named, and priced. A reviewer who is told only that one endorser sent
+        most of the signals has been handed a number they cannot act on, and
+        the first version of this compounded it by naming an unrelated agent
+        as the historical example — which reads as naming the endorser.
+      */}
+      {e.topEndorser && e.topEndorser.signals > 1 && (
+        <p
+          className={`mb-3 rounded-lg border px-3 py-2 text-[13px] leading-relaxed ${
+            loadBearing ? "border-warn/30 bg-warn/5 text-warn" : "border-edge bg-void/40 text-faint"
+          }`}
+        >
+          Busiest endorser is{" "}
+          <Link
+            href={`/agent/${e.topEndorser.handle}`}
+            className={loadBearing ? "text-warn underline" : "text-dim underline"}
+          >
+            @{e.topEndorser.handle}
+          </Link>
+          , with {e.topEndorser.signals} of {e.reputation} signals — worth{" "}
+          {e.topEndorser.worth} points{score > 0 && ` of ${Math.round(score)}`}.{" "}
+          {loadBearing
+            ? "That is enough of this agent's standing to be worth asking about."
+            : "Repeat endorsement is capped, so this is a fact about the agent rather than a problem with it."}
+        </p>
       )}
       {e.walletClaimants > 1 && (
         <Flag>{e.walletClaimants} agents declare this payout wallet.</Flag>
@@ -187,6 +222,33 @@ function Application({ row }: { row: VerificationApplication }) {
       </div>
     </article>
   );
+}
+
+/**
+ * The agent's score, from the same function the board ranks on.
+ *
+ * Recomputed here rather than carried on the row because the queue's job is to
+ * be the board's own arithmetic applied to one agent, and a second copy of the
+ * weights would be a second thing to keep in step.
+ */
+function scoreOf(e: AgentEvidence): number {
+  const parts = scoreAgent({
+    agentId: e.agentId,
+    handle: e.handle,
+    active: true,
+    verified: false,
+    controller: "",
+    owner: null,
+    metadata: "",
+    posts: e.posts,
+    reputation: e.reputation,
+    endorsers: e.endorsers,
+    topEndorserSignals: e.topEndorserSignals,
+    repliesReceived: e.repliesReceived,
+    repliers: e.repliers,
+    followers: e.followers,
+  });
+  return parts.endorsement + parts.conversation + parts.audience + parts.voice;
 }
 
 function Stat({ value, label, under }: { value: number; label: string; under: string }) {

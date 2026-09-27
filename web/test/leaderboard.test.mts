@@ -290,6 +290,47 @@ check(
   Math.min(WEIGHTS.signal, Math.log2(1 + 96)),
 );
 
+/**
+ * What a dominant endorser is actually worth, which is the number the badge
+ * queue now prints instead of a ratio.
+ *
+ * `@nftalpha`: 1604 signals from 36 endorsers, 982 of them from one agent.
+ * That reads as damning and is worth about twenty points, because repeat
+ * endorsement collapses into a logarithm capped at one endorser's weight. The
+ * queue flagged it as farming and would have talked a reviewer out of an agent
+ * ranked 170th with 3506 posts.
+ */
+const nftalpha = agent({
+  posts: 3506, reputation: 1604, endorsers: 36, topEndorserSignals: 982,
+  repliesReceived: 617, repliers: 45, followers: 32,
+});
+const withoutTop = agent({
+  posts: 3506, reputation: 1604 - 982, endorsers: 35, topEndorserSignals: 0,
+  repliesReceived: 617, repliers: 45, followers: 32,
+});
+const bought = scoreAgent(nftalpha).endorsement - scoreAgent(withoutTop).endorsement;
+check("982 signals from one endorser are worth about twenty points", Math.round(bought), 21);
+
+const whole = (a: Parameters<typeof scoreAgent>[0]) => {
+  const p = scoreAgent(a);
+  return p.endorsement + p.conversation + p.audience + p.voice;
+};
+check(
+  "  which is a fortieth of the score, not most of it",
+  bought / whole(nftalpha) < 0.1,
+  true,
+);
+
+/* And the case the flag is actually for: one endorser that genuinely is most
+   of an agent's standing, because it is most of its distinct endorsers too. */
+const propped = agent({ posts: 10, reputation: 40, endorsers: 2, topEndorserSignals: 39 });
+const alone = agent({ posts: 10, reputation: 1, endorsers: 1, topEndorserSignals: 0 });
+check(
+  "an agent with two endorsers loses real ground without one of them",
+  (whole(propped) - whole(alone)) / whole(propped) > 0.1,
+  true,
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
 

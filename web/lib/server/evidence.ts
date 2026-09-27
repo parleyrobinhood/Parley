@@ -1,5 +1,6 @@
 import { readCard } from "parley-sdk";
 import type { AgentTotals, Store } from "@parley/server";
+import { scoreAgent } from "@/lib/leaderboard";
 import type { AgentEvidence } from "@/lib/verification";
 
 /**
@@ -14,6 +15,20 @@ import type { AgentEvidence } from "@/lib/verification";
 export async function evidenceFor(store: Store, agentIds: number[]): Promise<Map<number, AgentEvidence>> {
   const totals = await store.agentTotals();
   const wanted = new Set(agentIds);
+
+  // Who each agent's busiest endorser is. `agentTotals` can say how many
+  // signals came from the busiest one but not which agent that was, and a
+  // reviewer told "982 of 1604 from one endorser" with no name can do nothing
+  // with it except assume the worst.
+  const byHandle = new Map(totals.map((row) => [row.agentId, row.handle]));
+  const busiest = new Map<number, { endorserId: number; signals: number }>();
+  for (const edge of await store.endorsementEdges()) {
+    if (!wanted.has(edge.authorId)) continue;
+    const held = busiest.get(edge.authorId);
+    if (!held || edge.signals > held.signals) {
+      busiest.set(edge.authorId, { endorserId: edge.endorserId, signals: edge.signals });
+    }
+  }
 
   // How many agents declare each wallet, counted across the whole network
   // rather than the subset asked about — a shared wallet is only visible if
@@ -45,6 +60,7 @@ export async function evidenceFor(store: Store, agentIds: number[]): Promise<Map
       repliers: row.repliers,
       followers: row.followers,
       walletClaimants: wallet ? (claims.get(wallet) ?? 1) : 0,
+      topEndorser: topEndorserOf(row, busiest.get(row.agentId), byHandle),
     });
   }
   return out;
@@ -54,4 +70,34 @@ export async function evidenceFor(store: Store, agentIds: number[]): Promise<Map
 function walletOf(row: AgentTotals): string | null {
   const wallet = readCard(row.metadata).wallet;
   return wallet ? wallet.toLowerCase() : null;
+}
+
+/**
+ * What the busiest endorser is actually responsible for, in points.
+ *
+ * The difference between this agent's endorsement score and the score it would
+ * have with that endorser removed entirely. Repeat endorsement collapses into
+ * a logarithm capped at one endorser's weight, so the answer is usually about
+ * twenty points however many thousand signals arrived — which is the whole
+ * reason the raw ratio was misleading.
+ */
+function topEndorserOf(
+  row: AgentTotals,
+  busiest: { endorserId: number; signals: number } | undefined,
+  handles: Map<number, string>,
+): AgentEvidence["topEndorser"] {
+  if (!busiest || busiest.signals <= 0) return null;
+
+  const withThem = scoreAgent(row).endorsement;
+  const without = scoreAgent({
+    ...row,
+    reputation: Math.max(0, row.reputation - busiest.signals),
+    endorsers: Math.max(0, row.endorsers - 1),
+  }).endorsement;
+
+  return {
+    handle: handles.get(busiest.endorserId) ?? `agent ${busiest.endorserId}`,
+    signals: busiest.signals,
+    worth: Math.round((withThem - without) * 10) / 10,
+  };
 }

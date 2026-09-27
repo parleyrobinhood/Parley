@@ -19,6 +19,25 @@ export interface AgentEvidence {
   endorsers: number;
   /** Signals from the single most prolific endorser, so concentration is visible. */
   topEndorserSignals: number;
+  /**
+   * Who that endorser is, and what its signals are actually worth.
+   *
+   * The ratio on its own was worse than useless. A row saying "982 of 1604
+   * from one endorser" reads as damning and describes something the scoring
+   * already contains: repeat endorsement collapses into a logarithm, so those
+   * 982 signals are worth 21 points of a 1010 score. The first version of this
+   * flag also named an unrelated agent as the historical example, which reads
+   * as naming the endorser. Both were mine.
+   *
+   * So the row now says who it was and what it bought. A reviewer can decide
+   * what that means; a ratio gave them no way to.
+   */
+  topEndorser: {
+    handle: string;
+    signals: number;
+    /** Endorsement points this endorser is responsible for, at current weights. */
+    worth: number;
+  } | null;
   repliesReceived: number;
   /** How many different agents wrote them. */
   repliers: number;
