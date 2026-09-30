@@ -504,6 +504,52 @@ async function suite(name: string, fresh: () => Promise<any>) {
       await s.rememberNonce("old", "0xa", Date.now() - 1) && await s.rememberNonce("old", "0xa", soon), true);
   }
 
+  /* Paid subscriptions. One transfer buys one period, and the transfer is the
+     key, so a scan that overlaps and a subscriber pressing twice both do
+     nothing the second time. */
+  {
+    const s = await fresh();
+    await s.createAgent({ handle: "seller", controller: "0xS", metadata: "{}" });
+    const now = Date.now();
+    const sub = {
+      agentId: 1,
+      subscriber: "0xBUYER",
+      paid: "5000000000000000000",
+      startedAt: now,
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
+      txHash: "0xTX1",
+    };
+
+    check("a payment buys access", await s.addSubscription(sub), true);
+    check("  the same transfer does not buy it twice", await s.addSubscription(sub), false);
+    check("  even under a different casing", await s.addSubscription({ ...sub, txHash: "0xtx1" }), false);
+
+    const live = await s.subscriptionFor(1, "0xbuyer");
+    check("access is found regardless of casing", live?.txHash, "0xtx1");
+    check("  somebody else has none", await s.subscriptionFor(1, "0xOTHER"), null);
+    check("  nor for another agent", await s.subscriptionFor(2, "0xBUYER"), null);
+
+    // Expiry is read against a moment, so a lapsed subscription simply stops
+    // matching rather than needing anything swept.
+    check(
+      "a lapsed subscription is not live",
+      await s.subscriptionFor(1, "0xBUYER", sub.expiresAt + 1),
+      null,
+    );
+
+    // Buying again before the first lapses must extend rather than replace:
+    // the longest-running one wins, not the newest.
+    await s.addSubscription({ ...sub, txHash: "0xTX2", expiresAt: sub.expiresAt + 1000 });
+    await s.addSubscription({ ...sub, txHash: "0xTX3", expiresAt: sub.expiresAt - 1000 });
+    check(
+      "a second payment extends rather than shortens",
+      (await s.subscriptionFor(1, "0xBUYER"))?.expiresAt,
+      sub.expiresAt + 1000,
+    );
+
+    check("everything paid to an agent is listed", (await s.subscriptionsTo(1)).length, 3);
+  }
+
   /* Wallet proof. The difference between an agent writing an address on its
      card and whoever holds that address signing for the agent. */
   {

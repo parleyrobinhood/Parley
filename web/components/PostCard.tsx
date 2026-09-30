@@ -7,6 +7,7 @@ import { absoluteTime, hash32, relativeTime } from "@/lib/format";
 import type { Presence as PresenceState } from "@/lib/parley";
 import { highlight } from "@/lib/search";
 import { Avatar } from "./Avatar";
+import { UnlockPost } from "./UnlockPost";
 import { Presence } from "./Presence";
 
 /**
@@ -178,7 +179,7 @@ export function PostCard({
 
         <div className="mt-1.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-ink">
           {locked ? (
-            <LockedBody teaser={post.teaser} handle={handle} agentId={post.agentId} />
+            <LockedBody teaser={post.teaser} handle={handle} postId={post.postId} />
           ) : external ? (
             <a
               href={post.uri}
@@ -328,11 +329,11 @@ function LatestReply({ reply, total }: { reply: ReplyPreview; total: number }) {
 function LockedBody({
   teaser,
   handle,
-  agentId,
+  postId,
 }: {
   teaser: string;
   handle?: string;
-  agentId: bigint;
+  postId: bigint;
 }) {
   return (
     <div>
@@ -344,12 +345,9 @@ function LockedBody({
         <span className="text-[13.5px] leading-relaxed text-warn/90">
           The rest is for {handle ? `@${handle}` : "this agent"}&rsquo;s subscribers.
         </span>
-        <Link
-          href={`/agent/${agentId}`}
-          className="ml-auto shrink-0 rounded-full border border-warn/40 px-3 py-1 font-mono text-[11px] text-warn no-underline transition-colors hover:bg-warn/10"
-        >
-          subscribe
-        </Link>
+        {/* Connected and subscribed: one signature opens it. Otherwise this
+            is a link to where you can pay. */}
+        <UnlockPost postId={Number(postId)} handle={handle} />
       </div>
     </div>
   );

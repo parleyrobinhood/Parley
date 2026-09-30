@@ -16,6 +16,7 @@ import type {
   Stance,
   EndorsementEdge,
   Store,
+  Subscription,
   SubscriptionOffer,
   VerificationRequest,
   SearchFilter,
@@ -36,6 +37,7 @@ interface Snapshot {
   verifications?: StoredVerification[];
   offers?: SubscriptionOffer[];
   offerCodes?: { codeHash: string; agentId: number; expiresAt: number }[];
+  subscriptions?: Subscription[];
 }
 
 /**
@@ -89,6 +91,8 @@ export class MemoryStore implements Store {
   private offers = new Map<number, SubscriptionOffer>();
   /** Unspent codes proving control, hashed. One live per agent. */
   private offerCodes = new Map<string, { agentId: number; expiresAt: number }>();
+  /** Paid access, keyed by the transfer that bought it. */
+  private subscriptions = new Map<string, Subscription>();
   /** agentId -> when it last woke. Absent means it never has. */
   private wokeAt = new Map<number, number>();
   /** Handles ever claimed, including retired. Never shrinks. */
@@ -123,6 +127,7 @@ export class MemoryStore implements Store {
       for (const offer of snapshot.offers ?? []) this.offers.set(offer.agentId, offer);
       for (const code of snapshot.offerCodes ?? [])
         this.offerCodes.set(code.codeHash, { agentId: code.agentId, expiresAt: code.expiresAt });
+      for (const sub of snapshot.subscriptions ?? []) this.subscriptions.set(sub.txHash, sub);
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -144,6 +149,7 @@ export class MemoryStore implements Store {
       verifications: this.verifications,
       offers: [...this.offers.values()],
       offerCodes: [...this.offerCodes].map(([codeHash, v]) => ({ codeHash, ...v })),
+      subscriptions: [...this.subscriptions.values()],
     };
     writeFileSync(this.path, `${JSON.stringify(snapshot, null, 2)}\n`);
   }
@@ -266,6 +272,36 @@ export class MemoryStore implements Store {
     this.offers.set(input.agentId, offer);
     this.persist();
     return offer;
+  }
+
+  async addSubscription(input: Subscription) {
+    const hash = input.txHash.toLowerCase();
+    // One transfer buys one period, and the transfer is the key.
+    if (this.subscriptions.has(hash)) return false;
+    this.subscriptions.set(hash, {
+      ...input,
+      txHash: hash,
+      subscriber: input.subscriber.toLowerCase(),
+    });
+    this.persist();
+    return true;
+  }
+
+  async subscriptionFor(agentId: number, subscriber: string, now = Date.now()) {
+    const key = subscriber.toLowerCase();
+    // The longest-running one, so buying again before the first lapses extends
+    // access rather than replacing it with a shorter window.
+    return (
+      [...this.subscriptions.values()]
+        .filter((s) => s.agentId === agentId && s.subscriber === key && s.expiresAt > now)
+        .sort((a, b) => b.expiresAt - a.expiresAt)[0] ?? null
+    );
+  }
+
+  async subscriptionsTo(agentId: number) {
+    return [...this.subscriptions.values()]
+      .filter((s) => s.agentId === agentId)
+      .sort((a, b) => b.startedAt - a.startedAt);
   }
 
   async openOfferCode(input: { agentId: number; codeHash: string; expiresAt: number }) {

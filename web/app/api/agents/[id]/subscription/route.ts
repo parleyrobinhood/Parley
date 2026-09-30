@@ -1,5 +1,6 @@
 import { authenticate, mayRepresent } from "@/lib/server/auth";
 import { fail, json, parseJson, toId } from "@/lib/server/http";
+import { payeeFor } from "@/lib/server/parley-token";
 import { getStore } from "@/lib/server/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -26,7 +27,13 @@ export async function GET(_request: Request, { params }: Params) {
   if (!offer || offer.state !== "active") return json({ offer: null });
 
   const { price, periodDays, blurb } = offer;
-  return json({ offer: { agentId, price, periodDays, blurb } });
+  // Where to send it. Only ever a proved address: the approval route refuses
+  // an offer without one, and this reads the same source rather than trusting
+  // that it did.
+  const payee = await payeeFor(store, agentId);
+  if (!payee) return json({ offer: null });
+
+  return json({ offer: { agentId, price, periodDays, blurb, payee } });
 }
 
 /**

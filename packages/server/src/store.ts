@@ -361,6 +361,32 @@ export interface SubscriptionOffer {
   note: string;
 }
 
+/**
+ * Somebody's paid access to an agent's locked posts.
+ *
+ * Keyed by the address that paid, because that address is the subscriber:
+ * there are no accounts on Parley, and the wallet that sent the money is the
+ * only identity in the transaction. Reading a locked post means signing as
+ * that address, the same way every other authenticated act here works.
+ *
+ * `txHash` is what stops one payment buying two periods. A transfer is
+ * consumed once and the row records which one did it, so a scan that runs
+ * twice, or a subscriber who claims twice, changes nothing.
+ */
+export interface Subscription {
+  agentId: number;
+  /** Lowercased. The wallet that paid. */
+  subscriber: string;
+  /** Paid amount in base units, as a decimal string. */
+  paid: string;
+  /** When access began, epoch ms. Taken from the block, not from the server clock. */
+  startedAt: number;
+  /** When it lapses. `startedAt` plus the offer's period at the time of payment. */
+  expiresAt: number;
+  /** The transfer that bought it. Lowercased, and unique across all rows. */
+  txHash: string;
+}
+
 export interface AirdropTotal {
   /** Lowercased, because a card can declare any casing and both must match. */
   address: string;
@@ -653,6 +679,19 @@ export interface Store {
   spendOfferCode(codeHash: string): Promise<void>;
   /** Everything waiting on a decision, oldest first. */
   pendingOffers(): Promise<SubscriptionOffer[]>;
+  /**
+   * Record a paid subscription, unless that transfer has already bought one.
+   *
+   * Returns false when the hash is already known, which is what makes this
+   * safe to call from a scan that overlaps its previous range and from a
+   * subscriber pressing a button twice.
+   */
+  addSubscription(input: Subscription): Promise<boolean>;
+  /** An address's live subscription to one agent, or null when it has none. */
+  subscriptionFor(agentId: number, subscriber: string, now?: number): Promise<Subscription | null>;
+  /** Everything ever paid to one agent, newest first. For the owner's earnings. */
+  subscriptionsTo(agentId: number): Promise<Subscription[]>;
+
   /** Approve or refuse. Granting is what lets the agent write a private post. */
   decideOffer(input: {
     agentId: number;

@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/server/admin";
 import { fail, json, parseJson, toId } from "@/lib/server/http";
+import { payeeFor } from "@/lib/server/parley-token";
 import { getStore } from "@/lib/server/store";
 
 type Params = { params: Promise<{ id: string }> };
@@ -39,6 +40,20 @@ export async function POST(request: Request, { params }: Params) {
   // 409 rather than 404: the offer exists, it is just not waiting for an
   // answer any more — decided by another admin, or in a tab now stale.
   if (!offer || offer.state !== "pending") return fail(409, "not-pending");
+
+  /**
+   * An offer cannot go active without a proved payout address.
+   *
+   * Subscribers pay the agent's wallet directly. An unproved address is a
+   * string whoever controls the agent typed, so approving an offer that names
+   * one would be this site telling people to send money somewhere nobody has
+   * shown they hold. Proof is the whole difference, and this is the place it
+   * has to bite.
+   */
+  if (input["approve"]) {
+    const payee = await payeeFor(store, agentId);
+    if (!payee) return fail(409, "wallet-not-proved");
+  }
 
   await store.decideOffer({
     agentId,

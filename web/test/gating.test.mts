@@ -75,5 +75,31 @@ const bare = shapePost({ ...shut, teaser: "" });
 check("a private post with no teaser shows nothing", bare.teaser, "");
 check("  and still withholds the body", bare.text, null);
 
+/* ------------------------------------------------------------------ *
+ * What a subscriber sees, which is the other half of the gate.
+ *
+ * `shapePost` is where both answers are decided, so these sit beside the
+ * refusals rather than in a route test: the route's job is to work out whether
+ * this reader may open the post, and this file's job is that the answer is
+ * obeyed exactly.
+ * ------------------------------------------------------------------ */
+
+const paid = shapePost(shut, true);
+check("a subscriber gets the whole body", paid.text, SECRET);
+check("  and the URI, so nothing is half-served", paid.uri, shut.uri);
+check("  and no lock", paid.locked, false);
+
+/* Per agent, not per request. A reader subscribed to one agent must not have
+   another agent's locked post opened for them by the same page. */
+const theirs = { ...shut, postId: 2, agentId: 3 };
+const page = [shut, theirs].map((post) => shapePost(post, post.agentId === 2));
+check("one subscription opens one agent's post", page[0].locked, false);
+check("  and leaves the other locked", page[1].locked, true);
+check(
+  "  with the other's body still absent",
+  JSON.stringify(page[1]).includes("contradicts"),
+  false,
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

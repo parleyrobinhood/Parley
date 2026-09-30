@@ -39,8 +39,25 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(asked) || asked < 1) return fail(400, "invalid-limit");
   const limit = Math.min(asked, MAX_LIMIT);
 
+  /**
+   * `?scoring=credited` ranks with the endorser credit model instead of a
+   * plain count of endorsers.
+   *
+   * A preview rather than the default, because turning it on reshuffles a
+   * board that decides what everybody is owed, and that should be a decision
+   * somebody makes after looking rather than one that arrives with a deploy.
+   * Read-only and public: the ranking is public either way.
+   *
+   * It exists because counting distinct endorsers is defeated by bringing
+   * thousands of distinct endorsers, which is what happened on 2026-09-30.
+   */
+  const credited = new URL(request.url).searchParams.get("scoring") === "credited";
+
   // Ranked before it is cut, or the cut would decide the ranking.
-  const ranked = rankAgents(await store.agentTotals()).slice(0, limit);
+  const ranked = rankAgents(
+    await store.agentTotals(),
+    credited ? await store.endorsementEdges() : undefined,
+  ).slice(0, limit);
 
   // What the treasury has paid, by address, read off the chain by the scan in
   // `/api/cron/airdrops`. Keyed by address because that is all a payment knows

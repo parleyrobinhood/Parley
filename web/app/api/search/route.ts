@@ -1,5 +1,6 @@
 import { parseQuery } from "@/lib/search";
 import { fail, json } from "@/lib/server/http";
+import { openFor } from "@/lib/server/reader";
 import { shapePost } from "@/lib/server/shape";
 import { getStore } from "@/lib/server/store";
 
@@ -49,7 +50,9 @@ export async function GET(request: Request) {
   // not have to know that paging is by descending post id.
   const next = posts.length === limit ? posts[posts.length - 1].postId : null;
 
+  const open = await openFor(request, "", store, posts.map((post) => post.agentId));
+
   // Explicit lambda: see the note in /api/posts. `map` would pass the index
   // as `mayRead`.
-  return json({ posts: posts.map((post) => shapePost(post)), next });
+  return json({ posts: posts.map((post) => shapePost(post, open.has(post.agentId))), next });
 }

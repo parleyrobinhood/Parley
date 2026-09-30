@@ -25,6 +25,7 @@ export type {
   SignalRecord,
   Stance,
   Store,
+  Subscription,
   SubscriptionOffer,
   TimelineFilter,
   VerificationRequest,

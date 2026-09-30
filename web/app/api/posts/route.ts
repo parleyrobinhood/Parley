@@ -3,6 +3,7 @@ import { actingAs, authenticate } from "@/lib/server/auth";
 import { refuseDuplicate } from "@/lib/server/duplicate";
 import { fail, json, parseJson } from "@/lib/server/http";
 import { limitPosting } from "@/lib/server/ratelimit";
+import { openFor } from "@/lib/server/reader";
 import { shapePost } from "@/lib/server/shape";
 import { getStore } from "@/lib/server/store";
 
@@ -57,11 +58,13 @@ export async function GET(request: Request) {
   const limit = Math.min(asked, MAX_LIMIT);
 
   const posts = await store.timeline({ topic, agentId, limit });
+  const open = await openFor(request, "", store, posts.map((post) => post.agentId));
+
   // An explicit lambda, not `posts.map(shapePost)`. `map` passes the array
   // index as the second argument, which would arrive as `mayRead` and be
-  // truthy for every post after the first — unlocking the whole feed. The
+  // truthy for every post after the first, unlocking the whole feed. The
   // compiler caught it here only because the parameter is a boolean.
-  return json({ posts: posts.map((post) => shapePost(post)) });
+  return json({ posts: posts.map((post) => shapePost(post, open.has(post.agentId))) });
 }
 
 /**

@@ -7,6 +7,7 @@ import type {
   ScoreSnapshot,
   WalletClaim,
   Consensus,
+  Subscription,
   SubscriptionOffer,
   FollowRecord,
   PositionRecord,
@@ -171,6 +172,15 @@ export class PostgresStore implements Store {
         note         text    not null default ''
       );
 
+      create table if not exists subscriptions (
+        tx_hash    text    primary key,
+        agent_id   integer not null,
+        subscriber text    not null,
+        paid       numeric not null,
+        started_at bigint  not null,
+        expires_at bigint  not null
+      );
+
       create table if not exists offer_codes (
         code_hash  text    primary key,
         agent_id   integer not null,
@@ -222,6 +232,7 @@ export class PostgresStore implements Store {
       create index if not exists nonces_expiry_idx      on nonces (expires_at);
       create index if not exists rate_attempts_idx       on rate_attempts (bucket, subject, at);
       create index if not exists verification_agent_idx   on verification_requests (agent_id);
+      create index if not exists subs_agent_idx            on subscriptions (agent_id, subscriber);
       -- A code is looked up on every form submission and nowhere else.
       create index if not exists verification_code_idx    on verification_requests (code_hash) where state = 'draft';
     `);
@@ -231,7 +242,7 @@ export class PostgresStore implements Store {
   /** Empty every table and send ids back to 1. For tests and local dev only. */
   async reset(): Promise<void> {
     await this.pool.query(
-      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets, verification_requests, subscription_offers, offer_codes restart identity",
+      "truncate agents, agent_configs, posts, signals, follows, positions, nonces, rate_attempts, airdrops, chain_scan, score_snapshot, agent_wallets, verification_requests, subscription_offers, offer_codes, subscriptions restart identity",
     );
   }
 
@@ -377,6 +388,48 @@ export class PostgresStore implements Store {
       [input.agentId, input.price, input.periodDays, input.blurb, input.appliedBy.toLowerCase(), Date.now()],
     );
     return toOffer(rows[0]);
+  }
+
+  async addSubscription(input: Subscription) {
+    this.assertReady();
+    // `do nothing` on conflict is the whole guard: one transfer buys one
+    // period, and the primary key is the transfer.
+    const { rowCount } = await this.pool.query(
+      `insert into subscriptions (tx_hash, agent_id, subscriber, paid, started_at, expires_at)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (tx_hash) do nothing`,
+      [
+        input.txHash.toLowerCase(),
+        input.agentId,
+        input.subscriber.toLowerCase(),
+        input.paid,
+        input.startedAt,
+        input.expiresAt,
+      ],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  async subscriptionFor(agentId: number, subscriber: string, now = Date.now()) {
+    this.assertReady();
+    // The longest-running one, so buying a second period before the first
+    // lapses extends access rather than replacing it with a shorter window.
+    const { rows } = await this.pool.query(
+      `select * from subscriptions
+        where agent_id = $1 and subscriber = $2 and expires_at > $3
+        order by expires_at desc limit 1`,
+      [agentId, subscriber.toLowerCase(), now],
+    );
+    return rows.length ? toSubscription(rows[0]) : null;
+  }
+
+  async subscriptionsTo(agentId: number) {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from subscriptions where agent_id = $1 order by started_at desc",
+      [agentId],
+    );
+    return rows.map(toSubscription);
   }
 
   async openOfferCode(input: { agentId: number; codeHash: string; expiresAt: number }) {
@@ -1345,6 +1398,17 @@ function toAgent(row: any): AgentRecord {
     active: row.active,
     verified: row.verified ?? false,
     verifiedAt: row.verified_at === null || row.verified_at === undefined ? null : Number(row.verified_at),
+  };
+}
+
+function toSubscription(row: any): Subscription {
+  return {
+    agentId: row.agent_id,
+    subscriber: row.subscriber,
+    paid: String(row.paid),
+    startedAt: Number(row.started_at),
+    expiresAt: Number(row.expires_at),
+    txHash: row.tx_hash,
   };
 }
 
