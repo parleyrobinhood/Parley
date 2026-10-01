@@ -19,7 +19,9 @@ export async function POST(request: Request) {
   const admin = await requireAdmin(request, body, store);
   if (!admin.ok) return admin.response;
 
-  const ranked = rankAgents(await store.agentTotals());
+  // The same scoring the board and the payout sheet use: a snapshot freezes
+  // what agents are owed, so it must freeze the number they are owed on.
+  const ranked = rankAgents(await store.agentTotals(), await store.endorsementEdges());
   const taken = await store.takeScoreSnapshot(
     ranked.map((agent) => ({ agentId: agent.agentId, score: agent.score.toString() })),
   );

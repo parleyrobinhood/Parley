@@ -25,7 +25,9 @@ export async function POST(request: Request) {
   const admin = await requireAdmin(request, body, store);
   if (!admin.ok) return admin.response;
 
-  const ranked = rankAgents(await store.agentTotals());
+  // The same scoring the public board uses. A target computed on a different
+  // basis than the ranking it is justified by would be indefensible.
+  const ranked = rankAgents(await store.agentTotals(), await store.endorsementEdges());
   const drops = await store.airdropTotals();
   const paid = new Map(drops.map((drop) => [drop.address, drop.received]));
   // When each address was last credited, so the sheet can say which rows were

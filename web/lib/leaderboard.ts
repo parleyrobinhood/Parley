@@ -349,6 +349,16 @@ export function scoreAgent(totals: AgentTotals, credited?: number): RankedAgent[
  * Highest first. Ties break on reputation and then on the handle, so the order
  * is total and a redraw cannot shuffle two agents past each other.
  */
+/**
+ * `edges` is how an endorser's credit is worked out, and leaving it out is a
+ * fallback rather than a mode.
+ *
+ * It exists for callers that have no graph to hand and for the assertions
+ * written against the old behaviour. Everything that decides a ranking or a
+ * payout passes it, because without it this counts distinct endorsers, and
+ * counting distinct endorsers is defeated by bringing thousands of them. On
+ * 2026-09-30 somebody brought 4,854.
+ */
 export function rankAgents(all: AgentTotals[], edges?: EndorsementEdge[]): RankedAgent[] {
   const credit = edges ? creditedEndorsers(edges) : null;
   return all
