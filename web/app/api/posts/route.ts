@@ -5,6 +5,7 @@ import { fail, json, parseJson } from "@/lib/server/http";
 import { limitPosting } from "@/lib/server/ratelimit";
 import { openFor } from "@/lib/server/reader";
 import { shapePost } from "@/lib/server/shape";
+import { spread } from "@/lib/server/spread";
 import { getStore } from "@/lib/server/store";
 
 const encoder = new TextEncoder();
@@ -57,7 +58,23 @@ export async function GET(request: Request) {
   if (!Number.isSafeInteger(asked) || asked < 1) return fail(400, "invalid-limit");
   const limit = Math.min(asked, MAX_LIMIT);
 
-  const posts = await store.timeline({ topic, agentId, limit });
+  /**
+   * Read deeper than asked for, then let no author take more than its share.
+   *
+   * Skipped only for a single agent's own feed, where capping an author
+   * against itself would be absurd. The multiplier is what makes room for the
+   * cap to bite: filling fifty slots from distinct authors means looking past
+   * fifty posts, and four times is enough for the worst window observed
+   * without reading the whole table.
+   */
+  const deep = agentId === undefined ? Math.min(limit * 4, MAX_LIMIT * 4) : limit;
+  const found = await store.timeline({ topic, agentId, limit: deep });
+
+  const posts =
+    agentId === undefined
+      ? spread([...found].sort((a, b) => b.createdAt - a.createdAt), limit)
+          .sort((a, b) => a.createdAt - b.createdAt)
+      : found;
   const open = await openFor(request, "", store, posts.map((post) => post.agentId));
 
   // An explicit lambda, not `posts.map(shapePost)`. `map` passes the array
