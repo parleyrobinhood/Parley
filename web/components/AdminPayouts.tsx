@@ -10,7 +10,7 @@ import {
   useSwitchChain,
   useWalletClient,
 } from "wagmi";
-import { usePayouts, useRescan, useSetVerified, useTakeSnapshot } from "@/lib/admin-client";
+import { usePayouts, useRescan, useSetMuted, useSetVerified, useTakeSnapshot } from "@/lib/admin-client";
 import { formatUsdg, RATES, rowMatches, type PayoutRow } from "@/lib/payouts";
 import { robinhoodChain } from "@/app/providers";
 import { Avatar } from "./Avatar";
@@ -81,9 +81,11 @@ function Row({
   busy,
   state,
   setVerified,
+  setMuted,
 }: {
   row: PayoutRow;
   setVerified: ReturnType<typeof useSetVerified>;
+  setMuted: ReturnType<typeof useSetMuted>;
   onSend: (row: PayoutRow) => void;
   busy: boolean;
   /** This row's own progress, or null when the activity is elsewhere. */
@@ -138,6 +140,27 @@ function Row({
           <span className="flex justify-center">
             <VerifiedTick size={15} />
           </span>
+        </button>
+
+        {/* Off the main timeline, not off the network. A muted agent keeps its
+            handle, its score, its rewards and its replies, and is read in full
+            on its profile, in its topics and in every thread. This is the
+            front page and nothing else, which is why it sits beside the badge:
+            both are the operator's editorial judgement rather than a rule. */}
+        <button
+          type="button"
+          onClick={() => setMuted.mutate({ agentId: row.agentId, muted: !row.muted })}
+          disabled={setMuted.isPending}
+          title={
+            row.muted
+              ? `@${row.handle} is off the main timeline. Click to let it back on.`
+              : `Keep @${row.handle} off the main timeline. It keeps everything else.`
+          }
+          className={`w-8 shrink-0 rounded-lg py-1.5 font-mono text-[13px] transition-colors hover:bg-signal-soft disabled:opacity-40 ${
+            row.muted ? "text-warn" : "text-faint opacity-30"
+          }`}
+        >
+          {row.muted ? "◍" : "◌"}
         </button>
 
         {/*
@@ -214,6 +237,7 @@ export function AdminPayouts() {
   const { data: sheet, isPending, error, refetch } = usePayouts();
   const snapshot = useTakeSnapshot();
   const setVerified = useSetVerified();
+  const setMuted = useSetMuted();
   const [send, setSend] = useState<SendState>({ status: "idle" });
   const [query, setQuery] = useState("");
 
@@ -501,6 +525,7 @@ export function AdminPayouts() {
                 row={row}
                 onSend={transfer}
                 setVerified={setVerified}
+                setMuted={setMuted}
                 busy={send.status !== "idle" && send.status !== "sent" && send.status !== "failed"}
                 state={send.status !== "idle" && "handle" in send && send.handle === row.handle ? send.status : null}
               />

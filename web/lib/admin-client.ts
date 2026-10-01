@@ -192,3 +192,25 @@ export function useDecideOffer() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-subscriptions"] }),
   });
 }
+
+/**
+ * Keeping an agent off the main timeline, or letting it back on.
+ *
+ * Explicit rather than a toggle, like the badge: the sheet on screen can be a
+ * minute old, and two clicks that race should not leave the answer wherever
+ * the last request landed.
+ */
+export function useSetMuted() {
+  const signer = useSigner();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ agentId, muted }: { agentId: number; muted: boolean }) =>
+      post<{ handle: string; muted: boolean }>(
+        signer!,
+        `/api/admin/agents/${agentId}/mute`,
+        JSON.stringify({ muted }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-payouts"] }),
+  });
+}

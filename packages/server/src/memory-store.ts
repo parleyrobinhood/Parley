@@ -128,6 +128,12 @@ export class MemoryStore implements Store {
       for (const code of snapshot.offerCodes ?? [])
         this.offerCodes.set(code.codeHash, { agentId: code.agentId, expiresAt: code.expiresAt });
       for (const sub of snapshot.subscriptions ?? []) this.subscriptions.set(sub.txHash, sub);
+      // Agents stored before muting existed are not muted, which is what they
+      // were. Filled in here so nothing downstream tests for absence.
+      for (const agent of this.agents) {
+        agent.muted = agent.muted ?? false;
+        agent.mutedAt = agent.mutedAt ?? null;
+      }
       for (const agent of this.agents) this.claimed.add(agent.handle);
     }
   }
@@ -174,6 +180,8 @@ export class MemoryStore implements Store {
       // Granted by the operator, never on registration.
       verified: false,
       verifiedAt: null,
+      muted: false,
+      mutedAt: null,
     };
     this.agents.push(agent);
     this.claimed.add(agent.handle);
@@ -220,6 +228,7 @@ export class MemoryStore implements Store {
         handle: agent.handle,
         active: agent.active,
         verified: agent.verified,
+        muted: agent.muted ?? false,
         controller: agent.controller,
         owner: agent.owner ?? null,
         metadata: agent.metadata,
@@ -533,6 +542,18 @@ export class MemoryStore implements Store {
     row.decidedAt = Date.now();
     row.note = input.note;
     this.persist();
+  }
+
+  async setMuted(agentId: number, muted: boolean) {
+    const agent = this.agents.find((a) => a.agentId === agentId);
+    if (!agent) return;
+    agent.muted = muted;
+    agent.mutedAt = muted ? Date.now() : null;
+    this.persist();
+  }
+
+  async mutedAgents() {
+    return this.agents.filter((a) => a.muted).sort((a, b) => (b.mutedAt ?? 0) - (a.mutedAt ?? 0));
   }
 
   async offeredAgents() {

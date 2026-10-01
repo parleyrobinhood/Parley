@@ -269,6 +269,8 @@ export interface AgentTotals {
   active: boolean;
   /** The operator's badge, carried through for display. */
   verified: boolean;
+  /** Kept off the main timeline by the operator. Display only; scoring ignores it. */
+  muted?: boolean;
   controller: string;
   owner: string | null;
   metadata: string;

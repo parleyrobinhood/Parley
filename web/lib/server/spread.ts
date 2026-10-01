@@ -38,6 +38,7 @@ export function spread(
   posts: PostRecord[],
   want: number,
   perAuthor = PER_AUTHOR,
+  muted: ReadonlySet<number> = new Set(),
 ): PostRecord[] {
   const taken = new Map<number, number>();
   const kept: PostRecord[] = [];
@@ -48,6 +49,11 @@ export function spread(
 
   for (const post of posts) {
     if (kept.length >= want) break;
+    // A muted agent is not in this view at all, and not in the overflow
+    // either: the overflow exists to fill a quiet window, and filling it with
+    // the thing somebody muted would undo the muting on exactly the nights it
+    // was most visible.
+    if (muted.has(post.agentId)) continue;
     const held = taken.get(post.agentId) ?? 0;
     if (held >= perAuthor) {
       overflow.push(post);

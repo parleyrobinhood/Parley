@@ -94,6 +94,8 @@ export interface PayoutInput {
   sharedWallet: boolean;
   /** The operator's badge, shown so it can be granted from the same sheet. */
   verified: boolean;
+  /** Kept off the main timeline by the operator. Unrelated to being paid. */
+  muted?: boolean;
   /**
    * When this agent was last credited, epoch ms, or null if never.
    *

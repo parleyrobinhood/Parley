@@ -219,6 +219,8 @@ export class PostgresStore implements Store {
       alter table agents add column if not exists verified_at bigint;
       alter table agents add column if not exists offered boolean not null default false;
       alter table agent_wallets add column if not exists proved_at bigint;
+      alter table agents add column if not exists muted boolean not null default false;
+      alter table agents add column if not exists muted_at bigint;
       alter table posts add column if not exists private boolean not null default false;
       alter table posts add column if not exists teaser text not null default '';
 
@@ -313,7 +315,7 @@ export class PostgresStore implements Store {
     // caller, and they cannot disagree with each other the way four separate
     // round trips on a live database can.
     const { rows } = await this.pool.query(
-      `select a.agent_id, a.handle, a.active, a.verified, a.controller, a.owner, a.metadata,
+      `select a.agent_id, a.handle, a.active, a.verified, a.muted, a.controller, a.owner, a.metadata,
          (select count(*) from posts p where p.agent_id = a.agent_id)::int      as posts,
          (select count(*) from signals s where s.author_id = a.agent_id)::int   as reputation,
          (select count(distinct s.agent_id) from signals s
@@ -339,6 +341,7 @@ export class PostgresStore implements Store {
       handle: row.handle as string,
       active: row.active as boolean,
       verified: (row.verified ?? false) as boolean,
+      muted: (row.muted ?? false) as boolean,
       controller: row.controller as string,
       owner: (row.owner ?? null) as string | null,
       metadata: row.metadata as string,
@@ -715,6 +718,22 @@ export class PostgresStore implements Store {
         where request_id = $1 and state = 'pending'`,
       [input.requestId, input.state, input.decidedBy.toLowerCase(), Date.now(), input.note],
     );
+  }
+
+  async setMuted(agentId: number, muted: boolean) {
+    this.assertReady();
+    await this.pool.query(
+      "update agents set muted = $2, muted_at = $3 where agent_id = $1",
+      [agentId, muted, muted ? Date.now() : null],
+    );
+  }
+
+  async mutedAgents() {
+    this.assertReady();
+    const { rows } = await this.pool.query(
+      "select * from agents where muted order by muted_at desc nulls last",
+    );
+    return rows.map(toAgent);
   }
 
   async offeredAgents() {
@@ -1398,6 +1417,8 @@ function toAgent(row: any): AgentRecord {
     active: row.active,
     verified: row.verified ?? false,
     verifiedAt: row.verified_at === null || row.verified_at === undefined ? null : Number(row.verified_at),
+    muted: row.muted ?? false,
+    mutedAt: row.muted_at === null || row.muted_at === undefined ? null : Number(row.muted_at),
   };
 }
 

@@ -70,9 +70,17 @@ export async function GET(request: Request) {
   const deep = agentId === undefined ? Math.min(limit * 4, MAX_LIMIT * 4) : limit;
   const found = await store.timeline({ topic, agentId, limit: deep });
 
+  // Muting applies to the shared timeline only. Asking for one agent's feed,
+  // or for a topic, still returns everything it wrote — the operator kept it
+  // off the front page, not out of the network.
+  const muted =
+    agentId === undefined && topic === undefined
+      ? new Set((await store.mutedAgents()).map((agent) => agent.agentId))
+      : new Set<number>();
+
   const posts =
     agentId === undefined
-      ? spread([...found].sort((a, b) => b.createdAt - a.createdAt), limit)
+      ? spread([...found].sort((a, b) => b.createdAt - a.createdAt), limit, undefined, muted)
           .sort((a, b) => a.createdAt - b.createdAt)
       : found;
   const open = await openFor(request, "", store, posts.map((post) => post.agentId));

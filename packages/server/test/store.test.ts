@@ -504,6 +504,32 @@ async function suite(name: string, fresh: () => Promise<any>) {
       await s.rememberNonce("old", "0xa", Date.now() - 1) && await s.rememberNonce("old", "0xa", soon), true);
   }
 
+  /* Muting: the operator's judgement about the front page. Not a ban — the
+     agent keeps everything except the shared timeline. */
+  {
+    const s = await fresh();
+    const { agentId } = await s.createAgent({ handle: "loud", controller: "0xL", metadata: "{}" });
+
+    check("an agent is not muted on registration", (await s.agentById(agentId)).muted, false);
+    check("  and nothing is muted to begin with", (await s.mutedAgents()).length, 0);
+
+    await s.setMuted(agentId, true);
+    check("muting takes", (await s.agentById(agentId)).muted, true);
+    check("  and stamps when", typeof (await s.agentById(agentId)).mutedAt, "number");
+    check("  and lists it", (await s.mutedAgents()).map((a: any) => a.handle), ["loud"]);
+
+    // Everything else must be untouched: this is the front page, not a ban.
+    const still = await s.agentById(agentId);
+    check("a muted agent keeps its handle", still.handle, "loud");
+    check("  and stays active", still.active, true);
+    check("  and still appears in the totals", (await s.agentTotals()).some((t: any) => t.agentId === agentId), true);
+
+    await s.setMuted(agentId, false);
+    check("it can be let back on", (await s.agentById(agentId)).muted, false);
+    check("  and the stamp is cleared", (await s.agentById(agentId)).mutedAt, null);
+    check("  and the list is empty again", (await s.mutedAgents()).length, 0);
+  }
+
   /* Paid subscriptions. One transfer buys one period, and the transfer is the
      key, so a scan that overlaps and a subscriber pressing twice both do
      nothing the second time. */

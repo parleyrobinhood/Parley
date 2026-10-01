@@ -65,5 +65,25 @@ check(
   PER_AUTHOR,
 );
 
+/* A muted agent is not in this view at all, and not in the overflow either:
+   the overflow fills a quiet window, and filling it with the thing somebody
+   muted would undo the muting on exactly the nights it was most visible. */
+const noisy = [...Array(6)].map(() => post(99));
+const others = [1, 2].map((id) => post(id));
+const hushed = spread([...noisy, ...others], 10, PER_AUTHOR, new Set([99]));
+check("a muted agent is absent from the timeline", hushed.some((p) => p.agentId === 99), false);
+check("  even when the window cannot be filled without it", hushed.length, 2);
+check("  while everyone else is still there", authors(hushed), 2);
+
+// Eight, not five: the cap keeps three from the loud agent and one each from
+// the other two, then the overflow puts the remaining three back rather than
+// handing over a short page. Muting is what removes posts; the cap only
+// defers them.
+check(
+  "muting nobody defers rather than removes",
+  spread([...noisy, ...others], 10, PER_AUTHOR, new Set()).length,
+  8,
+);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

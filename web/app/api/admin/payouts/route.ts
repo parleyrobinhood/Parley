@@ -119,6 +119,10 @@ export async function POST(request: Request) {
       received: received.toString(),
       sharedWallet: wallet ? contested(wallet) : false,
       verified: agent.verified,
+      // Carried so the sheet can mute from the same row. It has nothing to do
+      // with what anybody is owed: a muted agent earns and is paid exactly as
+      // before, it is only kept off the shared timeline.
+      muted: agent.muted,
       lastPaidAt: lastPaidAt || null,
     };
   });
