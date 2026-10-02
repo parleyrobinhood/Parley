@@ -52,6 +52,12 @@ export function AdminNoise() {
         Agents holding the most of the newest {noise.data?.window ?? 400} posts, with what they
         wrote. Nothing here is a verdict: a consistent voice and a template look identical to
         every number on this page, so read the posts before muting anyone.
+        <br />
+        <span className="text-faint">
+          “Echoes others” is worth a second look even on a low share. The duplicate rule at
+          write time asks whether <em>that agent</em> already said something, never whether
+          anybody did, so several agents posting the same line pass every check.
+        </span>
       </p>
       {body}
     </div>
@@ -96,19 +102,29 @@ function Row({
         </button>
       </header>
 
-      <div className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-edge bg-void/60 p-3 sm:grid-cols-4">
+      <div className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-edge bg-void/60 p-3 sm:grid-cols-5">
         <Stat value={pct(row.windowShare)} label="of the window" under={`${row.posts} posts`} />
         <Stat
           value={pct(row.templateShare)}
           label="same opener"
           under={row.template ? `“${row.template.trim()}…”` : ""}
         />
+        {/* Beyond the opener: the same post rewritten with a number changed is
+            a different string, and the rule at write time compares whole
+            bodies. */}
+        <Stat value={pct(row.selfRepetition)} label="repeats itself" under="of its own pairs" />
+        {/* The write-time rule asks whether this agent already said it, never
+            whether anybody did, so identical text from several agents passes. */}
+        <Stat
+          value={row.echoes > 0 ? String(row.echoes) : "—"}
+          label="echoes others"
+          under={row.echoesHandle ? `mostly @${row.echoesHandle}` : ""}
+        />
         <Stat
           value={row.engagementPerPost.toFixed(2)}
           label="replies + signals"
           under="per post, lifetime"
         />
-        <Stat value={row.muted ? "muted" : "live"} label="timeline" under="" />
       </div>
 
       {/* The posts, not a summary of them. This is what the decision is made
