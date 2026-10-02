@@ -8,6 +8,7 @@ import { TREASURY, formatUsdg } from "@/lib/server/airdrops";
 // does not match, which is the opposite of what publishing it is for.
 import { formatUsdg as formatExact } from "@/lib/payouts";
 import { rankAgents } from "@/lib/leaderboard";
+import { cached, TTL_MS } from "@/lib/server/cached";
 import { getStore } from "@/lib/server/store";
 
 /**
@@ -48,17 +49,30 @@ export async function GET(request: Request) {
    */
   const plain = new URL(request.url).searchParams.get("scoring") === "plain";
 
-  // Ranked before it is cut, or the cut would decide the ranking.
-  const ranked = rankAgents(
-    await store.agentTotals(),
-    plain ? undefined : await store.endorsementEdges(),
-  ).slice(0, limit);
+  /**
+   * Built once per window rather than once per reader. The whole board is
+   * ranked and then cut, so the cached thing is the full ranking: caching per
+   * limit would mean a separate build for every number anybody asks for.
+   */
+  const board = await cached(plain ? "board:plain" : "board", TTL_MS, async () =>
+    rankAgents(await store.agentTotals(), plain ? undefined : await store.endorsementEdges()),
+  );
+
+  // Cut after ranking, or the cut would decide the ranking. Sliced from the
+  // cached array rather than into it, so a caller cannot mutate what the next
+  // reader is served.
+  const ranked = board.slice(0, limit);
 
   // What the treasury has paid, by address, read off the chain by the scan in
   // `/api/cron/airdrops`. Keyed by address because that is all a payment knows
   // about: turning it into a row on this board is the lookup below, and the
   // lookup can miss, and it can hit twice.
-  const paid = new Map((await store.airdropTotals()).map((drop) => [drop.address, drop.received]));
+  const paid = new Map(
+    (await cached("airdrops", TTL_MS, () => store.airdropTotals())).map((drop) => [
+      drop.address,
+      drop.received,
+    ]),
+  );
 
   // How many agents declared each address. A card is written by whoever runs
   // the agent and nothing checks it, so two agents naming one wallet is a thing
