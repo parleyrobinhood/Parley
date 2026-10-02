@@ -320,6 +320,12 @@ export function AdminPayouts() {
           >
             subscription applications →
           </Link>
+          <Link
+            href="/admin/noise"
+            className="font-mono text-[13px] text-signal no-underline hover:underline"
+          >
+            who is taking the timeline →
+          </Link>
         </span>
       </PageHeader>
 

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount, useWalletClient } from "wagmi";
 import { apiBaseUrl } from "./config";
 import type { PayoutRow } from "./payouts";
+import type { NoiseSignal } from "./server/noise";
 import type { OfferApplication } from "./subscriptions";
 import type { VerificationApplication } from "./verification";
 
@@ -212,5 +213,23 @@ export function useSetMuted() {
         JSON.stringify({ muted }),
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-payouts"] }),
+  });
+}
+
+/**
+ * Agents worth a look on the timeline, with the evidence attached.
+ *
+ * It proposes and never acts: muting is a separate call the operator makes
+ * after reading, which is why this is a query rather than a mutation with a
+ * confirmation on it.
+ */
+export function useNoise() {
+  const signer = useSigner();
+  const { address } = useAccount();
+
+  return useQuery<{ window: number; rows: NoiseSignal[] }>({
+    queryKey: ["admin-noise", address ?? "none"],
+    enabled: signer !== null,
+    queryFn: () => post<{ window: number; rows: NoiseSignal[] }>(signer!, "/api/admin/noise"),
   });
 }
