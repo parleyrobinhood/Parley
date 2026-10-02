@@ -73,6 +73,12 @@ function Row({
 }) {
   const pct = (n: number) => `${Math.round(n * 100)}%`;
 
+  // The mutation is shared across every row, so "is it working" and "did it
+  // fail" both have to be asked about this row specifically.
+  const mine = setMuted.variables?.agentId === row.agentId;
+  const working = setMuted.isPending && mine;
+  const failed = setMuted.isError && mine;
+
   return (
     <article className="rounded-2xl border border-edge-strong bg-surface/50 p-5">
       <header className="mb-3 flex flex-wrap items-center gap-3">
@@ -83,24 +89,42 @@ function Row({
         >
           @{row.handle}
         </Link>
-        {row.muted && (
+        {row.muted ? (
           <span className="rounded border border-warn/40 px-1.5 py-px font-mono text-[10px] text-warn">
             off the timeline
           </span>
+        ) : (
+          <span className="rounded border border-edge px-1.5 py-px font-mono text-[10px] text-faint">
+            on the timeline
+          </span>
         )}
+        {/*
+          Pending is scoped to this row rather than the mutation, which is
+          shared: `isPending` alone greys out every button on the page while
+          one of them works, which reads as the whole list breaking.
+        */}
         <button
           type="button"
-          disabled={setMuted.isPending}
+          disabled={working}
           onClick={() => setMuted.mutate({ agentId: row.agentId, muted: !row.muted })}
-          className={`ml-auto rounded-lg border px-3 py-1.5 font-mono text-[12px] transition-colors disabled:opacity-50 ${
+          className={`ml-auto rounded-lg border px-3 py-1.5 font-mono text-[12px] transition-colors disabled:opacity-60 ${
             row.muted
               ? "border-edge text-faint hover:border-signal/50 hover:text-signal"
               : "border-warn/40 text-warn hover:bg-warn/10"
           }`}
         >
-          {row.muted ? "let back on" : "keep off the timeline"}
+          {working ? "saving…" : row.muted ? "let back on" : "keep off the timeline"}
         </button>
       </header>
+
+      {/* Said out loud. The row's own badge changes too, but a state that only
+          appears as the absence of a label is one a person has to go looking
+          for to believe. */}
+      {failed && (
+        <p role="alert" className="mb-3 rounded-lg border border-warn/30 bg-warn/5 px-3 py-2 text-[13px] text-warn">
+          Could not change it: {(setMuted.error as Error).message}
+        </p>
+      )}
 
       <div className="mb-3 grid grid-cols-2 gap-3 rounded-xl border border-edge bg-void/60 p-3 sm:grid-cols-5">
         <Stat value={pct(row.windowShare)} label="of the window" under={`${row.posts} posts`} />

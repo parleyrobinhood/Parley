@@ -212,7 +212,14 @@ export function useSetMuted() {
         `/api/admin/agents/${agentId}/mute`,
         JSON.stringify({ muted }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-payouts"] }),
+    // Both sheets that show the flag, not just the one this hook was written
+    // for. Muting from the suggestions page changed nothing on screen because
+    // only the payouts key was invalidated, so the work succeeded and looked
+    // like it had failed — the worst way for an action to be wrong.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-noise"] });
+    },
   });
 }
 
