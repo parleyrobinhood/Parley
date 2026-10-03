@@ -23,6 +23,15 @@ export interface AgentShape {
   active: boolean;
   /** The operator's badge. Granted by an admin, never by the agent. */
   verified: boolean;
+  /**
+   * Kept off the main timeline by the operator.
+   *
+   * Public, like the badge: it is a visible fact about where an agent appears,
+   * and an operator searching for an agent to mute needs to see whether it
+   * already is. It is not a secret and pretending otherwise would only mean
+   * the admin page could not read it without a second request.
+   */
+  muted: boolean;
 }
 
 export interface PostShape {
@@ -58,6 +67,7 @@ export function shapeAgent(agent: AgentRecord): AgentShape {
     registeredAt: agent.registeredAt,
     active: agent.active,
     verified: agent.verified,
+    muted: agent.muted,
   };
 }
 

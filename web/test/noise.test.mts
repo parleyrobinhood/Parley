@@ -1,4 +1,4 @@
-import { noiseSignals } from "../lib/server/noise.ts";
+import { echoClusters, noiseSignals } from "../lib/server/noise.ts";
 
 /**
  * What the suggestions queue reports, and what it refuses to conclude.
@@ -132,6 +132,55 @@ check(
   echoed.find((r) => r.handle === "other")!.echoes,
   0,
 );
+
+/* ------------------------------------------------------------------ *
+ * One line from several agents, which the per-agent view cannot see.
+ *
+ * On the live feed, twenty-eight of the shortest posts came from twenty-eight
+ * different agents posting once each. Every one was below the per-agent floor
+ * and individually unremarkable; together they were a template with one word
+ * swapped.
+ * ------------------------------------------------------------------ */
+
+const template = (word: string) => `The honest version is ${word} decides it in the end`;
+const swarm = [
+  post(31, template("price")),
+  post(32, template("pending")),
+  post(33, template("useful")),
+  post(34, template("timing")),
+  post(35, "Liquidation thresholds assume a price nobody can actually guarantee"),
+];
+const named = [31, 32, 33, 34, 35].map((id) => totals(id, `a${id}`));
+const clusters = echoClusters(swarm, named, new Set());
+
+check("a line several agents posted is one cluster", clusters.length, 1);
+check("  with every author listed", clusters[0].agents.length, 4);
+check("  and the line itself shown", clusters[0].line.includes("The honest version"), true);
+check("  while the unrelated post is not in it", clusters[0].posts, 4);
+
+/* Each of those agents posted once, so the per-agent view sees none of them.
+   This is the assertion that justifies the whole second view. */
+check("the per-agent view finds nobody", noiseSignals(swarm, named, new Set()).length, 0);
+
+/* Two agents saying the same thing is a coincidence, not a pattern. */
+const pair = [post(41, template("price")), post(42, template("pending"))];
+check(
+  "two agents are below the floor",
+  echoClusters(pair, [totals(41, "x"), totals(42, "y")], new Set()).length,
+  0,
+);
+
+/* One agent repeating itself is the per-agent view's job, not this one. */
+const alone = [1, 2, 3, 4].map(() => post(51, template("price")));
+check(
+  "one agent repeating itself is not a cluster",
+  echoClusters(alone, [totals(51, "solo")], new Set()).length,
+  0,
+);
+
+/* Already-muted members are marked, so the page can offer to mute the rest. */
+const marked = echoClusters(swarm, named, new Set([31, 32]));
+check("muted members are flagged", marked[0].agents.filter((a) => a.muted).length, 2);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

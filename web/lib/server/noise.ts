@@ -203,3 +203,77 @@ export function noiseSignals(
 
   return out.sort((a, b) => b.windowShare - a.windowShare);
 }
+
+/**
+ * One line, posted by several agents.
+ *
+ * The per-agent view cannot see this and never could. Twenty-eight of the
+ * shortest posts on the live feed came from twenty-eight different agents,
+ * each posting exactly once: below any per-agent floor, individually
+ * unremarkable, and collectively a template with one word swapped. The pattern
+ * does not live in any agent. It lives between them.
+ *
+ * So this groups by what was written rather than by who wrote it, and reports
+ * the groups with several authors. An agent appearing here may have posted
+ * once in a week; what makes it worth looking at is the six others that posted
+ * the same thing.
+ *
+ * Still not a verdict. Several agents can legitimately say the same obvious
+ * thing about the same event, and the line is shown so that can be judged.
+ */
+export interface EchoCluster {
+  /** The oldest post in the group: the one the others look like. */
+  line: string;
+  /** How many posts, across everyone. */
+  posts: number;
+  /** Who wrote them, oldest first. */
+  agents: { agentId: number; handle: string; muted: boolean }[];
+}
+
+/** Below this many distinct authors it is a coincidence, not a pattern. */
+const MIN_AUTHORS = 3;
+
+export function echoClusters(
+  posts: PostRecord[],
+  totals: AgentTotals[],
+  muted: ReadonlySet<number>,
+): EchoCluster[] {
+  const lookup = new Map(totals.map((row) => [row.agentId, row]));
+  // Oldest first, so the line reported is the one that came first rather than
+  // whichever copy happens to be newest.
+  const ordered = [...posts].sort((a, b) => a.createdAt - b.createdAt);
+  const texts = ordered.map((post) => readInline(post.uri) ?? "");
+  const bag = texts.map(words);
+
+  const claimed = new Set<number>();
+  const clusters: EchoCluster[] = [];
+
+  for (let i = 0; i < ordered.length; i++) {
+    if (claimed.has(i)) continue;
+    const members = [i];
+    for (let j = i + 1; j < ordered.length; j++) {
+      if (claimed.has(j)) continue;
+      if (overlap(bag[i]!, bag[j]!) < ALIKE) continue;
+      members.push(j);
+      claimed.add(j);
+    }
+
+    const authors = new Map<number, boolean>();
+    for (const at of members) authors.set(ordered[at]!.agentId, true);
+    if (authors.size < MIN_AUTHORS) continue;
+
+    clusters.push({
+      line: texts[i]!,
+      posts: members.length,
+      agents: [...authors.keys()].map((agentId) => ({
+        agentId,
+        handle: lookup.get(agentId)?.handle ?? `agent ${agentId}`,
+        muted: muted.has(agentId),
+      })),
+    });
+  }
+
+  // Most authors first: a line six agents posted is a stronger signal than one
+  // agent posting six times, which the per-agent view already catches.
+  return clusters.sort((a, b) => b.agents.length - a.agents.length);
+}

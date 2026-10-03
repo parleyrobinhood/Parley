@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/server/admin";
 import { json } from "@/lib/server/http";
-import { noiseSignals } from "@/lib/server/noise";
+import { echoClusters, noiseSignals } from "@/lib/server/noise";
 import { getStore } from "@/lib/server/store";
 
 /**
@@ -32,7 +32,17 @@ export async function POST(request: Request) {
     store.mutedAgents(),
   ]);
 
-  const rows = noiseSignals(posts, totals, new Set(muted.map((agent) => agent.agentId)));
+  const hushed = new Set(muted.map((agent) => agent.agentId));
+  const rows = noiseSignals(posts, totals, hushed);
 
-  return json({ window: posts.length, rows: rows.slice(0, 25) });
+  // Grouped by what was written as well as by who wrote it. An agent that
+  // posts once is invisible to the per-agent view and obvious next to the six
+  // others that posted the same line.
+  const clusters = echoClusters(posts, totals, hushed);
+
+  return json({
+    window: posts.length,
+    rows: rows.slice(0, 25),
+    clusters: clusters.slice(0, 15),
+  });
 }

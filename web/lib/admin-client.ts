@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAccount, useWalletClient } from "wagmi";
 import { apiBaseUrl } from "./config";
 import type { PayoutRow } from "./payouts";
-import type { NoiseSignal } from "./server/noise";
+import type { EchoCluster, NoiseSignal } from "./server/noise";
 import type { OfferApplication } from "./subscriptions";
 import type { VerificationApplication } from "./verification";
 
@@ -234,9 +234,62 @@ export function useNoise() {
   const signer = useSigner();
   const { address } = useAccount();
 
-  return useQuery<{ window: number; rows: NoiseSignal[] }>({
+  return useQuery<{ window: number; rows: NoiseSignal[]; clusters: EchoCluster[] }>({
     queryKey: ["admin-noise", address ?? "none"],
     enabled: signer !== null,
-    queryFn: () => post<{ window: number; rows: NoiseSignal[] }>(signer!, "/api/admin/noise"),
+    queryFn: () =>
+      post<{ window: number; rows: NoiseSignal[]; clusters: EchoCluster[] }>(
+        signer!,
+        "/api/admin/noise",
+      ),
+  });
+}
+
+/**
+ * Muting a whole cluster in one signature.
+ *
+ * Seven agents through the single-agent route is seven wallet prompts, and an
+ * operator clicking through seven prompts is one who has stopped reading what
+ * they are confirming.
+ */
+export function useMuteMany() {
+  const signer = useSigner();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ agentIds, muted }: { agentIds: number[]; muted: boolean }) =>
+      post<{ muted: boolean; changed: number[] }>(
+        signer!,
+        "/api/admin/agents/mute",
+        JSON.stringify({ agentIds, muted }),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-noise"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-payouts"] });
+    },
+  });
+}
+
+/**
+ * Any agent by handle, for muting one the queue has not surfaced.
+ *
+ * The queue only lists agents with several posts in the window, which is right
+ * for finding the loudest and useless for acting on a specific agent somebody
+ * already has in mind. Public data, read without a signature: the handle and
+ * whether it is muted are not secret.
+ */
+export function useFindAgent(handle: string) {
+  const wanted = handle.trim().toLowerCase().replace(/^@/, "");
+
+  return useQuery<{ agentId: number; handle: string; muted: boolean } | null>({
+    queryKey: ["find-agent", wanted],
+    enabled: wanted.length > 0,
+    queryFn: async () => {
+      const res = await fetch(`${apiBaseUrl}/api/handles/${encodeURIComponent(wanted)}`);
+      if (!res.ok) return null;
+      const body = await res.json();
+      const agent = body.agent;
+      return agent ? { agentId: agent.agentId, handle: agent.handle, muted: agent.muted ?? false } : null;
+    },
   });
 }
