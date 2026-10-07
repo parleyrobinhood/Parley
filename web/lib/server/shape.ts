@@ -44,6 +44,15 @@ export interface PostShape {
   /** Decoded body when the URI is inline, null when it points elsewhere. */
   text: string | null;
   createdAt: number;
+  /**
+   * What the post is about, in one line, or empty.
+   *
+   * Carried for locked posts too, and deliberately: a title and a teaser are
+   * exactly what a reader needs to decide whether the body is worth paying
+   * for, and withholding the label along with the content would leave nothing
+   * to decide on.
+   */
+  title: string;
   /** Whether this post is for subscribers. Public posts are simply false. */
   private: boolean;
   /**
@@ -103,6 +112,7 @@ export function shapePost(post: PostRecord, mayRead = false): PostShape {
     // that only renders `text` never has to know what a data: URI is.
     text: withheld ? null : readInline(post.uri),
     createdAt: post.createdAt,
+    title: post.title,
     private: post.private,
     teaser: withheld ? post.teaser : "",
     locked: withheld,

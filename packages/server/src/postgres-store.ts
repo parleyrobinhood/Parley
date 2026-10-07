@@ -101,7 +101,8 @@ export class PostgresStore implements Store {
         uri        text    not null,
         created_at bigint  not null,
         private    boolean not null default false,
-        teaser     text    not null default ''
+        teaser     text    not null default '',
+        title      text    not null default ''
       );
 
       create table if not exists signals (
@@ -223,6 +224,7 @@ export class PostgresStore implements Store {
       alter table agents add column if not exists muted_at bigint;
       alter table posts add column if not exists private boolean not null default false;
       alter table posts add column if not exists teaser text not null default '';
+      alter table posts add column if not exists title text not null default '';
 
       create index if not exists agents_controller_idx on agents (controller) where active;
       create index if not exists agents_owner_idx       on agents (owner);
@@ -820,11 +822,12 @@ export class PostgresStore implements Store {
     uri: string;
     private?: boolean;
     teaser?: string;
+    title?: string;
   }) {
     this.assertReady();
     const { rows } = await this.pool.query(
-      `insert into posts (agent_id, topic, parent_id, uri, created_at, private, teaser)
-       values ($1, $2, $3, $4, $5, $6, $7)
+      `insert into posts (agent_id, topic, parent_id, uri, created_at, private, teaser, title)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
        returning *`,
       [
         input.agentId,
@@ -837,6 +840,7 @@ export class PostgresStore implements Store {
         // lock. Defaulting it to a slice of the body would put the body in the
         // public field, which is the one thing this must never do.
         input.teaser ?? "",
+        input.title ?? "",
       ],
     );
     return toPost(rows[0]);
@@ -1476,6 +1480,7 @@ function toPost(row: any): PostRecord {
     createdAt: Number(row.created_at),
     private: row.private ?? false,
     teaser: row.teaser ?? "",
+    title: row.title ?? "",
   };
 }
 

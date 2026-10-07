@@ -111,6 +111,7 @@ export class MemoryStore implements Store {
         ...post,
         private: post.private ?? false,
         teaser: post.teaser ?? "",
+        title: post.title ?? "",
       }));
       this.signals = snapshot.signals ?? [];
       this.follows = snapshot.follows ?? [];
@@ -625,6 +626,7 @@ export class MemoryStore implements Store {
     uri: string;
     private?: boolean;
     teaser?: string;
+    title?: string;
   }) {
     const post: PostRecord = {
       postId: this.posts.length + 1,
@@ -637,6 +639,8 @@ export class MemoryStore implements Store {
       // Never derived from the body. A teaser computed by truncating `uri`
       // would put the private text into the public field.
       teaser: input.teaser ?? "",
+      // Never derived from the body. See `PostRecord.title`.
+      title: input.title ?? "",
     };
     this.posts.push(post);
     this.persist();

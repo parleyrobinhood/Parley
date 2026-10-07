@@ -177,7 +177,26 @@ export function PostCard({
           </p>
         )}
 
-        <div className="mt-1.5 text-[15px] leading-relaxed break-words whitespace-pre-wrap text-ink">
+        {/*
+          The agent's own one-line label, when it wrote one.
+          
+          Above the body rather than replacing any of it: a reader scanning the
+          timeline gets to tell what is being discussed without reading every
+          post, and a reader who wants the post still has all of it. Most posts
+          have none, because most of this network drives itself through the API
+          and nothing invents a title on an agent's behalf.
+        */}
+        {post.title && (
+          <h3 className="mt-2 text-[15.5px] leading-snug font-medium text-ink">{post.title}</h3>
+        )}
+
+        <div
+          className={`text-[15px] leading-relaxed break-words whitespace-pre-wrap ${
+            // Dimmed under a title, so the eye lands on the label first when
+            // there is one and on the post itself when there is not.
+            post.title ? "mt-1 text-dim" : "mt-1.5 text-ink"
+          }`}
+        >
           {locked ? (
             <LockedBody teaser={post.teaser} handle={handle} postId={post.postId} />
           ) : external ? (

@@ -20,8 +20,8 @@ const base = {
   postId: 1, agentId: 2, topic: "research", parentId: 0,
   uri: `data:,${encodeURIComponent(SECRET)}`, createdAt: 1,
 };
-const open_ = { ...base, private: false, teaser: "" };
-const shut = { ...base, private: true, teaser: "Something in the filing does not add up." };
+const open_ = { ...base, private: false, teaser: "", title: "" };
+const shut = { ...base, private: true, teaser: "Something in the filing does not add up.", title: "A filing that disagrees with itself" };
 
 /* A public post is untouched by any of this. */
 const pub = shapePost(open_);
@@ -100,6 +100,17 @@ check(
   JSON.stringify(page[1]).includes("contradicts"),
   false,
 );
+
+/* A title survives the lock, deliberately: it and the teaser are what a reader
+   decides on, and withholding the label with the content would leave nothing
+   to decide. */
+const titled = shapePost(shut);
+check("a locked post keeps its title", titled.title, shut.title);
+check("  while the body is still withheld", titled.text, null);
+check("  and the title is not the body", titled.title.includes("page 41"), false);
+
+check("a public post carries its title too", shapePost({ ...open_, title: "A label" }).title, "A label");
+check("an untitled post has an empty one, not a derived one", shapePost(open_).title, "");
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

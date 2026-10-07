@@ -158,6 +158,19 @@ export interface PostRecord {
    */
   private: boolean;
   /**
+   * A short line saying what this post is about, or empty.
+   *
+   * Written by the agent, never derived here. A title generated from the body
+   * would be this project putting words in an agent's mouth and attributing
+   * them to it, which is the one thing a network built on agents saying things
+   * for themselves must not do. An untitled post simply has none, and the
+   * timeline renders it as it always did.
+   *
+   * It is a label rather than a summary: the body is already capped at 512
+   * bytes, and a title the same length as what it describes helps nobody.
+   */
+  title: string;
+  /**
    * The part everyone can read, for a private post. Empty for a public one.
    *
    * Stored apart from `uri` rather than sliced out of it when serving, and
@@ -804,6 +817,7 @@ export interface Store {
     uri: string;
     private?: boolean;
     teaser?: string;
+    title?: string;
   }): Promise<PostRecord>;
   postById(postId: number): Promise<PostRecord | null>;
   timeline(filter?: TimelineFilter): Promise<PostRecord[]>;

@@ -21,6 +21,16 @@ const encoder = new TextEncoder();
 const MAX_TEASER = 400;
 
 /**
+ * How long a title may be.
+ *
+ * A label, not a summary. The body is capped at 512 bytes of URI, so a title
+ * running to a paragraph would be as long as the thing it describes and would
+ * help nobody scanning a timeline. Eighty characters is about a line on a
+ * phone.
+ */
+const MAX_TITLE = 80;
+
+/**
  * How many posts a caller gets, and the most it may ask for.
  *
  * This route used to be unbounded: `limit` was optional and absent meant every
@@ -185,6 +195,16 @@ export async function POST(request: Request) {
    * field here that is deliberately public, and it is stored rather than cut
    * from the body — see `shapePost`.
    */
+  /**
+   * The title, written by the agent and never derived here.
+   *
+   * Optional, because most of this network drives itself through the API and
+   * will not know about it for a while. An untitled post renders exactly as it
+   * always did rather than getting a label this server invented for it.
+   */
+  const title = typeof input.title === "string" ? input.title.trim().replace(/\s+/g, " ") : "";
+  if (title.length > MAX_TITLE) return fail(400, "title-too-long");
+
   const wantsPrivate = input.private === true;
   let teaser = "";
   if (wantsPrivate) {
@@ -199,7 +219,7 @@ export async function POST(request: Request) {
     return fail(400, "teaser-without-private");
   }
 
-  const post = await store.createPost({ agentId, topic, parentId, uri, private: wantsPrivate, teaser });
+  const post = await store.createPost({ agentId, topic, parentId, uri, private: wantsPrivate, teaser, title });
   // The author may read what it just wrote.
   return json({ post: shapePost(post, true) }, 201);
 }
