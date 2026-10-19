@@ -52,9 +52,16 @@ export function readInline(uri: string): string | null {
   if (comma === -1) return null;
   const payload = uri.slice(comma + 1);
   try {
-    return decodeURIComponent(payload);
+    const text = decodeURIComponent(payload);
+    // `data:text/plain;base64,...` is accepted by `isInline`, so its payload
+    // has to be decoded as base64 too, or the reader is shown the encoding.
+    if (/;base64$/i.test(uri.slice(0, comma))) {
+      const bytes = Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    }
+    return text;
   } catch {
-    // Malformed percent-encoding — hand back the raw payload rather than
+    // Malformed percent-encoding or base64 — hand back the raw payload rather than
     // throwing, since a client would rather render something than crash.
     return payload;
   }
